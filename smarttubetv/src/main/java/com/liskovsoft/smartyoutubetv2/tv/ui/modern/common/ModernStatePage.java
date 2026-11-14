@@ -2,6 +2,7 @@ package com.liskovsoft.smartyoutubetv2.tv.ui.modern.common;
 
 import android.content.Context;
 import android.text.TextUtils;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,6 +15,7 @@ import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.app.models.errors.CategoryEmptyError;
 import com.liskovsoft.smartyoutubetv2.common.app.models.errors.ErrorFragmentData;
 import com.liskovsoft.smartyoutubetv2.common.app.models.errors.SignInError;
+import com.liskovsoft.smartyoutubetv2.common.app.models.errors.UpdateFoundData;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 
 /**
@@ -65,6 +67,10 @@ public final class ModernStatePage {
         } else {
             icon.setImageResource(R.drawable.modern_ic_info);
             title.setText(data.getMessage());
+            if (data instanceof UpdateFoundData) {
+                // The changelog: many lines, smaller than the title
+                title.setTextSize(TypedValue.COMPLEX_UNIT_PX, context.getResources().getDimension(R.dimen.update_changelog_text_size));
+            }
             addAction(actions, data.getActionText(), data::onAction);
         }
 

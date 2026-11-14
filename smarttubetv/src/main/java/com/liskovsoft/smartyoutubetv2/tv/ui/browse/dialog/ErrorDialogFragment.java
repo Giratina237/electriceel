@@ -14,6 +14,7 @@ import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.app.models.errors.CategoryEmptyError;
 import com.liskovsoft.smartyoutubetv2.common.app.models.errors.ErrorFragmentData;
 import com.liskovsoft.smartyoutubetv2.common.app.models.errors.SignInError;
+import com.liskovsoft.smartyoutubetv2.common.app.models.errors.UpdateFoundData;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 import com.liskovsoft.smartyoutubetv2.tv.ui.mod.fragments.ErrorSupportFragment;
 
@@ -65,6 +66,11 @@ public class ErrorDialogFragment extends ErrorSupportFragment implements BrowseS
         }
 
         setMessage(mDialogData.getMessage());
+
+        if (mDialogData instanceof UpdateFoundData) {
+            // The changelog: the same size as in the modern skin
+            setMessageTextSize(getResources().getDimension(R.dimen.update_changelog_text_size));
+        }
 
         TextView mTextView = (TextView) Helpers.getField(this, "mTextView");
         ImageView mImageView = (ImageView) Helpers.getField(this, "mImageView");
