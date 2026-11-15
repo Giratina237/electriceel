@@ -1,6 +1,7 @@
 package com.google.android.exoplayer2.source.sabr.manifest;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -82,13 +83,57 @@ public class SabrManifestParserTest {
     }
 
     /**
-     * A live stream's formats aren't its length
+     * A live stream's formats aren't its length: it spans the DASH live manifest's 48 hours from its start segment. Unset, the player
+     * had no duration (SABR representations have no index), and the app's live position is the player's duration less a buffer.
      */
     @Test
-    public void aLiveStreamIsntGivenItsFormatsLength() {
+    public void aLiveStreamSpansTheDashLiveWindow() {
         MediaItemFormatInfo formatInfo = videoFormatInfo("0", true, format(1_971_792));
 
-        assertEquals(C.TIME_UNSET, new SabrManifestParser().parse(formatInfo).durationMs);
+        SabrManifest manifest = new SabrManifestParser().parse(formatInfo);
+
+        assertEquals(LIVE_WINDOW_MS, manifest.durationMs);
+        assertTrue(manifest.isLive());
+    }
+
+    /**
+     * The server's times are the media's: less the start segment's (as the DASH live manifest's), they're the timeline's
+     */
+    @Test
+    public void aLiveStreamsTimelineStartsAtItsStartSegment() {
+        MediaItemFormatInfo formatInfo = videoFormatInfo("0", true, liveAudio(2));
+        when(formatInfo.getStartSegmentTimeUs()).thenReturn(START_SEGMENT_TIME_US);
+        when(formatInfo.getStartSegmentNum()).thenReturn(391_522);
+        when(formatInfo.getSegmentDurationUs()).thenReturn(4_999_839);
+
+        SabrManifest manifest = new SabrManifestParser().parse(formatInfo);
+
+        Representation audio = manifest.getPeriod(0).adaptationSets.get(0).representations.get(0);
+        assertEquals(START_SEGMENT_TIME_US, audio.presentationTimeOffsetUs);
+        assertEquals(2, manifest.liveSegmentTargetDurationSec);
+    }
+
+    @Test
+    public void aLiveSegmentsTargetIsTheFormatsElseTheHeadsAverage() {
+        MediaItemFormatInfo average = videoFormatInfo("0", true, liveAudio(0));
+        when(average.getSegmentDurationUs()).thenReturn(999_986);
+        assertEquals(1, new SabrManifestParser().parse(average).liveSegmentTargetDurationSec);
+
+        MediaItemFormatInfo none = videoFormatInfo("0", true, liveAudio(0));
+        assertEquals(5, new SabrManifestParser().parse(none).liveSegmentTargetDurationSec);
+    }
+
+    /**
+     * A finished stream is a video: its length, no live timeline
+     */
+    @Test
+    public void aFinishedStreamIsAVideo() {
+        MediaItemFormatInfo formatInfo = videoFormatInfo("2031", false, format(2_030_910));
+
+        SabrManifest manifest = new SabrManifestParser().parse(formatInfo);
+
+        assertEquals(2_030_910, manifest.durationMs);
+        assertEquals(SabrManifest.NOT_LIVE, manifest.liveSegmentTargetDurationSec);
     }
 
     private static MediaItemFormatInfo videoFormatInfo(String lengthSeconds, boolean isLive, MediaFormat... formats) {
@@ -108,6 +153,23 @@ public class SabrManifestParserTest {
         when(formatInfo.getAdaptiveFormats()).thenReturn(Arrays.asList(formats));
 
         return formatInfo;
+    }
+
+    private static final long LIVE_WINDOW_MS = 48 * 60 * 60 * 1_000L;
+    private static final long START_SEGMENT_TIME_US = 1_957_547_035_080L;
+
+    /**
+     * A live stream's audio format, as TV answers it (no URL, no index range)
+     */
+    private static MediaFormat liveAudio(int targetDurationSec) {
+        MediaFormat format = mock(MediaFormat.class);
+        when(format.getITag()).thenReturn("140");
+        when(format.getMimeType()).thenReturn("audio/mp4; codecs=\"mp4a.40.2\"");
+        when(format.getTargetDurationSec()).thenReturn(targetDurationSec);
+        when(format.getGlobalSegmentList()).thenReturn(null); // a mock's empty list is an OTF format's
+        when(format.getSegmentUrlList()).thenReturn(null);
+
+        return format;
     }
 
     /**

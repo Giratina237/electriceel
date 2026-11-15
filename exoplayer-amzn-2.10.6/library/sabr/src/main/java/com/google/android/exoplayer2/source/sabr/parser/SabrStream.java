@@ -62,8 +62,8 @@ public class SabrStream {
             UMPPartId.SABR_REDIRECT,
             UMPPartId.FORMAT_INITIALIZATION_METADATA,
             UMPPartId.NEXT_REQUEST_POLICY,
-            //UMPPartId.LIVE_METADATA,
-            //UMPPartId.SABR_SEEK,
+            UMPPartId.LIVE_METADATA, // a live stream's head and seekable range, in each response
+            UMPPartId.SABR_SEEK, // e.g. to a live stream's head, when the time asked for is out of its range
             UMPPartId.SABR_ERROR,
             UMPPartId.SABR_CONTEXT_UPDATE,
             UMPPartId.SABR_CONTEXT_SENDING_POLICY,
@@ -279,6 +279,25 @@ public class SabrStream {
         noNewSegmentsTracker.reset();
     }
 
+    /**
+     * A live stream's media headers have no duration: it's estimated from the target duration (see SabrProcessor#processMediaHeader).
+     * Known from the format info before the first response, whose live metadata says it too.
+     */
+    public void setLive(boolean isLive) {
+        processor.setLive(isLive);
+    }
+
+    public boolean isLive() {
+        return processor.isLive();
+    }
+
+    /**
+     * Of a live stream, the newest segment the server has (see LiveMetadata), -1 before it says
+     */
+    public long getLiveHeadSequenceNumber() {
+        return processor.getLiveHeadSequenceNumber();
+    }
+
     public void reset(int iTag) {
         processor.reset(iTag);
     }
@@ -365,6 +384,9 @@ public class SabrStream {
                 return null;
             case UMPPartId.RELOAD_PLAYER_RESPONSE:
                 return processReloadPlayerResponse(part);
+            case UMPPartId.LIVE_METADATA:
+            case UMPPartId.SABR_SEEK:
+                return null; // parts of their own (see parseMultiPart)
         }
 
         if (!contains(IGNORED_PARTS, part.partId)) {

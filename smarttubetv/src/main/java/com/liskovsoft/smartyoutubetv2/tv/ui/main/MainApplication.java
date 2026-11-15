@@ -28,6 +28,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.views.ViewManager;
 import com.liskovsoft.smartyoutubetv2.common.app.views.WebBrowserView;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.AppExits;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LastState;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.ExoMediaSourceFactory;
 import com.liskovsoft.smartyoutubetv2.common.prefs.HomeScreenPlaylistsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.NetworkData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
@@ -104,6 +105,8 @@ public class MainApplication extends MultiDexApplication implements Configuratio
 
         // The channels can be updated with nothing else of the app running
         HomeScreenPlaylistsData.registerChannelsSource(this);
+        // A live stream with only a SABR URL is asked its head over it, before the player exists (e.g. a prefetch)
+        ExoMediaSourceFactory.installSabrLiveHead();
     }
 
     /**

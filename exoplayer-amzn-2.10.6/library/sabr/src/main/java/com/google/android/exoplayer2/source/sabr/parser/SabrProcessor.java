@@ -67,7 +67,7 @@ public class SabrProcessor {
     private final Map<String, SelectedFormat> selectedFormats;
     private Status streamProtectionStatus;
     private boolean isLive;
-    private LiveMetadata liveMetadata;
+    private volatile LiveMetadata liveMetadata; // read on the playback thread too (see getLiveHeadSequenceNumber)
     private long totalDurationMs;
     private NextRequestPolicy nextRequestPolicy;
     private final Map<Integer, SabrContextUpdate> sabrContextUpdates;
@@ -310,7 +310,15 @@ public class SabrProcessor {
         }
 
         if (!segment.mediaHeader.getIsInitSeg()) {
-            initializedFormats.put(segment.mediaHeader.getItag(), segment.mediaHeader);
+            MediaHeader mediaHeader = segment.mediaHeader;
+
+            // A live segment's header has no duration: the estimate is kept (see processMediaHeader), or the next request asks for the
+            // time this segment starts at (see getSegmentStartTimeMs)
+            if (isLive() && !mediaHeader.hasDurationMs() && segment.durationMs > 0) {
+                mediaHeader = mediaHeader.toBuilder().setDurationMs(segment.durationMs).build();
+            }
+
+            initializedFormats.put(mediaHeader.getItag(), mediaHeader);
         }
 
         Log.d(TAG, "MediaEnd for %s (sequence %s, data length = %s)",
@@ -639,6 +647,11 @@ public class SabrProcessor {
 
     public boolean isLive() {
         return liveMetadata != null || isLive;
+    }
+
+    public long getLiveHeadSequenceNumber() {
+        LiveMetadata metadata = liveMetadata;
+        return metadata != null && metadata.hasHeadSequenceNumber() ? metadata.getHeadSequenceNumber() : -1;
     }
 
     public void setLive(boolean isLive) {

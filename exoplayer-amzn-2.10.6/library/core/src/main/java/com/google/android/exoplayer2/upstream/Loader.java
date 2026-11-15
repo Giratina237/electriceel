@@ -193,6 +193,21 @@ public final class Loader implements LoaderErrorThrower {
    */
   private static final ThreadLocal<Loadable> currentLoadable = new ThreadLocal<>();
 
+  /**
+   * MOD: told the thread of a load canceled while it runs (see setCancelListener)
+   */
+  public interface CancelListener {
+
+    /**
+     * On the thread that canceled the load (the player's): quick, and never throws
+     *
+     * @param loadThread the loader's thread, still in the load
+     */
+    void onLoadCanceled(Thread loadThread);
+  }
+
+  @Nullable private static volatile CancelListener cancelListener;
+
   private final ExecutorService downloadExecutorService;
 
   private LoadTask<? extends Loadable> currentTask;
@@ -205,6 +220,15 @@ public final class Loader implements LoaderErrorThrower {
   @Nullable
   public static Loadable getCurrentLoadable() {
     return currentLoadable.get();
+  }
+
+  /**
+   * MOD: a canceled load's thread is interrupted, which ends a wait on a lock or a sleep, but not a socket read: an HTTP stack that
+   * blocks in one (OkHttp's) held a canceled load until the server sent data or the read timed out (1.6-5 s for a seek at a live
+   * stream's head, against 0.04-0.09 s for Cronet's, on 2026-11-15). The listener aborts the thread's request instead.
+   */
+  public static void setCancelListener(@Nullable CancelListener listener) {
+    cancelListener = listener;
   }
 
   /**
@@ -382,8 +406,13 @@ public final class Loader implements LoaderErrorThrower {
       } else {
         canceled = true;
         loadable.cancelLoad();
-        if (executorThread != null) {
-          executorThread.interrupt();
+        Thread thread = executorThread;
+        if (thread != null) {
+          thread.interrupt();
+          CancelListener listener = cancelListener;
+          if (listener != null) {
+            listener.onLoadCanceled(thread);
+          }
         }
       }
       if (released) {

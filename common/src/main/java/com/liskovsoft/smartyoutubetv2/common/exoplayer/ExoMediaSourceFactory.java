@@ -47,7 +47,9 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.googlecommon.common.helpers.DefaultHeaders;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CancelableCalls;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SabrHostPrewarmer;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SabrLiveHeadFetcher;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -81,11 +83,21 @@ public class ExoMediaSourceFactory {
     private DataSource.Factory mSabrMediaDataSourceFactory;
     private DataSource.Factory mDashMediaDataSourceFactory;
 
+    /**
+     * At the process start, before any video's formats are fetched: a live stream whose formats have no URLs is asked its head over
+     * SABR (see SabrLiveHead)
+     */
+    public static void installSabrLiveHead() {
+        SabrLiveHeadFetcher.install();
+    }
+
     public ExoMediaSourceFactory(Context context) {
         mContext = context;
         ValidatedNetworkState.install(context);
         // The host a SABR stream is sent to is connected to while the response that said so is read
         SabrHostPrewarmer.init(context);
+        // A canceled load's OkHttp call is aborted, e.g. on a seek (see CancelableCalls)
+        CancelableCalls.install();
     }
 
     public MediaSource fromSabrFormatInfo(MediaItemFormatInfo formatInfo) {
@@ -317,7 +329,7 @@ public class ExoMediaSourceFactory {
                 .readTimeout(readTimeoutMs, TimeUnit.MILLISECONDS)
                 .eventListenerFactory(Connections.LISTENER)
                 .build();
-        OkHttpDataSourceFactory dataSourceFactory = new OkHttpDataSourceFactory(client, USER_AGENT,
+        OkHttpDataSourceFactory dataSourceFactory = new OkHttpDataSourceFactory(new CancelableCalls(client), USER_AGENT,
                 bandwidthMeter);
         addCommonHeaders(dataSourceFactory);
         return dataSourceFactory;

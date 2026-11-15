@@ -31,9 +31,29 @@ public final class SabrExtractorInput implements ExtractorInput {
      * The init chunk's response was read up to the end of its init segment: the rest isn't
      */
     private boolean isInitEnded;
+    /**
+     * Each live segment is read from the response's start position (see startsNextFile)
+     */
+    private final boolean isLiveSegmentAFile;
+    /**
+     * Where the response's reading started: the position each live segment is read from
+     */
+    private long basePosition;
+    /**
+     * Of the response's last segment read, -1 for none yet
+     */
+    private long lastSequenceNumber = -1;
 
     public SabrExtractorInput(SabrStream sabrStream) {
+        this(sabrStream, false);
+    }
+
+    /**
+     * @param isLiveSegmentAFile a live segment of the format is a whole file (its own header), as a live WebM segment is
+     */
+    public SabrExtractorInput(SabrStream sabrStream, boolean isLiveSegmentAFile) {
         this.sabrStream = sabrStream;
+        this.isLiveSegmentAFile = isLiveSegmentAFile;
     }
 
     /** Should be called before passing the extractor to a handler */
@@ -50,6 +70,8 @@ public final class SabrExtractorInput implements ExtractorInput {
         this.input = input;
         position = input.getPosition();
         startPosition = position;
+        basePosition = position;
+        lastSequenceNumber = -1;
         remaining = C.LENGTH_UNSET;
         isInitEnded = false;
     }
@@ -67,6 +89,7 @@ public final class SabrExtractorInput implements ExtractorInput {
         data = null;
         isInitEnded = false;
         position = C.POSITION_UNSET;
+        lastSequenceNumber = -1;
         remaining = C.LENGTH_UNSET;
     }
 
@@ -212,6 +235,12 @@ public final class SabrExtractorInput implements ExtractorInput {
 
             if (sabrPart instanceof MediaSegmentDataSabrPart) {
                 data = (MediaSegmentDataSabrPart) sabrPart;
+
+                if (startsNextFile(data)) {
+                    position = basePosition;
+                }
+
+                lastSequenceNumber = data.sequenceNumber;
                 startPosition = position;
                 break;
             }
@@ -228,6 +257,17 @@ public final class SabrExtractorInput implements ExtractorInput {
                 throwIfAttestationRequired((PoTokenStatusSabrPart) sabrPart);
             }
         }
+    }
+
+    /**
+     * A live segment after the response's first: read from the response's start position, as DASH reads each from its own file's.
+     * A live WebM segment has its own EBML header and Segment: read on from the first's end, the extractor refused the second Segment
+     * (Multiple Segment elements not supported), the chunk ended with its first segment and the rest of the response was thrown away,
+     * then asked for again. On 2026-11-15, 5 of a 4K stream's responses after each start or seek: ~3 MB thrown away each.
+     */
+    private boolean startsNextFile(MediaSegmentDataSabrPart part) {
+        return isLiveSegmentAFile && sabrStream.isLive() && !part.isInitSegment
+                && lastSequenceNumber != -1 && part.sequenceNumber != lastSequenceNumber;
     }
 
     private interface ForwardCallback {

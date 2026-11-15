@@ -20,13 +20,13 @@ public class SabrMatroskaAdapter extends MatroskaExtractor {
 
     public SabrMatroskaAdapter(SabrStream sabrStream) {
         this.sabrStream = sabrStream;
-        this.extractorInput = new SabrExtractorInput(sabrStream);
+        this.extractorInput = new SabrExtractorInput(sabrStream, true); // a live WebM segment is a whole WebM file
     }
 
     public SabrMatroskaAdapter(int flags, SabrStream sabrStream) {
         super(flags);
         this.sabrStream = sabrStream;
-        this.extractorInput = new SabrExtractorInput(sabrStream);
+        this.extractorInput = new SabrExtractorInput(sabrStream, true); // a live WebM segment is a whole WebM file
     }
 
     @Override

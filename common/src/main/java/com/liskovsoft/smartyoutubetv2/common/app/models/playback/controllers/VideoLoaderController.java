@@ -553,7 +553,7 @@ public class VideoLoaderController extends BasePlayerController {
                 mFormatProtocol = PlayerFailure.PROTOCOL_DASH;
                 player.openDash(formatInfo);
             }
-        } else if (acceptAdaptiveFormats(formatInfo) && formatInfo.containsSabrFormats() && !formatInfo.isLive()) { // TODO: SABR live not implemented yet
+        } else if (acceptAdaptiveFormats(formatInfo) && formatInfo.containsSabrFormats()) {
             Log.d(TAG, "Loading video in sabr format...");
             mFormatProtocol = PlayerFailure.PROTOCOL_SABR;
             player.openSabr(formatInfo);

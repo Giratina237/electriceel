@@ -40,6 +40,7 @@ public class SabrManifestParser {
     private static final String NULL_INDEX_RANGE = "0-0";
     private static final String NULL_CONTENT_LENGTH = "0";
     private static final int MAX_DURATION_SEC = 48 * 60 * 60;
+    private static final int DEFAULT_LIVE_SEGMENT_DURATION_SEC = 5;
     private MediaItemFormatInfo mFormatInfo;
     private Set<MediaFormat> mMP4Videos;
     private Set<MediaFormat> mWEBMVideos;
@@ -91,22 +92,44 @@ public class SabrManifestParser {
                 formatInfo.getPoToken(),
                 formatInfo.getVideoId(),
                 createClientInfo(formatInfo),
-                formatInfo.getVisitorCookie());
+                formatInfo.getVisitorCookie(),
+                formatInfo.isLive() ? getLiveSegmentTargetDurationSec(formatInfo) : SabrManifest.NOT_LIVE);
+    }
+
+    /**
+     * A live segment's length the server's media headers don't give (see SabrProcessor#processMediaHeader): the formats' target (1 s,
+     * 2 s or 5 s by the stream's latency), else the average the dash info took from the head (see MediaItemFormatInfo#getSegmentDurationUs),
+     * else a normal latency stream's
+     */
+    private static int getLiveSegmentTargetDurationSec(MediaItemFormatInfo formatInfo) {
+        if (formatInfo.getAdaptiveFormats() != null) {
+            for (MediaFormat format : formatInfo.getAdaptiveFormats()) {
+                if (format.getTargetDurationSec() > 0) {
+                    return format.getTargetDurationSec();
+                }
+            }
+        }
+
+        int segmentDurationUs = formatInfo.getSegmentDurationUs();
+
+        return segmentDurationUs > 0 ? Math.max(1, Math.round(segmentDurationUs / 1_000_000f)) : DEFAULT_LIVE_SEGMENT_DURATION_SEC;
     }
 
     /**
      * A video's: its media's, to the ms (see MediaItemFormatInfo#getMediaDurationMs()). Its whole seconds (lengthSeconds) are
-     * rounded: past the end, or short of it. A live stream's: its lengthSeconds, as before
+     * rounded: past the end, or short of it. A live stream's: the 48 hours its timeline spans from the start segment, as the DASH
+     * live manifest's segments do (see parseSegmentTemplate). Unset, the player had no duration: SABR representations have no index
+     * to take it from (see SabrMediaSource.PeriodSeekInfo), and the app's live position is the player's duration less a buffer.
      */
     private static long getDurationMs(MediaItemFormatInfo formatInfo) {
+        if (formatInfo.isLive()) {
+            return MAX_DURATION_SEC * 1_000L;
+        }
+
         long lenSeconds = Helpers.parseLong(formatInfo.getLengthSeconds());
 
         if (lenSeconds <= 0) {
             return C.TIME_UNSET;
-        }
-
-        if (formatInfo.isLive()) {
-            return lenSeconds * 1_000;
         }
 
         long durationMs = formatInfo.getMediaDurationMs();
@@ -236,10 +259,12 @@ public class SabrManifestParser {
         //long segmentCount = (long) lengthSeconds / targetDurationSec * 10000 / 9999;
         //int segmentCount = (int)(lengthSeconds * (long) unitsPerSecond / segmentDurationUnits);
         int segmentCount = (int) Math.ceil(lengthSeconds * (double) unitsPerSecond / segmentDurationUnits);
-        // Increase offset a bit to compensate previous tweaks
-        // Streams to check:
-        // https://www.youtube.com/watch?v=drdemkJpgao
-        long offsetUnits = (long) segmentDurationUnits * mFormatInfo.getStartSegmentNum();
+        // The start segment's media time, as the DASH live manifest's (see DashManifestParser2): the server's times (requests, media
+        // headers, samples) less it are the timeline's, so a live stream plays at the same positions over SABR as over DASH. Not the
+        // number × the average duration, which is seconds off on a stream with millions of segments (see
+        // MediaItemFormatInfo#getStartSegmentTimeUs). The units are microseconds: not scaled, the product overflows on a long stream.
+        long startSegmentTimeUs = mFormatInfo.getStartSegmentTimeUs();
+        long offsetUnits = startSegmentTimeUs >= 0 ? startSegmentTimeUs : (long) segmentDurationUnits * mFormatInfo.getStartSegmentNum();
 
         long timescale = unitsPerSecond;
         long presentationTimeOffset = offsetUnits;
@@ -417,7 +442,8 @@ public class SabrManifestParser {
 
         SegmentBase segmentBase = null;
 
-        if (MediaFormatUtils.isLiveMedia(baseUrl)) {
+        // Of the stream, not its URL: the SABR URL of a live stream doesn't say it (no live=1), and a finished one's may
+        if (mFormatInfo.isLive()) {
             segmentBase = parseSegmentTemplate(mediaFormat);
         } else if (mediaFormat.getSegmentUrlList() != null) {
             segmentBase = parseSegmentList(mediaFormat);
@@ -734,9 +760,14 @@ public class SabrManifestParser {
         return C.TRACK_TYPE_UNKNOWN;
     }
 
-    private ClientInfo createClientInfo(MediaItemFormatInfo formatInfo) {
-        MediaItemFormatInfo.ClientInfo clientInfo = formatInfo.getClientInfo();
+    private static ClientInfo createClientInfo(MediaItemFormatInfo formatInfo) {
+        return createClientInfo(formatInfo.getClientInfo());
+    }
 
+    /**
+     * Of the SABR requests (see StreamerContext)
+     */
+    public static ClientInfo createClientInfo(MediaItemFormatInfo.ClientInfo clientInfo) {
         return ClientInfo.newBuilder()
                 .setClientName(ClientName.valueOf(clientInfo.getClientName().toUpperCase()))
                 .setClientVersion(clientInfo.getClientVersion())

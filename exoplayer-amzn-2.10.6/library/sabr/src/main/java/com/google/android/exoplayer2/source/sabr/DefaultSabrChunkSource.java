@@ -39,6 +39,7 @@ import com.google.android.exoplayer2.source.sabr.parser.models.CaptionSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.FormatSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.VideoSelector;
 import com.google.android.exoplayer2.source.sabr.protos.misc.FormatId;
+import com.google.android.exoplayer2.source.sabr.protos.videostreaming.MediaHeader;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
@@ -50,6 +51,7 @@ import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -89,7 +91,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             if (transferListener != null) {
                 dataSource.addTransferListener(transferListener);
             }
-            return new DefaultSabrChunkSource(
+            DefaultSabrChunkSource source = new DefaultSabrChunkSource(
                     manifestLoaderErrorThrower,
                     manifest,
                     periodIndex,
@@ -102,6 +104,8 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                     enableEventMessageTrack,
                     closedCaptionFormats,
                     playerEmsgHandler);
+            source.enableLivePrefetch(dataSourceFactory, transferListener);
+            return source;
         }
 
     }
@@ -113,6 +117,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
      * Of a media segment, about: the first media chunk's length, before any segment of its format is received
      */
     private static final long DEFAULT_SEGMENT_DURATION_MS = 5_000;
+    /**
+     * Of a live stream at its head, the wait for its next segment (see maybeWaitForLiveSegment)
+     */
+    private static final long MIN_LIVE_WAIT_MS = 250;
+    private static final long MAX_LIVE_WAIT_MS = 10_000;
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final int[] adaptationSetIndices;
     private final int trackType;
@@ -136,6 +145,27 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     private final Map<String, String> sabrHeaders;
     private int nexChunkIdx = -1;
     private long pendingSeekTimeUs = C.TIME_UNSET;
+    /**
+     * Of a live stream: the next media chunk's request isn't sent before (elapsed realtime), see maybeWaitForLiveSegment
+     */
+    private long nextLiveLoadTimeMs = C.TIME_UNSET;
+    /**
+     * Of the last media chunk's request: its format's itag and the sequence number of the segment received last before it
+     */
+    private int liveRequestItag = -1;
+    private long liveRequestSequenceNumber = -1;
+    /**
+     * Of a live stream with short segments (see SabrLivePrefetcher), null otherwise
+     */
+    @Nullable private SabrLivePrefetcher livePrefetcher;
+    /**
+     * How many segments of the format the last response held (see maybePrefetch): 1 till one says, and after a seek
+     */
+    private int liveSegmentsPerResponse = 1;
+    /**
+     * The newest segment's number when the last chunk was made, -1 for none since a seek
+     */
+    private long livePrefetchSequenceNumber = -1;
 
     /**
      * @param manifestLoaderErrorThrower Throws errors affecting loading of manifests.
@@ -210,6 +240,16 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         }
         this.sabrStream = stream;
         this.sampleDeduplicator = stream != null ? new SabrSampleDeduplicator(stream) : null;
+    }
+
+    /**
+     * Of a live stream with segments of up to 2 s: the next ones are asked for while the player loads one (see SabrLivePrefetcher)
+     */
+    /* package */ void enableLivePrefetch(DataSource.Factory dataSourceFactory, @Nullable TransferListener transferListener) {
+        if (sabrStream != null && manifest.isLive()
+                && manifest.liveSegmentTargetDurationSec <= SabrLivePrefetcher.MAX_SEGMENT_DURATION_SEC) {
+            livePrefetcher = new SabrLivePrefetcher(dataSourceFactory, transferListener);
+        }
     }
 
     @Override
@@ -435,6 +475,9 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         //}
 
         long seekTimeUs = queue.isEmpty() ? loadPositionUs : C.TIME_UNSET;
+        if (queue.isEmpty()) {
+            nextLiveLoadTimeMs = C.TIME_UNSET; // a seek asks for another time, at once
+        }
         if (queue.isEmpty() && sampleDeduplicator != null) {
             sampleDeduplicator.reset(); // nothing is queued
         }
@@ -491,6 +534,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         if (playerTrackEmsgHandler != null) {
             playerTrackEmsgHandler.onChunkLoadCompleted(chunk);
         }
+        maybeWaitForLiveSegment(chunk);
         // FIX: the connection broke in the middle of the response, which ended the chunk early (see
         // SabrFragmentedMp4Adapter, SabrMatroskaAdapter). A media network that stalls is left as after a failed load.
         IOException responseError = sabrStream != null ? sabrStream.pollResponseError() : null;
@@ -560,6 +604,113 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             resetSampleDeduplicator(); // the chunk is discarded with its samples
         }
         return blacklisted;
+    }
+
+    /**
+     * A live stream's request for the segment after its newest is answered with no media while that segment doesn't exist (at once,
+     * or after the server held it a few seconds). Asked again at once, the same: requests in a loop, tens a second (seen 2026-11-15,
+     * the audio track's, until the app reloaded the stream). The next one waits the backoff the server asks for (see
+     * NextRequestPolicy), else a quarter of a segment.
+     */
+    private void maybeWaitForLiveSegment(Chunk chunk) {
+        if (!manifest.isLive() || sabrStream == null || !(chunk instanceof MediaChunk) || liveRequestItag == -1) {
+            return;
+        }
+
+        int itag = liveRequestItag;
+        liveRequestItag = -1;
+
+        // After a seek, the stream has none until one comes (see SabrStream#reset)
+        if (sabrStream.hasSegmentStartTime(itag) && getLastSequenceNumber(itag) > liveRequestSequenceNumber) {
+            return; // a new segment came
+        }
+
+        int backoffMs = sabrStream.getBackoffTimeMs();
+        long waitMs = backoffMs > 0
+                ? Math.min(backoffMs, MAX_LIVE_WAIT_MS)
+                : Math.max(MIN_LIVE_WAIT_MS, manifest.liveSegmentTargetDurationSec * 1_000L / 4);
+        nextLiveLoadTimeMs = SystemClock.elapsedRealtime() + waitMs;
+        Log.d(TAG, "No new live segment: the next request waits " + waitMs + " ms");
+    }
+
+    /**
+     * Of a live stream with short segments: the request for the next segment is served by its response asked for ahead, if any, and
+     * the ones after it are asked for, up to the head (see SabrLivePrefetcher)
+     *
+     * @return the data source of the chunk's request
+     */
+    private DataSource maybePrefetch(int trackType, int iTag, boolean isSeek) {
+        SabrLivePrefetcher prefetcher = livePrefetcher;
+
+        if (prefetcher == null || sabrStream == null) {
+            return dataSource;
+        }
+
+        if (isSeek) {
+            prefetcher.clear(); // another time
+            liveSegmentsPerResponse = 1;
+            livePrefetchSequenceNumber = -1;
+            return dataSource;
+        }
+
+        MediaHeader last = sabrStream.getInitializedFormat(iTag);
+
+        if (last == null || !sabrStream.hasSegmentStartTime(iTag) || !last.hasSequenceNumber()) {
+            return dataSource;
+        }
+
+        updateLiveSegmentsPerResponse(last.getSequenceNumber());
+        DataSource chunkDataSource = prefetcher.dataSourceFor(iTag, last.getSequenceNumber() + 1L, dataSource);
+        long head = sabrStream.getLiveHeadSequenceNumber();
+        long targetDurationMs = manifest.liveSegmentTargetDurationSec * 1_000L;
+        int segmentsPerResponse = liveSegmentsPerResponse;
+        int maxPrefetchBytes = SabrLivePrefetcher.getMaxResponseBytes(
+                trackSelection.getSelectedFormat().bitrate, targetDurationMs, segmentsPerResponse);
+
+        for (int k = 1; k <= SabrLivePrefetcher.PREFETCH_COUNT; k++) {
+            // A response holds the segments after the one asked for too (3 behind the head of a 1 s stream): the ones asked for ahead
+            // are as far apart. One by one, each segment came in 3 responses, and 2 of them weren't read: 3x the bytes for as long as
+            // the player stayed behind the head (2026-11-15).
+            long offset = (long) k * segmentsPerResponse;
+            long sequenceNumber = last.getSequenceNumber() + 1L + offset;
+
+            if (head < 0 || sequenceNumber > head) {
+                break; // a later one would be held until it exists
+            }
+
+            // As if the segment before it were the newest one received: its number, and its start about where it should be
+            MediaHeader before = last.toBuilder()
+                    .setSequenceNumber((int) (sequenceNumber - 1))
+                    .setStartMs(last.getStartMs() + offset * targetDurationMs)
+                    .build();
+            DataSpec dataSpec = new DataSpec(
+                    Uri.parse(manifest.getRequestUrl(trackType)),
+                    DataSpec.HTTP_METHOD_POST,
+                    manifest.createLiveRequestAfter(trackType, before).toByteArray(),
+                    0, 0, C.LENGTH_UNSET, null, 0, sabrHeaders);
+            prefetcher.prefetch(iTag, sequenceNumber, dataSpec, maxPrefetchBytes);
+        }
+
+        return chunkDataSource;
+    }
+
+    /**
+     * The segments the last chunk brought: since the last chunk was made, one loaded (a track loads one at a time). One that brought
+     * none (failed, or at the head) says nothing.
+     */
+    private void updateLiveSegmentsPerResponse(long lastSequenceNumber) {
+        long previous = livePrefetchSequenceNumber;
+        livePrefetchSequenceNumber = lastSequenceNumber;
+
+        if (previous != -1 && lastSequenceNumber > previous) {
+            liveSegmentsPerResponse = (int) Math.min(lastSequenceNumber - previous, SabrLivePrefetcher.MAX_SEGMENTS_PER_RESPONSE);
+        }
+    }
+
+    private long getLastSequenceNumber(int itag) {
+        MediaHeader mediaHeader = sabrStream != null ? sabrStream.getInitializedFormat(itag) : null;
+
+        return mediaHeader != null && mediaHeader.hasSequenceNumber() ? mediaHeader.getSequenceNumber() : -1;
     }
 
     private void resetSampleDeduplicator() {
@@ -703,6 +854,9 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
         SabrStream sabrStream = Assertions.checkNotNull(this.sabrStream);
         sabrStream.setInitRequest(false);
+        // A canceled load's (its call aborted by the seek, "Socket closed", see CancelableCalls in the app): not the new chunk's, whose
+        // completion would take it as its own, and leave the media network for a chunk that came empty
+        sabrStream.pollResponseError();
         boolean isInit = nexChunkIdx == -1;
         FormatId formatId = formatSelector.getSelectedFormatId();
         int iTag = formatId != null ? formatId.getItag() : -1;
@@ -735,7 +889,18 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
         boolean isSabrTimeSet = startTimeMs >= 0 && durationMs > 0;
 
-        long startTimeUs = isSabrTimeSet ? startTimeMs * 1_000L : C.TIME_UNSET;
+        // The server's times are the media's: a live stream's timeline starts at its start segment's (see SabrManifestParser), a
+        // video's at 0
+        long presentationTimeOffsetUs = representation.presentationTimeOffsetUs;
+        long startTimeUs = isSabrTimeSet ? startTimeMs * 1_000L - presentationTimeOffsetUs : C.TIME_UNSET;
+
+        // FIX: of a live stream, with no segment of the format received since the seek (see SabrStream#reset): the time asked for,
+        // not the media's 0, which is far before the timeline's start (a negative buffered duration)
+        if (presentationTimeOffsetUs != 0 && !sabrStream.hasSegmentStartTime(iTag)) {
+            long requestedTimeUs = seekTimeUs != C.TIME_UNSET ? seekTimeUs : pendingSeekTimeUs;
+            startTimeUs = requestedTimeUs != C.TIME_UNSET ? requestedTimeUs : 0;
+        }
+
         long endTimeUs = isSabrTimeSet ? startTimeUs + (durationMs * 1_000L) : C.TIME_UNSET;
         long clippedEndTimeUs = C.TIME_UNSET;
         int segmentCount = C.INDEX_UNSET; // TODO: replace with SABR value?
@@ -744,13 +909,25 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         //String baseUrl = representation.baseUrl;
         //baseUrl = Utils.updateQuery(baseUrl, "rn", sabrStream.getIncSabrRequestNumber());
 
+        // A live stream at its head: the next segment doesn't exist yet. The chunk is loaded now, its request waits: a chunk source
+        // that gives none isn't asked again until a load ends (the player stalled). Also a seek retried after an answer with no media
+        // (see getNextChunk): the seek's target may be the head's next segment.
+        DataSource chunkDataSource = maybePrefetch(trackType, iTag, isSeek);
+        if (nextLiveLoadTimeMs != C.TIME_UNSET) {
+            if (chunkDataSource == dataSource) {
+                chunkDataSource = new DelayedOpenDataSource(dataSource, nextLiveLoadTimeMs);
+            }
+            nextLiveLoadTimeMs = C.TIME_UNSET;
+        }
+
         DataSpec dataSpec = new DataSpec(
                 //Uri.parse(sabrStream.getRequestUrl()),
                 Uri.parse(manifest.getRequestUrl(trackType)),
                 //segmentUri.resolveUri(baseUrl),
                 DataSpec.HTTP_METHOD_POST,
                 //sabrStream.createVideoPlaybackAbrRequest(trackType, false).toByteArray(),
-                manifest.createVideoPlaybackAbrRequest(trackType, false, seekTimeUs).toByteArray(),
+                manifest.createVideoPlaybackAbrRequest(trackType, false,
+                        seekTimeUs != C.TIME_UNSET ? seekTimeUs + presentationTimeOffsetUs : C.TIME_UNSET).toByteArray(),
                 0, 0, C.LENGTH_UNSET,
                 //segmentUri.start,
                 //segmentUri.start,
@@ -758,11 +935,16 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                 representation.getCacheKey(),
                 0,
                 sabrHeaders);
-        long sampleOffsetUs = -representation.presentationTimeOffsetUs;
+        if (manifest.isLive()) {
+            liveRequestItag = iTag;
+            liveRequestSequenceNumber = !isSeek && sabrStream.hasSegmentStartTime(iTag) ? getLastSequenceNumber(iTag) : -1;
+        }
+
+        long sampleOffsetUs = -presentationTimeOffsetUs;
         Log.e(TAG, "Load media chunk: track=" + trackType + ", rn=" + manifest.getSabrRequestNumber()
                 + ", startTimeMs=" + startTimeMs + ", backoffTimeMs=" + sabrStream.getBackoffTimeMs());
         return new ContainerMediaChunk(
-                dataSource,
+                chunkDataSource,
                 dataSpec,
                 trackFormat,
                 trackSelectionReason,
@@ -927,6 +1109,62 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     //        return representationHolder.getSegmentEndTimeUs(getCurrentIndex());
     //    }
     //}
+
+    /**
+     * Opens no earlier than a time (elapsed realtime): a live stream's request for a segment that doesn't exist yet (see
+     * maybeWaitForLiveSegment). The wait ends early when the load is canceled (the loader interrupts its thread).
+     */
+    /* package */ static final class DelayedOpenDataSource implements DataSource {
+        private final DataSource upstream;
+        private final long openNotBeforeMs;
+
+        DelayedOpenDataSource(DataSource upstream, long openNotBeforeMs) {
+            this.upstream = upstream;
+            this.openNotBeforeMs = openNotBeforeMs;
+        }
+
+        @Override
+        public void addTransferListener(TransferListener transferListener) {
+            upstream.addTransferListener(transferListener);
+        }
+
+        @Override
+        public long open(DataSpec dataSpec) throws IOException {
+            long waitMs = openNotBeforeMs - SystemClock.elapsedRealtime();
+
+            if (waitMs > 0) {
+                try {
+                    Thread.sleep(waitMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new InterruptedIOException("Canceled while waiting for the next live segment");
+                }
+            }
+
+            return upstream.open(dataSpec);
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int readLength) throws IOException {
+            return upstream.read(buffer, offset, readLength);
+        }
+
+        @Nullable
+        @Override
+        public Uri getUri() {
+            return upstream.getUri();
+        }
+
+        @Override
+        public Map<String, List<String>> getResponseHeaders() {
+            return upstream.getResponseHeaders();
+        }
+
+        @Override
+        public void close() throws IOException {
+            upstream.close();
+        }
+    }
 
     /** Holds information about a snapshot of a single {@link Representation}. */
     protected static final class RepresentationHolder {

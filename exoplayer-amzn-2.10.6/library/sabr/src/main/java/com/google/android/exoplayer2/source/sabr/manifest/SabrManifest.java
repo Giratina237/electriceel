@@ -83,6 +83,16 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
     @Nullable public final String visitorCookie;
 
+    /**
+     * Of {@link #liveSegmentTargetDurationSec}: the stream isn't live
+     */
+    public static final int NOT_LIVE = -1;
+
+    /**
+     * A live stream's segment length (see SabrManifestParser), {@link #NOT_LIVE} for a video or a finished stream
+     */
+    public final int liveSegmentTargetDurationSec;
+
     private final String videoId;
     private final SabrCdnSelector cdnSelector;
     private final String videoPlaybackUstreamerConfig;
@@ -130,6 +140,31 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
             String videoId,
             ClientInfo clientInfo,
             @Nullable String visitorCookie) {
+        this(
+                availabilityStartTimeMs, durationMs, minBufferTimeMs, dynamic, minUpdatePeriodMs,
+                timeShiftBufferDepthMs, suggestedPresentationDelayMs, publishTimeMs, periods,
+                serverAbrStreamingUrl, videoPlaybackUstreamerConfig, poToken, videoId, clientInfo,
+                visitorCookie, NOT_LIVE);
+    }
+
+    public SabrManifest(
+            long availabilityStartTimeMs,
+            long durationMs,
+            long minBufferTimeMs,
+            boolean dynamic,
+            long minUpdatePeriodMs,
+            long timeShiftBufferDepthMs,
+            long suggestedPresentationDelayMs,
+            long publishTimeMs,
+            List<Period> periods,
+            String serverAbrStreamingUrl,
+            String videoPlaybackUstreamerConfig,
+            String poToken,
+            String videoId,
+            ClientInfo clientInfo,
+            @Nullable String visitorCookie,
+            int liveSegmentTargetDurationSec) {
+        this.liveSegmentTargetDurationSec = liveSegmentTargetDurationSec;
         this.availabilityStartTimeMs = availabilityStartTimeMs;
         this.durationMs = durationMs;
         this.minBufferTimeMs = minBufferTimeMs;
@@ -172,6 +207,13 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         return null;
     }
 
+    /**
+     * A live stream's, not a finished one's (see {@link #liveSegmentTargetDurationSec})
+     */
+    public final boolean isLive() {
+        return liveSegmentTargetDurationSec != NOT_LIVE;
+    }
+
     public final String getVideoId() {
         return videoId;
     }
@@ -183,11 +225,12 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
             return sabrStream;
         }
 
+        boolean isLive = isLive();
         sabrStream = new SabrStream(
                 cdnSelector.getCurrentUrl(),
                 videoPlaybackUstreamerConfig,
                 clientInfo,
-                -1,
+                isLive ? liveSegmentTargetDurationSec : -1,
                 -1,
                 -1,
                 poToken,
@@ -195,6 +238,8 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
                 videoId,
                 durationMs
         );
+        // The server's media headers of a live stream have no duration: estimated from the target (see SabrProcessor)
+        sabrStream.setLive(isLive);
 
         sabrStreams.put(trackType, sabrStream);
 
@@ -239,6 +284,22 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
     }
 
     public VideoPlaybackAbrRequest createVideoPlaybackAbrRequest(int trackType, boolean isInit, long seekTimeUs) {
+        return createVideoPlaybackAbrRequest(trackType, isInit, seekTimeUs, null);
+    }
+
+    /**
+     * A live stream's request for the segment after the given one, as if it were the newest received: the player asks for one segment
+     * of a track at a time, and an edge answers each in about a second however old it is (see DefaultSabrChunkSource's prefetch)
+     *
+     * @param lastSegment the format's segment taken as the newest one buffered: its sequence number, start and duration
+     */
+    public VideoPlaybackAbrRequest createLiveRequestAfter(int trackType, MediaHeader lastSegment) {
+        return createVideoPlaybackAbrRequest(trackType, false,
+                (lastSegment.getStartMs() + lastSegment.getDurationMs()) * 1_000L, lastSegment);
+    }
+
+    private VideoPlaybackAbrRequest createVideoPlaybackAbrRequest(int trackType, boolean isInit, long seekTimeUs,
+                                                                  @Nullable MediaHeader lastSegment) {
         SabrStream activeStream = sabrStreams.get(trackType);
 
         if (activeStream == null) {
@@ -293,7 +354,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
         ClientAbrState clientAbrState = clientAbrStateBuilder.build();
 
-        Pair<List<BufferedRange>, FormatId> bufferRanges = addBufferingInfoToAbrRequest(trackType);
+        Pair<List<BufferedRange>, FormatId> bufferRanges = addBufferingInfoToAbrRequest(trackType, lastSegment);
 
         List<FormatId> selectedFormats = createSelectedFormatIds(trackType);
 
@@ -336,7 +397,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
      *
      * @return The format to discard (if any) - typically formats that are active but not currently requested.
      */
-    private Pair<List<BufferedRange>, FormatId> addBufferingInfoToAbrRequest(int trackType) {
+    private Pair<List<BufferedRange>, FormatId> addBufferingInfoToAbrRequest(int trackType, @Nullable MediaHeader lastSegment) {
         SabrStream activeStream = sabrStreams.get(trackType);
 
         if (activeStream == null) {
@@ -359,7 +420,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
             int activeFormatKey = activeFormat.getItag();
             boolean shouldDiscard = currentFormatKey != activeFormatKey;
-            MediaHeader initializedFormat = getInitializedFormat(activeFormatKey);
+            MediaHeader initializedFormat = !shouldDiscard && lastSegment != null ? lastSegment : getInitializedFormat(activeFormatKey);
 
             BufferedRange bufferedRange = shouldDiscard ? createFullBufferRange(activeFormat) : createPartialBufferRange(initializedFormat);
 
@@ -407,11 +468,15 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
      * @return A BufferedRange object indicating the entire format is buffered.
      */
     private BufferedRange createFullBufferRange(@NonNull FormatId format) {
+        // FIX: of a live stream, every segment from the first. [MAX, MAX] covered none: its server goes by the segment numbers and
+        // sent the other track's segment to each request, which threw it away and never got its own (see yt-dlp's consumed range of a
+        // discarded format: sequence numbers 0 to max). A video's keeps [MAX, MAX]: with [0, MAX] its server sent the other
+        // track's media headers with no format metadata before them, and the init chunk failed (Initialized format not found).
         return BufferedRange.newBuilder()
                 .setFormatId(format)
                 .setDurationMs(Integer.MAX_VALUE)
                 .setStartTimeMs(0)
-                .setStartSegmentIndex(Integer.MAX_VALUE)
+                .setStartSegmentIndex(isLive() ? 0 : Integer.MAX_VALUE)
                 .setEndSegmentIndex(Integer.MAX_VALUE)
                 .setTimeRange(TimeRange.newBuilder()
                         .setDurationTicks(Integer.MAX_VALUE)
@@ -432,6 +497,27 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         }
 
         int sequenceNumber = initializedFormat.hasSequenceNumber() ? initializedFormat.getSequenceNumber() : 1;
+
+        // A live stream's server goes by the times: the segment's own, in ms. With a start at 0 and the duration's ms as ticks of the
+        // media's timescale (44100 for audio), the time asked for wasn't buffered, and each request was answered with a seek back to
+        // the segment's start and no media (see yt-dlp's buffered ranges)
+        if (isLive() && initializedFormat.hasStartMs() && initializedFormat.getStartMs() >= 0) {
+            long segmentStartMs = initializedFormat.getStartMs();
+            long segmentDurationMs = initializedFormat.hasDurationMs() ? initializedFormat.getDurationMs() : 0;
+            return BufferedRange.newBuilder()
+                    .setFormatId(initializedFormat.getFormatId())
+                    .setStartSegmentIndex(sequenceNumber)
+                    .setEndSegmentIndex(sequenceNumber)
+                    .setStartTimeMs(segmentStartMs)
+                    .setDurationMs(segmentDurationMs)
+                    .setTimeRange(TimeRange.newBuilder()
+                            .setTimescale(1_000)
+                            .setStartTicks(segmentStartMs)
+                            .setDurationTicks(segmentDurationMs)
+                            .build())
+                    .build();
+        }
+
         TimeRange timeRange = initializedFormat.hasTimeRange() ? initializedFormat.getTimeRange() : null;
         int timeScale = timeRange != null && timeRange.hasTimescale() ? timeRange.getTimescale() : 1_000;
         long startMs = initializedFormat.hasStartMs() ? initializedFormat.getStartMs() : 0;
