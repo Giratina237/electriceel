@@ -277,20 +277,22 @@ public class ModernPlaybackFragment extends PlaybackFragment {
     /**
      * Arrow keys that behave like the reference:<br/>
      * up shows the controls too (the base one only moves the focus), unless up is set to skip to the previous video;<br/>
-     * down from the progress bar goes back to play/pause (not to the button that happens to be below the knob).
+     * down from the progress bar goes back to play/pause (not to the button that happens to be below the knob).<br/>
+     * Only the press: the release goes on to the player like any other. Its controller drops a press while the release of
+     * the previous one is missing (see VideoPlayerGlue#isSingleKeyDown), and the release of the up that closes the controls
+     * through the top edge comes once they're hidden: consumed here, the next OK only showed the controls again instead of
+     * pausing (#78).
      * @return true if consumed
      */
     public boolean dispatchNavigationKey(KeyEvent event) {
-        if (mIsShortsMode || getView() == null) {
+        if (event.getAction() != KeyEvent.ACTION_DOWN || mIsShortsMode || getView() == null) {
             return false;
         }
 
         if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP && !isControlsOverlayVisible()
                 && !PlayerTweaksData.instance(getContext()).isQuickSkipVideosAltEnabled()) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                notifyKey(event);
-                showControlsOverlay(true);
-            }
+            notifyKey(event);
+            showControlsOverlay(true);
             return true;
         }
 
@@ -299,10 +301,8 @@ public class ModernPlaybackFragment extends PlaybackFragment {
         boolean inSeek = thumbs != null && thumbs.getVisibility() == View.VISIBLE;
 
         if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_DOWN && focus != null && focus.getId() == R.id.playback_progress && !inSeek) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                notifyKey(event);
-                focusPlayPause();
-            }
+            notifyKey(event);
+            focusPlayPause();
             return true;
         }
 
