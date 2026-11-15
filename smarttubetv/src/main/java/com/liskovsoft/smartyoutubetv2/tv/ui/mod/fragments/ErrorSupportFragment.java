@@ -19,6 +19,7 @@ import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -43,6 +44,8 @@ public class ErrorSupportFragment extends BrandedSupportFragment {
     private View.OnClickListener mButtonClickListener;
     private Drawable mBackgroundDrawable;
     private boolean mIsBackgroundTranslucent = true;
+    // MOD: text size of the message in px, 0 for the size of the style
+    private float mMessageTextSize;
 
     /**
      * Sets the default background.
@@ -114,6 +117,14 @@ public class ErrorSupportFragment extends BrandedSupportFragment {
     }
 
     /**
+     * MOD: sets the text size of the message, in px.
+     */
+    public void setMessageTextSize(float size) {
+        mMessageTextSize = size;
+        updateMessageTextSize();
+    }
+
+    /**
      * Returns the error message.
      */
     public CharSequence getMessage() {
@@ -173,16 +184,30 @@ public class ErrorSupportFragment extends BrandedSupportFragment {
         mButton = (Button) root.findViewById(R.id.button);
         updateButton();
 
+        // MOD: the margins depend on the text size of the message
+        updateMessageTextSize();
+
+        return root;
+    }
+
+    // MOD: the message's baseline keeps its distance to the image and the button at any text size
+    private void updateMessageTextSize() {
+        if (mTextView == null || mButton == null) {
+            return;
+        }
+
+        if (mMessageTextSize > 0) {
+            mTextView.setTextSize(TypedValue.COMPLEX_UNIT_PX, mMessageTextSize);
+        }
+
         FontMetricsInt metrics = getFontMetricsInt(mTextView);
-        int underImageBaselineMargin = container.getResources().getDimensionPixelSize(
+        int underImageBaselineMargin = mTextView.getResources().getDimensionPixelSize(
                 R.dimen.lb_error_under_image_baseline_margin);
         setTopMargin(mTextView, underImageBaselineMargin + metrics.ascent);
 
-        int underMessageBaselineMargin = container.getResources().getDimensionPixelSize(
+        int underMessageBaselineMargin = mTextView.getResources().getDimensionPixelSize(
                 R.dimen.lb_error_under_message_baseline_margin);
         setTopMargin(mButton, underMessageBaselineMargin - metrics.descent);
-
-        return root;
     }
 
     private void updateBackground() {

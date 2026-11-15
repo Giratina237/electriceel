@@ -177,4 +177,6 @@
     <dimen name="end_screen_badge_text_size">12sp</dimen>
     <dimen name="end_screen_badge_padding">3dp</dimen>
     <dimen name="end_screen_label_gap">4dp</dimen>
+    <!-- The changelog of the pinned Update section, in every skin (ModernStatePage, ErrorDialogFragment) -->
+    <dimen name="update_changelog_text_size">12sp</dimen>
 </resources>
