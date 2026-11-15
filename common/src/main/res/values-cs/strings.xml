@@ -525,6 +525,14 @@
     <string name="shows_desc">Pořad (podcast) jako ty v Doporučených pořadech, s počtem epizod tam, kde má video délku. Rozpoznáno v každém jazyce.</string>
     <string name="shows_sections">Sekce</string>
     <string name="show_label">Pořad</string>
+    <string name="members">Videa pro členy</string>
+    <string name="members_show">Zobrazit</string>
+    <string name="members_mark">Označit</string>
+    <string name="members_mark_desc">Videa pro členy zůstanou v kanálech se štítkem YouTube (jen pro členy nebo nejdřív pro členy)</string>
+    <string name="members_hide">Skrýt</string>
+    <string name="members_desc">Videa, která mohou sledovat jen členové kanálu, teď (jen pro členy) nebo dřív než ostatní (nejdřív pro členy). Skrytá se nikdy nepřehrají, ani jako další. Rozpoznáno v každém jazyce.</string>
+    <string name="members_sections">Sekce</string>
+    <string name="members_only_label">Jen pro členy</string>
     <string name="streamed">Odvysíláno nebo živě</string>
     <string name="streamed_show">Zobrazit</string>
     <string name="streamed_mark">Označit</string>

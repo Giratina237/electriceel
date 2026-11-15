@@ -524,6 +524,14 @@
   <string name="shows_desc">გადაცემა (პოდკასტი), როგორც რეკომენდებულ გადაცემებში, სადაც ვიდეოს ხანგრძლივობის ადგილას ეპიზოდების რაოდენობაა. ამოიცნობა ყველა ენაზე.</string>
   <string name="shows_sections">სექციები</string>
   <string name="show_label">გადაცემა</string>
+  <string name="members">წევრების ვიდეოები</string>
+  <string name="members_show">ჩვენება</string>
+  <string name="members_mark">მონიშვნა</string>
+  <string name="members_mark_desc">წევრების ვიდეოები რჩება არხებში YouTube-ის ნიშნით (მხოლოდ წევრებისთვის ან ჯერ წევრებისთვის)</string>
+  <string name="members_hide">დამალვა</string>
+  <string name="members_desc">ვიდეოები, რომელთა ნახვაც მხოლოდ არხის წევრებს შეუძლიათ, ახლა (მხოლოდ წევრებისთვის) ან ყველაზე ადრე (ჯერ წევრებისთვის). დამალული ვიდეოები არასდროს ირთვება, თუნდაც შემდეგად. ამოიცნობა ყველა ენაზე.</string>
+  <string name="members_sections">სექციები</string>
+  <string name="members_only_label">მხოლოდ წევრებისთვის</string>
   <string name="streamed">ნატრანსლირები ან პირდაპირი</string>
   <string name="streamed_show">ჩვენება</string>
   <string name="streamed_mark">მონიშვნა</string>

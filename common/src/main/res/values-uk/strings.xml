@@ -521,6 +521,14 @@
     <string name="shows_desc">Шоу (подкаст), як у «Рекомендованих шоу», де замість тривалості відео вказано кількість випусків. Розпізнається будь-якою мовою.</string>
     <string name="shows_sections">Розділи</string>
     <string name="show_label">Шоу</string>
+    <string name="members">Відео для спонсорів</string>
+    <string name="members_show">Показувати</string>
+    <string name="members_mark">Позначати</string>
+    <string name="members_mark_desc">Відео для спонсорів залишаються у стрічках з міткою YouTube (лише для спонсорів або спершу для спонсорів)</string>
+    <string name="members_hide">Приховувати</string>
+    <string name="members_desc">Відео, які можуть дивитися лише спонсори каналу, зараз (лише для спонсорів) або раніше за всіх (спершу для спонсорів). Приховані ніколи не відтворюються, навіть як наступне. Розпізнається будь-якою мовою.</string>
+    <string name="members_sections">Розділи</string>
+    <string name="members_only_label">Лише для спонсорів</string>
     <string name="streamed">Трансляції</string>
     <string name="streamed_show">Показувати</string>
     <string name="streamed_mark">Позначати</string>

@@ -516,6 +516,14 @@
   <string name="shows_desc">Een show (podcast) zoals die in Aanbevolen shows, met het aantal afleveringen waar een video zijn lengte heeft. Herkend in elke taal.</string>
   <string name="shows_sections">Secties</string>
   <string name="show_label">Show</string>
+  <string name="members">Ledenvideo\'s</string>
+  <string name="members_show">Tonen</string>
+  <string name="members_mark">Markeren</string>
+  <string name="members_mark_desc">Ledenvideo\'s blijven in de feeds met het label van YouTube (alleen voor leden of eerst voor leden)</string>
+  <string name="members_hide">Verbergen</string>
+  <string name="members_desc">Video\'s die alleen leden van een kanaal kunnen bekijken, nu (alleen voor leden) of vóór iedereen (eerst voor leden). Verborgen video\'s worden nooit afgespeeld, ook niet als volgende. Herkend in elke taal.</string>
+  <string name="members_sections">Secties</string>
+  <string name="members_only_label">Alleen voor leden</string>
   <string name="streamed">Gestreamd of live</string>
   <string name="streamed_show">Tonen</string>
   <string name="streamed_mark">Markeren</string>

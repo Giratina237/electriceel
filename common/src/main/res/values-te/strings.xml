@@ -522,6 +522,14 @@
     <string name="shows_desc">సిఫార్సు చేసిన షోలలో ఉన్నటువంటి షో (పాడ్‌కాస్ట్), వీడియో నిడివి ఉండే చోట ఎపిసోడ్‌ల సంఖ్యతో. ప్రతి భాషలోనూ గుర్తించబడుతుంది.</string>
     <string name="shows_sections">విభాగాలు</string>
     <string name="show_label">షో</string>
+    <string name="members">సభ్యుల వీడియోలు</string>
+    <string name="members_show">చూపించు</string>
+    <string name="members_mark">గుర్తించు</string>
+    <string name="members_mark_desc">సభ్యుల వీడియోలు YouTube లేబుల్‌తో (సభ్యులకు మాత్రమే లేదా ముందుగా సభ్యులకు) ఫీడ్‌లలో ఉంటాయి</string>
+    <string name="members_hide">దాచు</string>
+    <string name="members_desc">ఛానెల్ సభ్యులు మాత్రమే చూడగలిగే వీడియోలు, ఇప్పుడు (సభ్యులకు మాత్రమే) లేదా అందరికంటే ముందు (ముందుగా సభ్యులకు). దాచినవి ఎప్పుడూ ప్లే కావు, తదుపరిగా కూడా. ప్రతి భాషలోనూ గుర్తించబడుతుంది.</string>
+    <string name="members_sections">విభాగాలు</string>
+    <string name="members_only_label">సభ్యులకు మాత్రమే</string>
     <string name="streamed">స్ట్రీమ్ అయినది లేదా లైవ్</string>
     <string name="streamed_show">చూపించు</string>
     <string name="streamed_mark">గుర్తించు</string>

@@ -39,6 +39,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil;
 import com.liskovsoft.smartyoutubetv2.common.misc.BufferingDetector;
 import com.liskovsoft.smartyoutubetv2.common.misc.BufferingDetector.OnLongBuffering;
+import com.liskovsoft.smartyoutubetv2.common.misc.MembersVideos;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
@@ -816,10 +817,15 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 .error(error)
                 .clientAttempts(attempts);
 
+        // The start ends at the failed fetch, not when the user leaves (see VideoStarts#onFormatsFailed)
+        if (getVideo() != null) {
+            VideoStarts.onFormatsFailed(getVideo().videoId, unplayable != null);
+        }
+
         try {
             if (unplayable != null) {
                 failure.playability(unplayable.status, unplayable.reason);
-                runUnplayableAction(unplayable, failure);
+                runUnplayableAction(unplayable, isMembers(attempts), failure);
             } else {
                 runFormatErrorAction(error, failure);
             }
@@ -854,9 +860,31 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
-     * Its reason is shown, and it's tried again in a while: each second asked every client again (about 20 requests a second)
+     * A client said only the channel's members watch it (see ClientAttempts.Attempt#members): the account isn't one
      */
-    private void runUnplayableAction(ClientAttempts.Attempt unplayable, PlayerFailure failure) {
+    private static boolean isMembers(@Nullable List<ClientAttempts.Attempt> attempts) {
+        if (attempts == null) {
+            return false;
+        }
+
+        for (ClientAttempts.Attempt attempt : attempts) {
+            if (attempt.members) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Its reason is shown, and it's tried again in a while: each second asked every client again (about 20 requests a second).
+     * One only the channel's members watch isn't tried again: it won't play in a while either. It's remembered (see MembersVideos), and
+     * the next video plays when it came next (autoplay, the Next button, see VideoLoaderController.skipMembersVideo). Its reason shows
+     * till then: what's next may be known only once its metadata loaded.
+     *
+     * @param isMembers only the channel's members watch it (see isMembers)
+     */
+    private void runUnplayableAction(ClientAttempts.Attempt unplayable, boolean isMembers, PlayerFailure failure) {
         if (isEmbedPlayer()) {
             failure.action("finish_embed");
             getPlayer().finish();
@@ -873,6 +901,33 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         getPlayer().showProgressBar(false);
         // The reason is the title, seen only with the controls: up, or the screen stays black. Nothing plays, so they don't hide
         getPlayer().showOverlay(true);
+
+        if (isMembers) {
+            Video video = getVideo();
+
+            if (video != null) {
+                MembersVideos.add(video.videoId);
+                // The reason stays the title when its metadata loads (see below, VideoLoaderController.skipMembersVideo)
+                video.syncUnplayable(reason);
+            }
+
+            if (mVideoLoaderController.skipMembersVideo(video)) {
+                failure.action("members_next");
+                return;
+            }
+
+            failure.action("members_stay");
+            // Its suggestions, and the next video of the Next button, come with its metadata: that loads once a video plays (see
+            // SuggestionsController.onVideoLoaded)
+            SuggestionsController suggestions = getController(SuggestionsController.class);
+
+            if (suggestions != null && video != null) {
+                suggestions.loadSuggestions(video);
+            }
+
+            return;
+        }
+
         failure.action("reload_video_" + UNPLAYABLE_RELOAD_MS / 1_000 + "s");
         mVideoLoaderController.reloadVideo(UNPLAYABLE_RELOAD_MS);
     }
@@ -1085,7 +1140,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             failure.playback(getPlayer().getPositionMs(), getPlayer().getDurationMs(), mBufferingDetector.isPlayable());
 
             try {
-                failure.formats(getPlayer().getVideoFormat(), getPlayer().getAudioFormat());
+                // The player's are the video before's till this one's reached it (e.g. its fetch failed)
+                if (mVideoLoaderController == null || mVideoLoaderController.isFormatOfVideo()) {
+                    failure.formats(getPlayer().getVideoFormat(), getPlayer().getAudioFormat());
+                }
             } catch (RuntimeException e) {
                 // The engine may be released already: the fix goes on without them
                 Log.e(TAG, "Can't read the formats of the failure: %s", e.getMessage());

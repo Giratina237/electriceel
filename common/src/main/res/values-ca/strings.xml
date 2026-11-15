@@ -492,6 +492,14 @@
   <string name="shows_desc">Un programa (pòdcast) com els de Programes recomanats, amb el nombre d\'episodis on un vídeo té la durada. Es detecta en qualsevol idioma.</string>
   <string name="shows_sections">Seccions</string>
   <string name="show_label">Programa</string>
+  <string name="members">Vídeos per a membres</string>
+  <string name="members_show">Mostra</string>
+  <string name="members_mark">Marca</string>
+  <string name="members_mark_desc">Els vídeos per a membres es queden als feeds amb l\'etiqueta de YouTube (només per a membres o primer per a membres)</string>
+  <string name="members_hide">Amaga</string>
+  <string name="members_desc">Vídeos que només poden veure els membres d\'un canal, ara (només per a membres) o abans que ningú (primer per a membres). Els amagats no es reprodueixen mai, ni tan sols com a següent. Es detecta en qualsevol idioma.</string>
+  <string name="members_sections">Seccions</string>
+  <string name="members_only_label">Només per a membres</string>
   <string name="streamed">Emès o en directe</string>
   <string name="streamed_show">Mostra</string>
   <string name="streamed_mark">Marca</string>

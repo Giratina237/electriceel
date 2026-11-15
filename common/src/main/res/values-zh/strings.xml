@@ -511,6 +511,14 @@
   <string name="shows_desc">像推荐节目中那样的节目（播客），在视频时长的位置显示集数。适用于所有语言。</string>
   <string name="shows_sections">分区</string>
   <string name="show_label">节目</string>
+  <string name="members">会员视频</string>
+  <string name="members_show">显示</string>
+  <string name="members_mark">标记</string>
+  <string name="members_mark_desc">会员视频以 YouTube 的标签（仅限会员或会员抢先看）保留在动态中</string>
+  <string name="members_hide">隐藏</string>
+  <string name="members_desc">只有频道会员才能观看的视频，现在（仅限会员）或比其他人更早（会员抢先看）。隐藏的视频永远不会播放，即使是作为下一个。适用于所有语言。</string>
+  <string name="members_sections">分区</string>
+  <string name="members_only_label">仅限会员</string>
   <string name="streamed">直播过或直播中</string>
   <string name="streamed_show">显示</string>
   <string name="streamed_mark">标记</string>

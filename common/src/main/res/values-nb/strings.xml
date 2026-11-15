@@ -535,6 +535,14 @@
     <string name="shows_desc">Et program (podkast) som dem i Anbefalte programmer, med antall episoder der en video har lengden sin. Gjenkjennes på alle språk.</string>
     <string name="shows_sections">Seksjoner</string>
     <string name="show_label">Program</string>
+    <string name="members">Medlemsvideoer</string>
+    <string name="members_show">Vis</string>
+    <string name="members_mark">Merk</string>
+    <string name="members_mark_desc">Medlemsvideoer blir værende i feedene med YouTubes etikett (bare for medlemmer eller først for medlemmer)</string>
+    <string name="members_hide">Skjul</string>
+    <string name="members_desc">Videoer som bare medlemmene av en kanal kan se, nå (bare for medlemmer) eller før alle andre (først for medlemmer). Skjulte spilles aldri av, heller ikke som neste. Gjenkjennes på alle språk.</string>
+    <string name="members_sections">Seksjoner</string>
+    <string name="members_only_label">Bare for medlemmer</string>
     <string name="streamed">Strømmet eller direkte</string>
     <string name="streamed_show">Vis</string>
     <string name="streamed_mark">Merk</string>

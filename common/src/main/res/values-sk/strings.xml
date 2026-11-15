@@ -524,6 +524,14 @@
     <string name="shows_desc">Relácia (podcast) ako tie v Odporúčaných reláciách, s počtom epizód tam, kde má video dĺžku. Rozpoznané v každom jazyku.</string>
     <string name="shows_sections">Sekcie</string>
     <string name="show_label">Relácia</string>
+    <string name="members">Videá pre členov</string>
+    <string name="members_show">Zobraziť</string>
+    <string name="members_mark">Označiť</string>
+    <string name="members_mark_desc">Videá pre členov zostanú v kanáloch so štítkom YouTube (len pre členov alebo najprv pre členov)</string>
+    <string name="members_hide">Skryť</string>
+    <string name="members_desc">Videá, ktoré môžu pozerať iba členovia kanála, teraz (len pre členov) alebo skôr ako ostatní (najprv pre členov). Skryté sa nikdy neprehrajú, ani ako ďalšie. Rozpoznané v každom jazyku.</string>
+    <string name="members_sections">Sekcie</string>
+    <string name="members_only_label">Len pre členov</string>
     <string name="streamed">Odvysielané alebo naživo</string>
     <string name="streamed_show">Zobraziť</string>
     <string name="streamed_mark">Označiť</string>

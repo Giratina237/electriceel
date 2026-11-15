@@ -509,6 +509,14 @@
   <string name="shows_desc">Saade (podcast) nagu jaotises Soovitatud saated, kus video pikkuse kohal on osade arv. Tuvastatakse igas keeles.</string>
   <string name="shows_sections">Jaotised</string>
   <string name="show_label">Saade</string>
+  <string name="members">Liikmete videod</string>
+  <string name="members_show">Näita</string>
+  <string name="members_mark">Märgista</string>
+  <string name="members_mark_desc">Liikmete videod jäävad voogudesse YouTube\'i märgisega (ainult liikmetele või esmalt liikmetele)</string>
+  <string name="members_hide">Peida</string>
+  <string name="members_desc">Videod, mida saavad vaadata ainult kanali liikmed, praegu (ainult liikmetele) või enne kõiki teisi (esmalt liikmetele). Peidetuid ei esitata kunagi, isegi mitte järgmisena. Tuvastatakse igas keeles.</string>
+  <string name="members_sections">Jaotised</string>
+  <string name="members_only_label">Ainult liikmetele</string>
   <string name="streamed">Voogesitatud või otse</string>
   <string name="streamed_show">Näita</string>
   <string name="streamed_mark">Märgista</string>

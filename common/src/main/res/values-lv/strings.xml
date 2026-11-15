@@ -522,6 +522,14 @@
     <string name="shows_desc">Raidījums (aplāde), piemēram, sadaļā Ieteiktie raidījumi, ar epizožu skaitu vietā, kur video ir garums. Tiek atpazīts jebkurā valodā.</string>
     <string name="shows_sections">Sadaļas</string>
     <string name="show_label">Raidījums</string>
+    <string name="members">Dalībnieku video</string>
+    <string name="members_show">Rādīt</string>
+    <string name="members_mark">Atzīmēt</string>
+    <string name="members_mark_desc">Dalībnieku video paliek plūsmās ar YouTube atzīmi (tikai dalībniekiem vai vispirms dalībniekiem)</string>
+    <string name="members_hide">Paslēpt</string>
+    <string name="members_desc">Video, ko var skatīties tikai kanāla dalībnieki, tagad (tikai dalībniekiem) vai pirms visiem citiem (vispirms dalībniekiem). Paslēptos nekad neatskaņo, pat kā nākamo. Tiek atpazīts jebkurā valodā.</string>
+    <string name="members_sections">Sadaļas</string>
+    <string name="members_only_label">Tikai dalībniekiem</string>
     <string name="streamed">Straumēts vai tiešraidē</string>
     <string name="streamed_show">Rādīt</string>
     <string name="streamed_mark">Atzīmēt</string>

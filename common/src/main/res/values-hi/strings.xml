@@ -484,6 +484,14 @@
   <string name="shows_desc">अनुशंसित शो जैसा शो (पॉडकास्ट), जिसमें वीडियो की अवधि की जगह एपिसोड की संख्या होती है। हर भाषा में पहचाना जाता है।</string>
   <string name="shows_sections">अनुभाग</string>
   <string name="show_label">शो</string>
+  <string name="members">सदस्यों के वीडियो</string>
+  <string name="members_show">दिखाएँ</string>
+  <string name="members_mark">चिह्नित करें</string>
+  <string name="members_mark_desc">सदस्यों के वीडियो YouTube के लेबल (सिर्फ़ सदस्यों के लिए या पहले सदस्यों के लिए) के साथ फ़ीड में बने रहते हैं</string>
+  <string name="members_hide">छिपाएँ</string>
+  <string name="members_desc">ऐसे वीडियो जिन्हें सिर्फ़ चैनल के सदस्य देख सकते हैं, अभी (सिर्फ़ सदस्यों के लिए) या सबसे पहले (पहले सदस्यों के लिए)। छिपे हुए वीडियो कभी नहीं चलाए जाते, अगले वीडियो के रूप में भी नहीं। हर भाषा में पहचाना जाता है।</string>
+  <string name="members_sections">अनुभाग</string>
+  <string name="members_only_label">सिर्फ़ सदस्यों के लिए</string>
   <string name="streamed">स्ट्रीम हो चुका या लाइव</string>
   <string name="streamed_show">दिखाएँ</string>
   <string name="streamed_mark">चिह्नित करें</string>

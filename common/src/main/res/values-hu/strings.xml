@@ -493,6 +493,14 @@
   <string name="shows_desc">Műsor (podcast), mint az Ajánlott műsorokban, ahol a videó hossza helyén az epizódok száma áll. Minden nyelven felismerhető.</string>
   <string name="shows_sections">Szakaszok</string>
   <string name="show_label">Műsor</string>
+  <string name="members">Tagi videók</string>
+  <string name="members_show">Megjelenítés</string>
+  <string name="members_mark">Megjelölés</string>
+  <string name="members_mark_desc">A tagi videók a YouTube címkéjével (csak tagoknak vagy először tagoknak) a hírfolyamokban maradnak</string>
+  <string name="members_hide">Elrejtés</string>
+  <string name="members_desc">Videók, amelyeket csak a csatorna tagjai nézhetnek meg, most (csak tagoknak) vagy mindenki más előtt (először tagoknak). A rejtetteket soha nem játssza le, következőként sem. Minden nyelven felismerhető.</string>
+  <string name="members_sections">Szakaszok</string>
+  <string name="members_only_label">Csak tagoknak</string>
   <string name="streamed">Közvetített vagy élő</string>
   <string name="streamed_show">Megjelenítés</string>
   <string name="streamed_mark">Megjelölés</string>

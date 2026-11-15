@@ -6,6 +6,8 @@ import android.os.Build.VERSION;
 import android.os.Environment;
 import android.os.Handler;
 
+import androidx.annotation.Nullable;
+
 import com.liskovsoft.sharedutils.helpers.AppInfoHelpers;
 import com.liskovsoft.sharedutils.helpers.FileHelpers;
 import com.liskovsoft.sharedutils.helpers.Helpers;
@@ -39,6 +41,7 @@ public class BackupAndRestoreManager implements MotherActivity.OnPermissions {
     private Runnable mPendingHandler;
     private Runnable mPendingDeniedHandler;
     private Disposable mZipAction;
+    private Disposable mBackupAction;
 
     public interface OnBackupNames {
         void onBackupNames(List<String> backupNames);
@@ -130,16 +133,44 @@ public class BackupAndRestoreManager implements MotherActivity.OnPermissions {
     }
 
     public void checkPermAndBackup() {
+        checkPermAndBackup(null);
+    }
+
+    /**
+     * Off the main thread (see backupAsync)
+     *
+     * @param onDone on the main thread, once it's done (not when the permission is refused)
+     */
+    public void checkPermAndBackup(@Nullable Runnable onDone) {
         if (FileHelpers.isExternalStorageWritable()) {
             if (hasStoragePermissions(mContext)) {
-                backupData();
+                backupAsync(onDone);
             } else {
-                mPendingHandler = this::backupData;
+                mPendingHandler = () -> backupAsync(onDone);
                 verifyStoragePermissionsAndReturn();
             }
         }
     }
 
+    /**
+     * It copies the settings and zips the media folder: on the main thread, a slow box froze while it did (an ANR)
+     */
+    private void backupAsync(@Nullable Runnable onDone) {
+        RxHelper.disposeActions(mBackupAction);
+        mBackupAction = RxHelper.runAsync(() -> {
+            try {
+                backupData();
+            } finally {
+                if (onDone != null) {
+                    Utils.post(onDone);
+                }
+            }
+        });
+    }
+
+    /**
+     * Waits for the copy and the zip: not on the main thread (see checkPermAndBackup), e.g. the backup worker's
+     */
     public void backupData() {
         Log.d(TAG, "App has been updated or installed. Doing data backup...");
 

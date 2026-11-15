@@ -494,6 +494,14 @@
     <string name="shows_desc">Emisija (podcast) poput onih u Preporučenim emisijama, s brojem epizoda tamo gdje video ima trajanje. Prepoznaje se na svakom jeziku.</string>
     <string name="shows_sections">Odjeljci</string>
     <string name="show_label">Emisija</string>
+    <string name="members">Videozapisi za članove</string>
+    <string name="members_show">Prikaži</string>
+    <string name="members_mark">Označi</string>
+    <string name="members_mark_desc">Videozapisi za članove ostaju u feedovima s oznakom YouTubea (samo za članove ili prvo za članove)</string>
+    <string name="members_hide">Sakrij</string>
+    <string name="members_desc">Videozapisi koje mogu gledati samo članovi kanala, sada (samo za članove) ili prije svih ostalih (prvo za članove). Skriveni se nikad ne reproduciraju, čak ni kao sljedeći. Prepoznaje se na svakom jeziku.</string>
+    <string name="members_sections">Odjeljci</string>
+    <string name="members_only_label">Samo za članove</string>
     <string name="streamed">Emitirano ili uživo</string>
     <string name="streamed_show">Prikaži</string>
     <string name="streamed_mark">Označi</string>

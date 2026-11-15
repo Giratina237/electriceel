@@ -490,6 +490,14 @@
   <string name="shows_desc">برنامج (بودكاست) مثل تلك الموجودة في البرامج المقترحة، يظهر فيه عدد الحلقات مكان مدة الفيديو. يُكتشف بكل اللغات.</string>
   <string name="shows_sections">الأقسام</string>
   <string name="show_label">برنامج</string>
+  <string name="members">فيديوهات الأعضاء</string>
+  <string name="members_show">عرض</string>
+  <string name="members_mark">تمييز</string>
+  <string name="members_mark_desc">تبقى فيديوهات الأعضاء في الخلاصات مع تسمية يوتيوب (للأعضاء فقط أو للأعضاء أولاً)</string>
+  <string name="members_hide">إخفاء</string>
+  <string name="members_desc">فيديوهات لا يشاهدها إلا أعضاء القناة، الآن (للأعضاء فقط) أو قبل الجميع (للأعضاء أولاً). المخفية منها لا تُشغَّل أبداً، ولا حتى كفيديو تالٍ. يُكتشف بكل اللغات.</string>
+  <string name="members_sections">الأقسام</string>
+  <string name="members_only_label">للأعضاء فقط</string>
   <string name="streamed">مبثوث أو مباشر</string>
   <string name="streamed_show">عرض</string>
   <string name="streamed_mark">تمييز</string>

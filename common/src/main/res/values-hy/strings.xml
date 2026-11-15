@@ -520,6 +520,14 @@
     <string name="shows_desc">Հաղորդում (փոդքասթ), ինչպես Խորհուրդ տրվող հաղորդումներում, որտեղ տեսանյութի տևողության փոխարեն դրվագների քանակն է։ Ճանաչվում է բոլոր լեզուներով։</string>
     <string name="shows_sections">Բաժիններ</string>
     <string name="show_label">Հաղորդում</string>
+    <string name="members">Անդամների տեսանյութեր</string>
+    <string name="members_show">Ցույց տալ</string>
+    <string name="members_mark">Նշել</string>
+    <string name="members_mark_desc">Անդամների տեսանյութերը մնում են լրահոսերում YouTube-ի պիտակով (միայն անդամների համար կամ նախ անդամների համար)</string>
+    <string name="members_hide">Թաքցնել</string>
+    <string name="members_desc">Տեսանյութեր, որոնք կարող են դիտել միայն ալիքի անդամները՝ հիմա (միայն անդամների համար) կամ բոլորից առաջ (նախ անդամների համար)։ Թաքցվածները երբեք չեն նվագարկվում, նույնիսկ որպես հաջորդը։ Ճանաչվում է բոլոր լեզուներով։</string>
+    <string name="members_sections">Բաժիններ</string>
+    <string name="members_only_label">Միայն անդամների համար</string>
     <string name="streamed">Հեռարձակված կամ ուղիղ</string>
     <string name="streamed_show">Ցույց տալ</string>
     <string name="streamed_mark">Նշել</string>

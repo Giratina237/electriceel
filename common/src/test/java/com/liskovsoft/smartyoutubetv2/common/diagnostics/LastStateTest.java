@@ -58,6 +58,48 @@ public class LastStateTest {
         assertFalse(state.has("pid"));
     }
 
+    /**
+     * Killed before any activity showed (e.g. started for a job): it says so
+     */
+    @Test
+    public void aProcessWithoutAnActivitySaysSo() throws Exception {
+        LastState.onProcessStart(RuntimeEnvironment.getApplication());
+
+        JSONObject state = LastState.find(getContext(), 100, T0 + 1_000);
+
+        assertNotNull(state);
+        assertEquals("none", state.getString("activity"));
+        assertFalse(state.has("pip"));
+    }
+
+    /**
+     * The activity on top: one leaving after another came up isn't it anymore
+     */
+    @Test
+    public void theActivityOnTopIsKept() throws Exception {
+        LastState.onActivity(getContext(), "ModernBrowseActivity", "resumed", false);
+        LastState.onActivity(getContext(), "ModernBrowseActivity", "paused", true);
+        LastState.onActivity(getContext(), "ModernPlaybackActivity", "resumed", false);
+        LastState.onActivity(getContext(), "ModernBrowseActivity", "stopped", true);
+
+        assertEquals("ModernPlaybackActivity resumed", LastState.find(getContext(), 100, T0 + 1_000).getString("activity"));
+
+        LastState.onActivity(getContext(), "ModernPlaybackActivity", "destroyed", true);
+
+        assertEquals("ModernPlaybackActivity destroyed", LastState.find(getContext(), 100, T0 + 1_000).getString("activity"));
+    }
+
+    @Test
+    public void pictureInPictureIsKept() throws Exception {
+        LastState.onPictureInPicture(getContext(), true);
+
+        assertTrue(LastState.find(getContext(), 100, T0 + 1_000).getBoolean("pip"));
+
+        LastState.onPictureInPicture(getContext(), false);
+
+        assertFalse(LastState.find(getContext(), 100, T0 + 1_000).has("pip"));
+    }
+
     @Test
     public void anotherProcessesStateIsntItsExits() {
         LastState.onPlayer(getContext(), true, true);

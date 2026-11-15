@@ -486,6 +486,14 @@
   <string name="shows_desc">Chương trình (podcast) như các chương trình trong Chương trình đề xuất, với số tập ở chỗ thời lượng của video. Nhận diện ở mọi ngôn ngữ.</string>
   <string name="shows_sections">Mục</string>
   <string name="show_label">Chương trình</string>
+  <string name="members">Video dành cho hội viên</string>
+  <string name="members_show">Hiện</string>
+  <string name="members_mark">Đánh dấu</string>
+  <string name="members_mark_desc">Video dành cho hội viên vẫn ở trong nguồn cấp dữ liệu với nhãn của YouTube (chỉ dành cho hội viên hoặc hội viên xem trước)</string>
+  <string name="members_hide">Ẩn</string>
+  <string name="members_desc">Video mà chỉ hội viên của kênh mới xem được, ngay bây giờ (chỉ dành cho hội viên) hoặc trước mọi người (hội viên xem trước). Video bị ẩn không bao giờ được phát, kể cả khi là video tiếp theo. Nhận diện ở mọi ngôn ngữ.</string>
+  <string name="members_sections">Mục</string>
+  <string name="members_only_label">Chỉ dành cho hội viên</string>
   <string name="streamed">Đã phát trực tiếp hoặc đang trực tiếp</string>
   <string name="streamed_show">Hiện</string>
   <string name="streamed_mark">Đánh dấu</string>

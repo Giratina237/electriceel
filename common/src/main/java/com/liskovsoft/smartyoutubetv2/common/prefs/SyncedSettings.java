@@ -348,6 +348,7 @@ public final class SyncedSettings {
         whole("filters.openedVideos", OpenedVideosData.class.getSimpleName(), "Opened videos");
         whole("filters.collaborations", CollaborationsData.class.getSimpleName(), "Collaborations");
         whole("filters.shows", ShowsData.class.getSimpleName(), "Shows");
+        whole("filters.members", MembersData.class.getSimpleName(), "Members videos");
         whole("filters.streamed", StreamedData.class.getSimpleName(), "Streamed");
         whole("filters.topChannels", TopChannelsData.class.getSimpleName(), "Top channels");
         whole("filters.watchLater", WatchLaterData.class.getSimpleName(), "Watch later");

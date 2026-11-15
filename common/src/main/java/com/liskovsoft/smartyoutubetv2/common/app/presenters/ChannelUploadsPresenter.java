@@ -229,7 +229,11 @@ public class ChannelUploadsPresenter extends BasePresenter<ChannelUploadsView> i
                                 getView().showProgressBar(false);
                             }
                         },
-                        () -> getView().showProgressBar(false)
+                        () -> {
+                            if (getView() != null) {
+                                getView().showProgressBar(false);
+                            }
+                        }
                 );
     }
 
@@ -290,6 +294,10 @@ public class ChannelUploadsPresenter extends BasePresenter<ChannelUploadsView> i
         // Hide loading as long as first group received
         if (!group.isEmpty()) {
             getView().showProgressBar(false);
+        } else if (group.hasHiddenVideos()) {
+            // Each of its videos is hidden (e.g. a channel's members-only ones): its next page, if it has one, else the loading ends.
+            // This load was let go above, its end doesn't hide the loading.
+            continueGroup(group);
         }
     }
 

@@ -489,6 +489,14 @@
   <string name="shows_desc">像推薦節目中那樣的節目（Podcast），在影片長度的位置顯示集數。適用於所有語言。</string>
   <string name="shows_sections">區塊</string>
   <string name="show_label">節目</string>
+  <string name="members">會員影片</string>
+  <string name="members_show">顯示</string>
+  <string name="members_mark">標記</string>
+  <string name="members_mark_desc">會員影片會以 YouTube 的標籤（會員專屬或會員搶先看）留在動態中</string>
+  <string name="members_hide">隱藏</string>
+  <string name="members_desc">只有頻道會員才能觀看的影片，現在（會員專屬）或比其他人更早（會員搶先看）。隱藏的影片永遠不會播放，即使是作為下一部。適用於所有語言。</string>
+  <string name="members_sections">區塊</string>
+  <string name="members_only_label">會員專屬</string>
   <string name="streamed">直播過或直播中</string>
   <string name="streamed_show">顯示</string>
   <string name="streamed_mark">標記</string>

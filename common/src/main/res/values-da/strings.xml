@@ -487,6 +487,14 @@
   <string name="shows_desc">Et program (podcast) som dem i Anbefalede programmer, med antallet af afsnit, hvor en video har sin længde. Genkendes på alle sprog.</string>
   <string name="shows_sections">Sektioner</string>
   <string name="show_label">Program</string>
+  <string name="members">Medlemsvideoer</string>
+  <string name="members_show">Vis</string>
+  <string name="members_mark">Markér</string>
+  <string name="members_mark_desc">Medlemsvideoer bliver i feedsene med YouTubes etiket (kun for medlemmer eller først for medlemmer)</string>
+  <string name="members_hide">Skjul</string>
+  <string name="members_desc">Videoer, som kun en kanals medlemmer kan se, nu (kun for medlemmer) eller før alle andre (først for medlemmer). Skjulte afspilles aldrig, heller ikke som den næste. Genkendes på alle sprog.</string>
+  <string name="members_sections">Sektioner</string>
+  <string name="members_only_label">Kun for medlemmer</string>
   <string name="streamed">Streamet eller direkte</string>
   <string name="streamed_show">Vis</string>
   <string name="streamed_mark">Markér</string>

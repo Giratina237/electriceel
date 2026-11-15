@@ -495,6 +495,14 @@
   <string name="shows_desc">Un programa (pódcast) como los de Programas recomendados, con el número de episodios donde un vídeo tiene su duración. Se detecta en todos los idiomas.</string>
   <string name="shows_sections">Secciones</string>
   <string name="show_label">Programa</string>
+  <string name="members">Vídeos para miembros</string>
+  <string name="members_show">Mostrar</string>
+  <string name="members_mark">Marcar</string>
+  <string name="members_mark_desc">Los vídeos para miembros siguen en los feeds con la etiqueta de YouTube (solo para miembros o primero para miembros)</string>
+  <string name="members_hide">Ocultar</string>
+  <string name="members_desc">Vídeos que solo pueden ver los miembros de un canal, ahora (solo para miembros) o antes que nadie (primero para miembros). Los ocultos nunca se reproducen, ni siquiera como siguiente. Se detecta en todos los idiomas.</string>
+  <string name="members_sections">Secciones</string>
+  <string name="members_only_label">Solo para miembros</string>
   <string name="streamed">Emitido o en vivo</string>
   <string name="streamed_show">Mostrar</string>
   <string name="streamed_mark">Marcar</string>

@@ -3,6 +3,7 @@ package com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers;
 import android.text.TextUtils;
 import android.util.Pair;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.liskovsoft.mediaserviceinterfaces.ContentService;
@@ -29,6 +30,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.misc.BrowseProcessorManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.HiddenVideoResolver;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.MembersVideos;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
@@ -45,6 +47,10 @@ public class SuggestionsController extends BasePlayerController {
     private ContentService mContentService;
     private BrowseProcessorManager mBrowseProcessor;
     private Video mNextSectionVideo;
+    /**
+     * Of the video playing, as its metadata gave them: a video to play instead of the next one the Members setting hides (see getNext)
+     */
+    private List<MediaGroup> mSuggestions;
     private int mFocusCount;
     private int mNextRetryCount;
     private List<ChapterItem> mChapters;
@@ -230,17 +236,35 @@ public class SuggestionsController extends BasePlayerController {
         mActions.add(continueAction);
     }
 
-    private void syncCurrentVideo(MediaItemMetadata mediaItemMetadata, Video video) {
+    /**
+     * @return false when the video isn't played on (see skipMembersVideo): its suggestions aren't added
+     */
+    private boolean syncCurrentVideo(MediaItemMetadata mediaItemMetadata, Video video) {
         if (getPlayer() == null) {
-            return;
+            return false;
         }
 
         video.sync(mediaItemMetadata);
         getPlayer().setVideo(video);
 
+        // Its own badge says it, not its card (e.g. YouTube's next one): a member account plays it, unless the Members setting hides it
+        if (video.membersLabel != null) {
+            MembersVideos.add(video.videoId);
+        }
+
+        VideoLoaderController loader = getController(VideoLoaderController.class);
+
+        // Or it was skipped before this said what's next (its formats failed first, see VideoLoaderController.skipMembersVideo)
+        if (loader != null && (MembersVideos.isHidden(getContext(), video) || loader.isMembersSkipPending(video))
+                && loader.skipMembersVideo(video)) {
+            return false;
+        }
+
         getPlayer().setNextTitle(getNext());
 
         appendDislikes(video);
+
+        return true;
     }
 
     public void loadSuggestions(Video video) {
@@ -283,11 +307,92 @@ public class SuggestionsController extends BasePlayerController {
         mActions.add(metadataAction);
     }
 
+    /**
+     * The video played next: of the queue, the mix, the section the video was opened from, else YouTube's next one. Not one only the
+     * channel's members watch, which the Members setting hides (see MembersVideos): the queue's one after it, else the first suggestion.
+     * YouTube's next one is only an id and a title: it's known to be such when a card of it was seen (e.g. the suggestions), or once it
+     * was tried.
+     */
     public Video getNext() {
         if (getPlayer() == null || getVideo() == null) {
             return null;
         }
 
+        Video next = getNextInt();
+
+        if (!MembersVideos.isHidden(getContext(), next)) {
+            return next;
+        }
+
+        // The queue goes on: a suggestion would end it (see Playlist.add)
+        Video queued = next.fromQueue ? findQueuedToPlay() : null;
+
+        return queued != null ? queued : findSuggestionToPlay();
+    }
+
+    /**
+     * Of the queue after the video playing, the first one not hidden (see MembersVideos)
+     */
+    @Nullable
+    private Video findQueuedToPlay() {
+        List<Video> queue = Playlist.instance().getAllAfterCurrent();
+
+        if (queue == null) {
+            return null;
+        }
+
+        for (Video video : queue) {
+            if (!MembersVideos.isHidden(getContext(), video)) {
+                video.fromQueue = true;
+                return video;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The first video of the suggestions, which leave out the ones hidden (see VideoGroup.isHiddenMembers), not the one playing. In a
+     * row that has the one playing (e.g. its playlist, its mix), one after it: the playlist goes on, not from its start. Null before
+     * they're loaded.
+     */
+    @Nullable
+    private Video findSuggestionToPlay() {
+        if (mSuggestions == null || getVideo() == null) {
+            return null;
+        }
+
+        for (MediaGroup group : mSuggestions) {
+            VideoGroup videoGroup = group != null && !group.isEmpty() ? VideoGroup.from(group) : null;
+            List<Video> videos = videoGroup != null ? videoGroup.getVideos() : null;
+
+            if (videos == null) {
+                continue;
+            }
+
+            int start = 0;
+
+            for (int i = 0; i < videos.size(); i++) {
+                if (Helpers.equals(videos.get(i).videoId, getVideo().videoId)) {
+                    start = i + 1;
+                    break;
+                }
+            }
+
+            for (int i = start; i < videos.size(); i++) {
+                Video video = videos.get(i);
+
+                if (video.hasVideo() && !video.isChapter && !video.isUpcoming && !Helpers.equals(video.videoId, getVideo().videoId)
+                        && !MembersVideos.isHidden(getContext(), video)) {
+                    return video;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private Video getNextInt() {
         Video result = null;
         Video next = Playlist.instance().getNext();
 
@@ -363,7 +468,11 @@ public class SuggestionsController extends BasePlayerController {
     }
 
     private void updateSuggestions(MediaItemMetadata mediaItemMetadata, Video video) {
-        syncCurrentVideo(mediaItemMetadata, video);
+        mSuggestions = mediaItemMetadata.getSuggestions();
+
+        if (!syncCurrentVideo(mediaItemMetadata, video)) {
+            return;
+        }
 
         appendSuggestions(video, mediaItemMetadata);
 
@@ -876,6 +985,7 @@ public class SuggestionsController extends BasePlayerController {
         RxHelper.disposeActions(mActions);
         mChapters = null;
         mNextSectionVideo = null;
+        mSuggestions = null;
         if (mBrowseProcessor != null) {
             mBrowseProcessor.dispose();
         }

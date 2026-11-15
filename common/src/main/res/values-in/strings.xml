@@ -511,6 +511,14 @@
   <string name="shows_desc">Acara (podcast) seperti yang ada di Acara yang direkomendasikan, dengan jumlah episode di tempat durasi video. Dikenali di semua bahasa.</string>
   <string name="shows_sections">Bagian</string>
   <string name="show_label">Acara</string>
+  <string name="members">Video khusus anggota</string>
+  <string name="members_show">Tampilkan</string>
+  <string name="members_mark">Tandai</string>
+  <string name="members_mark_desc">Video khusus anggota tetap ada di feed dengan label YouTube (khusus anggota atau anggota lebih dulu)</string>
+  <string name="members_hide">Sembunyikan</string>
+  <string name="members_desc">Video yang hanya dapat ditonton oleh anggota channel, sekarang (khusus anggota) atau sebelum orang lain (anggota lebih dulu). Video yang disembunyikan tidak pernah diputar, bahkan sebagai berikutnya. Dikenali di semua bahasa.</string>
+  <string name="members_sections">Bagian</string>
+  <string name="members_only_label">Khusus anggota</string>
   <string name="streamed">Sudah disiarkan atau live</string>
   <string name="streamed_show">Tampilkan</string>
   <string name="streamed_mark">Tandai</string>

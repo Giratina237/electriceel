@@ -55,6 +55,7 @@ public class AppPrefs extends SharedPreferencesBase implements AccountChangeList
             LocaleData.LOCALE_DATA, BlockedChannelData.BLOCKED_CHANNEL_DATA, KeywordFilterData.KEYWORD_FILTER_DATA, FilterExclusionData.FILTER_EXCLUSION_DATA,
             CollaborationsData.class.getSimpleName(), TopChannelsData.class.getSimpleName(), ExploreTopicsData.class.getSimpleName(),
             ShowsData.class.getSimpleName(), StreamedData.class.getSimpleName(), WatchLaterData.class.getSimpleName(), MusicAutoplayData.class.getSimpleName(),
+            MembersData.class.getSimpleName(),
             OldVideosData.class.getSimpleName(), AiSListFilterData.class.getSimpleName(), SponsorBlockData.SPONSOR_BLOCK_DATA,
             HideContentData.HIDE_CONTENT_DATA, DeArrowData.class.getSimpleName(), SearchData.SEARCH_DATA,
             DuplicatesData.class.getSimpleName(), CensoredWordsData.class.getSimpleName(), ChannelGroupFilterData.class.getSimpleName(),

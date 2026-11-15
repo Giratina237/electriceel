@@ -115,6 +115,10 @@ public final class VideoStarts {
     private static final String FETCH = "fetch";
     private static final String DETAIL_RETRY = "retry";
     /**
+     * Of the formats stage whose fetch failed (see onFormatsFailed)
+     */
+    static final String DETAIL_FAILED = "failed";
+    /**
      * Of a segment not loaded whole when the video played
      */
     private static final String DETAIL_LOADING = "still loading";
@@ -396,6 +400,22 @@ public final class VideoStarts {
             return group;
         }
 
+        /**
+         * The last one of the name, ended or not
+         */
+        @Nullable
+        Group findLast(String name) {
+            for (int i = groups.size() - 1; i >= 0; i--) {
+                Group group = groups.get(i);
+
+                if (group.name.equals(name)) {
+                    return group;
+                }
+            }
+
+            return null;
+        }
+
         @Nullable
         Group findOpen(String name) {
             for (int i = groups.size() - 1; i >= 0; i--) {
@@ -582,6 +602,43 @@ public final class VideoStarts {
         }
 
         long now = sClock.now();
+        long lastFetchEndMs = closeFormats(timer, videoId, now, null);
+
+        if (lastFetchEndMs >= 0 && now > lastFetchEndMs) {
+            timer.findLast(STAGE_FORMATS).children.add(new VideoStart.Stage(STAGE_TO_PLAYER, null, 1, lastFetchEndMs, now));
+        }
+
+        timer.client = client;
+        timer.open(STAGE_OPEN, null, now);
+    }
+
+    /**
+     * The fetch failed (see ErrorFixerController.runFormatErrorAction): the formats stage ends there with the fetch's stages, not when the
+     * user leaves. No client plays it: the start ends, unplayable. Another error (e.g. no network) is fetched again (see onFetch).
+     *
+     * @param isUnplayable every client said it can't be played (e.g. members only)
+     */
+    public static void onFormatsFailed(String videoId, boolean isUnplayable) {
+        Timer timer = getTimer(videoId);
+
+        if (timer == null || timer.fetchMs < 0) {
+            return;
+        }
+
+        closeFormats(timer, videoId, sClock.now(), DETAIL_FAILED);
+
+        if (isUnplayable) {
+            abandon(VideoStart.OUTCOME_UNPLAYABLE);
+        }
+    }
+
+    /**
+     * The formats stage ends now, with the stages of its fetch
+     *
+     * @param detail of the stage, e.g. DETAIL_FAILED, null for none
+     * @return when the last fetch ended, -1 when not known
+     */
+    private static long closeFormats(Timer timer, String videoId, long now, @Nullable String detail) {
         Group formats = timer.findOpen(STAGE_FORMATS);
 
         if (formats == null) {
@@ -589,6 +646,11 @@ public final class VideoStarts {
         }
 
         formats.endMs = now;
+
+        if (detail != null) {
+            formats.detail = detail;
+        }
+
         long firstFetchMs = -1;
         long lastFetchEndMs = -1;
         List<FetchStages.Stage> fetched = new ArrayList<>();
@@ -616,12 +678,7 @@ public final class VideoStarts {
             timer.isCached |= "cached".equals(stage.name);
         }
 
-        if (lastFetchEndMs >= 0 && now > lastFetchEndMs) {
-            formats.children.add(new VideoStart.Stage(STAGE_TO_PLAYER, null, 1, lastFetchEndMs, now));
-        }
-
-        timer.client = client;
-        timer.open(STAGE_OPEN, null, now);
+        return lastFetchEndMs;
     }
 
     /**

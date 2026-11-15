@@ -190,8 +190,9 @@ public class BackupSettingsPresenter extends BasePresenter<Void> {
                 option -> {
                     AppDialogUtil.showConfirmationDialog(getContext(), getContext().getString(R.string.app_backup), () -> {
                         mSidebarService.enableSection(MediaGroup.TYPE_SETTINGS, true); // prevent Settings lock
-                        backupManager.checkPermAndBackup();
-                        MessageHelpers.showMessage(getContext(), R.string.msg_done);
+                        Context context = getContext().getApplicationContext();
+                        // Done once it's done: it runs off the main thread
+                        backupManager.checkPermAndBackup(() -> MessageHelpers.showMessage(context, R.string.msg_done));
                     });
                 }));
 

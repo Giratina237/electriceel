@@ -521,6 +521,14 @@
     <string name="shows_desc">Un programma (podcast) come quelli dei programmi consigliati, con il numero di episodi dove un video ha la durata. Riconosciuto in ogni lingua.</string>
     <string name="shows_sections">Sezioni</string>
     <string name="show_label">Programma</string>
+    <string name="members">Video per i membri</string>
+    <string name="members_show">Mostra</string>
+    <string name="members_mark">Contrassegna</string>
+    <string name="members_mark_desc">I video per i membri restano nei feed con l\'etichetta di YouTube (solo per i membri o prima per i membri)</string>
+    <string name="members_hide">Nascondi</string>
+    <string name="members_desc">Video che solo i membri di un canale possono guardare, ora (solo per i membri) o prima di tutti gli altri (prima per i membri). Quelli nascosti non vengono mai riprodotti, nemmeno come successivo. Riconosciuto in ogni lingua.</string>
+    <string name="members_sections">Sezioni</string>
+    <string name="members_only_label">Solo per i membri</string>
     <string name="streamed">Trasmesso o in diretta</string>
     <string name="streamed_show">Mostra</string>
     <string name="streamed_mark">Contrassegna</string>

@@ -529,6 +529,14 @@
     <string name="shows_desc">A show (podcast) such as the ones in Recommended shows, with the number of episodes where a video has its length. Found in every language.</string>
     <string name="shows_sections">Sections</string>
     <string name="show_label">Show</string>
+    <string name="members">Member videos</string>
+    <string name="members_show">Show</string>
+    <string name="members_mark">Mark</string>
+    <string name="members_mark_desc">Member videos stay in the feeds with YouTube\'s \"Members only\" or \"Members first\" label</string>
+    <string name="members_hide">Hide</string>
+    <string name="members_desc">Videos only a channel\'s members can watch, now (Members only) or before everyone else (Members first). Hidden ones are never played, not even next. Found in every language.</string>
+    <string name="members_sections">Sections</string>
+    <string name="members_only_label">Members only</string>
     <string name="streamed">Streamed or Live</string>
     <string name="streamed_show">Show</string>
     <string name="streamed_mark">Mark</string>

@@ -18,6 +18,7 @@ import com.liskovsoft.smartyoutubetv2.common.misc.NotInterestedManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.OldVideoFilter;
 import com.liskovsoft.smartyoutubetv2.common.misc.ShortsDateManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.VideoCategoryManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.MembersVideos;
 import com.liskovsoft.smartyoutubetv2.common.misc.StreamedManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.WatchLaterManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AiSListFilterData;
@@ -30,6 +31,7 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.HomeRowsData.Row;
 import com.liskovsoft.smartyoutubetv2.common.prefs.KeywordFilterData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.OpenedVideosData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SectionFilterData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.MembersData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.ShowsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.StreamedData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.TopChannelsData;
@@ -497,6 +499,13 @@ public class VideoGroup {
     }
 
     /**
+     * Some of its videos were hidden, here or by the service (see MediaGroup.getFilteredVideoCount)
+     */
+    public boolean hasHiddenVideos() {
+        return mHiddenVideoCount > 0;
+    }
+
+    /**
      * Every video was hidden, here or by the service (see MediaGroup.getFilteredVideoCount), and only cards without a video are left
      * (e.g. "More music" of a music row, or of "Listen again" with Hide watched videos from Home)
      */
@@ -549,7 +558,8 @@ public class VideoGroup {
         addShortsDate(video);
 
         if (isChannelBlocked(video) || isNotInterested(video) || isHiddenWithMenu(video) || isAiListed(video) || isHiddenCategory(video) || isOld(video) || isHiddenCollaboration(video)
-                || isHiddenWatchLater(video) || isHiddenShow(video) || isHiddenStreamed(video) || isHiddenTopChannel(video) || isHiddenExploreTopic(video)
+                || isHiddenWatchLater(video) || isHiddenShow(video) || isHiddenMembers(video) || isHiddenStreamed(video) || isHiddenTopChannel(video)
+                || isHiddenExploreTopic(video)
                 || hasHiddenKeyword(video) || isWatchedSuggestion(video) || isUnsubscribedChannel(video) || isHiddenChannelGroupChannel(video)
                 || isWatchedInChannelGroup(video) || isHiddenOpened(video) || isDuplicate(video)) {
             if (video.videoId != null) {
@@ -982,6 +992,31 @@ public class VideoGroup {
         }
 
         video.isShowMarked = true;
+
+        return false;
+    }
+
+    /**
+     * A video only the channel's members watch (see Video.membersLabel), hidden by default. Unlike the other filters, also where no
+     * section is (-1, e.g. the player's suggestions): a hidden one is never played next (see MembersData.isHidingEnabledIn).
+     * Also marks the video when the setting marks instead of hiding. Each one is remembered, hidden or not, for the next video of
+     * autoplay, whose card doesn't say it (see MembersVideos).
+     */
+    private boolean isHiddenMembers(Video video) {
+        // No context before the app is initialized (GlobalPreferences)
+        if (video.isChapter || video.membersLabel == null || GlobalPreferences.context() == null) {
+            return false;
+        }
+
+        MembersVideos.add(video.videoId);
+        int sectionId = getFilterSectionId();
+        MembersData data = MembersData.instance(GlobalPreferences.context());
+
+        if (data.isHidingEnabledIn(sectionId)) {
+            return true;
+        }
+
+        video.isMembersMarked = data.isMarkingEnabledIn(sectionId);
 
         return false;
     }

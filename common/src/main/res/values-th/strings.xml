@@ -485,6 +485,14 @@
     <string name="shows_desc">รายการ (พอดแคสต์) เช่นเดียวกับในรายการแนะนำ ที่แสดงจำนวนตอนแทนความยาววิดีโอ ตรวจพบได้ในทุกภาษา</string>
     <string name="shows_sections">ส่วน</string>
     <string name="show_label">รายการ</string>
+    <string name="members">วิดีโอสำหรับสมาชิก</string>
+    <string name="members_show">แสดง</string>
+    <string name="members_mark">ทำเครื่องหมาย</string>
+    <string name="members_mark_desc">วิดีโอสำหรับสมาชิกยังอยู่ในฟีดพร้อมป้ายของ YouTube (เฉพาะสมาชิกหรือสมาชิกได้ดูก่อน)</string>
+    <string name="members_hide">ซ่อน</string>
+    <string name="members_desc">วิดีโอที่เฉพาะสมาชิกของช่องดูได้ ตอนนี้ (เฉพาะสมาชิก) หรือก่อนคนอื่น (สมาชิกได้ดูก่อน) วิดีโอที่ซ่อนไว้จะไม่เล่นเลย แม้แต่เป็นรายการถัดไป ตรวจพบได้ในทุกภาษา</string>
+    <string name="members_sections">ส่วน</string>
+    <string name="members_only_label">เฉพาะสมาชิก</string>
     <string name="streamed">สตรีมแล้วหรือสด</string>
     <string name="streamed_show">แสดง</string>
     <string name="streamed_mark">ทำเครื่องหมาย</string>

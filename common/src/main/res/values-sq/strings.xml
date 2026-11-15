@@ -513,6 +513,14 @@
   <string name="shows_desc">Një emision (podkast) si ato te Emisionet e rekomanduara, me numrin e episodeve aty ku një video ka kohëzgjatjen. Njihet në çdo gjuhë.</string>
   <string name="shows_sections">Seksionet</string>
   <string name="show_label">Emision</string>
+  <string name="members">Videot për anëtarët</string>
+  <string name="members_show">Shfaq</string>
+  <string name="members_mark">Shëno</string>
+  <string name="members_mark_desc">Videot për anëtarët mbeten në rrjedhat me etiketën e YouTube (vetëm për anëtarët ose fillimisht për anëtarët)</string>
+  <string name="members_hide">Fshih</string>
+  <string name="members_desc">Video që mund t\'i shikojnë vetëm anëtarët e një kanali, tani (vetëm për anëtarët) ose para të gjithëve (fillimisht për anëtarët). Të fshehurat nuk luhen kurrë, as si e radhës. Njihet në çdo gjuhë.</string>
+  <string name="members_sections">Seksionet</string>
+  <string name="members_only_label">Vetëm për anëtarët</string>
   <string name="streamed">I transmetuar ose drejtpërdrejt</string>
   <string name="streamed_show">Shfaq</string>
   <string name="streamed_mark">Shëno</string>

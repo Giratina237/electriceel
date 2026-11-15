@@ -453,6 +453,14 @@
     <string name="shows_desc">Емисија (подкаст) попут оних у Препорученим емисијама, са бројем епизода тамо где видео има трајање. Препознаје се на сваком језику.</string>
     <string name="shows_sections">Одељци</string>
     <string name="show_label">Емисија</string>
+    <string name="members">Видео снимци за чланове</string>
+    <string name="members_show">Прикажи</string>
+    <string name="members_mark">Означи</string>
+    <string name="members_mark_desc">Видео снимци за чланове остају у фидовима са ознаком YouTube-а (само за чланове или прво за чланове)</string>
+    <string name="members_hide">Сакриј</string>
+    <string name="members_desc">Видео снимци које могу да гледају само чланови канала, сада (само за чланове) или пре свих осталих (прво за чланове). Скривени се никад не пуштају, чак ни као следећи. Препознаје се на сваком језику.</string>
+    <string name="members_sections">Одељци</string>
+    <string name="members_only_label">Само за чланове</string>
     <string name="streamed">Емитовано или уживо</string>
     <string name="streamed_show">Прикажи</string>
     <string name="streamed_mark">Означи</string>

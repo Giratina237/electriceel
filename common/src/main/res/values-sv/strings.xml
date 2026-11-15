@@ -521,6 +521,14 @@
   <string name="shows_desc">Ett program (podcast) som de i Rekommenderade program, med antalet avsnitt där en video har sin längd. Känns igen på alla språk.</string>
   <string name="shows_sections">Avsnitt</string>
   <string name="show_label">Program</string>
+  <string name="members">Medlemsvideor</string>
+  <string name="members_show">Visa</string>
+  <string name="members_mark">Markera</string>
+  <string name="members_mark_desc">Medlemsvideor stannar i flödena med YouTubes etikett (endast för medlemmar eller först för medlemmar)</string>
+  <string name="members_hide">Dölj</string>
+  <string name="members_desc">Videor som bara en kanals medlemmar kan titta på, nu (endast för medlemmar) eller före alla andra (först för medlemmar). Dolda spelas aldrig upp, inte ens som nästa. Känns igen på alla språk.</string>
+  <string name="members_sections">Avsnitt</string>
+  <string name="members_only_label">Endast för medlemmar</string>
   <string name="streamed">Streamat eller live</string>
   <string name="streamed_show">Visa</string>
   <string name="streamed_mark">Markera</string>

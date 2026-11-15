@@ -486,6 +486,14 @@
   <string name="shows_desc">Εκπομπή (podcast) όπως αυτές στις Προτεινόμενες εκπομπές, με τον αριθμό επεισοδίων εκεί που ένα βίντεο έχει τη διάρκειά του. Αναγνωρίζεται σε κάθε γλώσσα.</string>
   <string name="shows_sections">Ενότητες</string>
   <string name="show_label">Εκπομπή</string>
+  <string name="members">Βίντεο μελών</string>
+  <string name="members_show">Εμφάνιση</string>
+  <string name="members_mark">Σήμανση</string>
+  <string name="members_mark_desc">Τα βίντεο μελών μένουν στις ροές με την ετικέτα του YouTube (μόνο για μέλη ή πρώτα για μέλη)</string>
+  <string name="members_hide">Απόκρυψη</string>
+  <string name="members_desc">Βίντεο που μόνο τα μέλη ενός καναλιού μπορούν να δουν, τώρα (μόνο για μέλη) ή πριν από όλους (πρώτα για μέλη). Τα κρυμμένα δεν αναπαράγονται ποτέ, ούτε ως επόμενα. Αναγνωρίζεται σε κάθε γλώσσα.</string>
+  <string name="members_sections">Ενότητες</string>
+  <string name="members_only_label">Μόνο για μέλη</string>
   <string name="streamed">Μεταδόθηκε ή ζωντανά</string>
   <string name="streamed_show">Εμφάνιση</string>
   <string name="streamed_mark">Σήμανση</string>

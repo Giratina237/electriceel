@@ -15,6 +15,7 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.CollaborationsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.ExploreTopicsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.FilterExclusionData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SectionFilterData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.MembersData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.ShowsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.StreamedData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.TopChannelsData;
@@ -28,7 +29,7 @@ import java.util.Map.Entry;
 /**
  * A card of the Content Filtering settings that shows, marks or hides a filter's videos, where, the color of the label,
  * the channels excluded from the hiding and the quick toggle of the hiding
- * (e.g. Collaborations, Watch later, Shows, Streamed or Live, Top channels you watch, Explore more topics, a category of Home)
+ * (e.g. Collaborations, Watch later, Shows, Member videos, Streamed or Live, Top channels you watch, Explore more topics, a category of Home)
  */
 public class SectionFilterSettingsPresenter extends BasePresenter<Void> {
     // Outside the sidebar: the title, the section id the filter knows it by (see VideoGroup.getFilterSectionId)
@@ -81,6 +82,15 @@ public class SectionFilterSettingsPresenter extends BasePresenter<Void> {
         return new SectionFilterSettingsPresenter(context, ShowsData.instance(context), R.string.shows,
                 R.string.shows_show, R.string.shows_mark, R.string.shows_mark_desc, R.string.shows_hide,
                 R.string.shows_sections, true, 0, false);
+    }
+
+    /**
+     * Hidden by default (see MembersData)
+     */
+    public static SectionFilterSettingsPresenter members(Context context) {
+        return new SectionFilterSettingsPresenter(context, MembersData.instance(context), R.string.members,
+                R.string.members_show, R.string.members_mark, R.string.members_mark_desc, R.string.members_hide,
+                R.string.members_sections, true, 0, false);
     }
 
     public static SectionFilterSettingsPresenter streamed(Context context) {

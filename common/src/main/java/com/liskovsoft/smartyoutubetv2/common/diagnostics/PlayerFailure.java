@@ -406,6 +406,8 @@ public final class PlayerFailure {
         mIsStateIncluded = false;
         // It happened in a process before this one
         mSinceProcessStartMs = -1;
+        // This process's: the one that exited told the player nothing of these (e.g. a seek of the video this one started)
+        mCommands = null;
 
         return this;
     }

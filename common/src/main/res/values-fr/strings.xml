@@ -501,6 +501,14 @@
   <string name="shows_desc">Une émission (podcast) comme celles des émissions recommandées, avec le nombre d\'épisodes à la place de la durée d\'une vidéo. Détectée dans toutes les langues.</string>
   <string name="shows_sections">Sections</string>
   <string name="show_label">Émission</string>
+  <string name="members">Vidéos pour les membres</string>
+  <string name="members_show">Afficher</string>
+  <string name="members_mark">Marquer</string>
+  <string name="members_mark_desc">Les vidéos pour les membres restent dans les flux avec l\'étiquette de YouTube (réservé aux membres ou d\'abord pour les membres)</string>
+  <string name="members_hide">Masquer</string>
+  <string name="members_desc">Des vidéos que seuls les membres d\'une chaîne peuvent regarder, maintenant (réservé aux membres) ou avant tout le monde (d\'abord pour les membres). Celles qui sont masquées ne sont jamais lues, même à la suite. Détectées dans toutes les langues.</string>
+  <string name="members_sections">Sections</string>
+  <string name="members_only_label">Réservé aux membres</string>
   <string name="streamed">Diffusé ou en direct</string>
   <string name="streamed_show">Afficher</string>
   <string name="streamed_mark">Marquer</string>

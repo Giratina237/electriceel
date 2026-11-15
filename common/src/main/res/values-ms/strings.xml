@@ -526,6 +526,14 @@
     <string name="shows_desc">Rancangan (podcast) seperti dalam Rancangan yang disyorkan, dengan bilangan episod di tempat panjang video. Dikesan dalam setiap bahasa.</string>
     <string name="shows_sections">Bahagian</string>
     <string name="show_label">Rancangan</string>
+    <string name="members">Video ahli</string>
+    <string name="members_show">Tunjukkan</string>
+    <string name="members_mark">Tandakan</string>
+    <string name="members_mark_desc">Video ahli kekal dalam suapan dengan label YouTube (ahli sahaja atau ahli dahulu)</string>
+    <string name="members_hide">Sembunyikan</string>
+    <string name="members_desc">Video yang hanya boleh ditonton oleh ahli saluran, sekarang (ahli sahaja) atau lebih awal daripada orang lain (ahli dahulu). Video yang disembunyikan tidak pernah dimainkan, walaupun sebagai seterusnya. Dikesan dalam setiap bahasa.</string>
+    <string name="members_sections">Bahagian</string>
+    <string name="members_only_label">Ahli sahaja</string>
     <string name="streamed">Telah distrim atau langsung</string>
     <string name="streamed_show">Tunjukkan</string>
     <string name="streamed_mark">Tandakan</string>

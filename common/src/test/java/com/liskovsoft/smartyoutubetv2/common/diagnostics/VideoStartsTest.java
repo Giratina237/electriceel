@@ -1275,6 +1275,48 @@ public class VideoStartsTest {
         assertEquals(0, first.toJson().getJSONArray("warmUps").length());
     }
 
+    /**
+     * No client plays it (a members' video, every client tried in 1.2 s): the start ends there, unplayable, with the fetch's stages, not
+     * "left" 9.9 s later with its formats still going
+     */
+    @Test
+    public void aFetchNoClientAnsweredEndsTheStartUnplayable() {
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_AUTOPLAY);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.fetchStages = stages(
+                stage("fetch", null, 0, 1, 1_200),
+                stage("TV attempt", "unplayable UNPLAYABLE members: Join this channel", 1, 1, 1_200),
+                stage("request", null, 2, 2, 1_200));
+        mFixture.at(1_250);
+        VideoStarts.onFormatsFailed(VIDEO_ID, true);
+
+        VideoStart start = last();
+
+        assertEquals(VideoStart.OUTCOME_UNPLAYABLE, start.outcome);
+        assertStage(find(start, VideoStarts.STAGE_FORMATS), VideoStarts.STAGE_FORMATS, VideoStarts.DETAIL_FAILED, 0, 0, 1_250);
+        assertStage(find(start, "TV attempt"), "TV attempt", "unplayable UNPLAYABLE members: Join this channel", 1, 1, 1_200);
+
+        for (VideoStart.Stage stage : start.stages) {
+            assertFalse(stage.name, VideoStarts.DETAIL_GOING.equals(stage.detail));
+        }
+    }
+
+    /**
+     * Another error (e.g. no network) is fetched again: the start goes on
+     */
+    @Test
+    public void aFetchThatFailedOtherwiseGoesOn() {
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(800);
+        VideoStarts.onFormatsFailed(VIDEO_ID, false);
+
+        assertTrue(mFixture.recorded.isEmpty());
+        assertTrue(VideoStarts.snapshot() != null);
+    }
+
     private VideoStart last() {
         return mFixture.recorded.get(mFixture.recorded.size() - 1);
     }

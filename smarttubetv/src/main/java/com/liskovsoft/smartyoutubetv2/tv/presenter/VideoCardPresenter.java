@@ -40,6 +40,7 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.CategoryFilterData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.CollaborationsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.ExploreTopicsData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.MembersData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.ShowsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.StreamedData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.TopChannelsData;
@@ -259,7 +260,8 @@ public class VideoCardPresenter extends LongClickPresenter {
     }
 
     /**
-     * The second title, shortened for a short (see CompactInfo), after the "AI", "Collab", "Watch later", "Show", "Top channel", "Topic",
+     * The second title, shortened for a short (see CompactInfo), after the "AI", "Collab", "Watch later", "Show", "Members only" (YouTube's
+     * label), "Top channel", "Topic",
      * category ("Music", "Gaming", "Sports", "News", "Tech") and "Streamed" or "Live" markers the video has.
      * The "Streamed" marker takes the word off the date ("Streamed • 5 hours ago").
      */
@@ -310,6 +312,10 @@ public class VideoCardPresenter extends LongClickPresenter {
             text = addMark(context, text, R.string.top_channel_label, TopChannelsData.instance(context).getMarkColor(), selected);
         }
 
+        if (video.isMembersMarked) {
+            text = addMark(context, text, getMembersLabel(context, video), MembersData.instance(context).getMarkColor(), selected);
+        }
+
         if (video.isShowMarked) {
             text = addMark(context, text, R.string.show_label, ShowsData.instance(context).getMarkColor(), selected);
         }
@@ -327,6 +333,14 @@ public class VideoCardPresenter extends LongClickPresenter {
         }
 
         return text;
+    }
+
+    /**
+     * As YouTube labels it, "Members only" or "Members first", in the language asked for. The app's "Members only" for a badge without a
+     * label.
+     */
+    private static CharSequence getMembersLabel(Context context, Video video) {
+        return !TextUtils.isEmpty(video.membersLabel) ? video.membersLabel : context.getString(R.string.members_only_label);
     }
 
     /**
@@ -375,7 +389,14 @@ public class VideoCardPresenter extends LongClickPresenter {
      * @param markColor the saved ARGB color of the marker or {@link AiSListFilterData#MARK_COLOR_OFF} (the card text color)
      */
     public static CharSequence addMark(Context context, CharSequence secondTitle, int markResId, int markColor, boolean selected) {
-        SpannableString mark = new SpannableString(context.getString(markResId));
+        return addMark(context, secondTitle, context.getString(markResId), markColor, selected);
+    }
+
+    /**
+     * @param label e.g. YouTube's own, in the language asked for (see getMembersLabel)
+     */
+    public static CharSequence addMark(Context context, CharSequence secondTitle, CharSequence label, int markColor, boolean selected) {
+        SpannableString mark = new SpannableString(label);
         mark.setSpan(new StyleSpan(Typeface.BOLD), 0, mark.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         if (markColor != AiSListFilterData.MARK_COLOR_OFF) {

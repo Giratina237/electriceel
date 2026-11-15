@@ -7,7 +7,9 @@ import android.content.Context;
 
 import com.liskovsoft.smartyoutubetv2.common.prefs.DebuggingData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import org.junit.After;
@@ -24,10 +26,13 @@ import org.robolectric.shadows.ShadowActivityManager.ApplicationExitInfoBuilder;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -49,6 +54,8 @@ public class AppExitsTest {
         // The exits seen are kept between the tests: each sees its own
         mSavedLastExitTs = DebuggingData.instance(getContext()).getLastAppExitTs();
         DebuggingData.instance(getContext()).setLastAppExitTs(0);
+        AppExits.resetForTesting(getContext());
+        PlayerCommands.onNewVideo(null);
         PlayerTweaksData.instance(getContext()).setPlayerDataSource(PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP);
     }
 
@@ -59,6 +66,8 @@ public class AppExitsTest {
         PlayerFailureLog.useForTesting(null);
         PlayerTweaksData.instance(getContext()).setPlayerDataSource(mSavedEngine);
         DebuggingData.instance(getContext()).setLastAppExitTs(mSavedLastExitTs);
+        AppExits.resetForTesting(getContext());
+        PlayerCommands.onNewVideo(null);
     }
 
     /**
@@ -238,6 +247,112 @@ public class AppExitsTest {
         JSONObject lastState = mLog.readAll().get(0).getJSONObject("details").getJSONObject("lastState");
         assertEquals(LastState.SERVICE_REMOTE_CONTROL, lastState.getJSONArray("services").getString(0));
         assertEquals(5_000, lastState.getLong("agoMs"));
+    }
+
+    /**
+     * Found on the next start once: the exit seen is on the disk before recordNew returns, not saved later on the main thread. A process
+     * whose main thread hung never saved it, and the next one recorded the same ANR again.
+     */
+    @Test
+    @Config(sdk = 30)
+    public void anExitIsRecordedOnceAcrossStarts() throws Exception {
+        addExit(getContext().getPackageName(), System.currentTimeMillis() - 60_000);
+
+        AppExits.recordNew(getContext());
+        // The settings' save never ran (the main thread hung): the next start finds the old value there
+        Utils.sHandler.removeCallbacksAndMessages(null);
+        DebuggingData.instance(getContext()).setLastAppExitTs(0);
+        AppExits.recordNew(getContext());
+
+        assertEquals(1, mLog.readAll().size());
+    }
+
+    /**
+     * Until its own file has one, the exit seen DebuggingData kept: an update records nothing twice
+     */
+    @Test
+    @Config(sdk = 30)
+    public void theExitSeenBeforeIsStillSeen() throws Exception {
+        long exitTs = System.currentTimeMillis() - 60_000;
+        addExit(getContext().getPackageName(), exitTs);
+        DebuggingData.instance(getContext()).setLastAppExitTs(exitTs);
+
+        AppExits.recordNew(getContext());
+
+        assertTrue(mLog.readAll().isEmpty());
+    }
+
+    /**
+     * What the new process told the player isn't what the one that exited did
+     */
+    @Test
+    @Config(sdk = 30)
+    public void anExitHasNoCommandsOfThisProcess() throws Exception {
+        PlayerCommands.onNewVideo("this process's");
+        PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, 0);
+        addExit(getContext().getPackageName(), System.currentTimeMillis() - 60_000);
+
+        AppExits.recordNew(getContext());
+
+        assertFalse(mLog.readAll().get(0).has("commands"));
+    }
+
+    @Test
+    public void aShortThreadIsKeptWhole() throws Exception {
+        List<String> thread = thread(40);
+
+        JSONArray json = AppExits.toJson(thread);
+
+        assertEquals(40, json.length());
+        assertEquals(thread.get(39), json.getString(39));
+    }
+
+    /**
+     * Its deep frames tell how the work got there (e.g. a pool's rejection handler): the last ones are kept too
+     */
+    @Test
+    public void aLongThreadKeepsItsFirstAndLastLines() throws Exception {
+        List<String> thread = thread(150);
+
+        JSONArray json = AppExits.toJson(thread);
+
+        assertEquals(AppExits.MAX_TRACE_LINES, json.length());
+        assertEquals(thread.get(0), json.getString(0));
+        int head = AppExits.MAX_TRACE_LINES - AppExits.TRACE_TAIL_LINES - 1;
+        assertEquals("  ... " + (150 - head - AppExits.TRACE_TAIL_LINES) + " lines left out", json.getString(head));
+        assertEquals(thread.get(149), json.getString(AppExits.MAX_TRACE_LINES - 1));
+    }
+
+    /**
+     * The main thread waits for a lock: the thread holding it is found by its tid
+     */
+    @Test
+    public void theThreadHoldingTheLockIsFound() {
+        List<String> main = Arrays.asList("\"main\" prio=5 tid=1 Blocked",
+                "  at com.liskovsoft.youtubeapi.app.potokennp2.TvPoTokenProvider.reset(TvPoTokenProvider.kt:224)",
+                "  - waiting to lock <0x053c914c> (a java.lang.Object) held by thread 37");
+        List<String> holder = Arrays.asList("\"RxCachedThreadScheduler-3\" daemon prio=5 tid=37 Waiting",
+                "  at com.liskovsoft.youtubeapi.app.potokennp2.misc.WebViewUtilKt.runOnMainThreadSync(WebViewUtil.kt:156)");
+        List<String> other = Arrays.asList("\"Signal Catcher\" daemon prio=10 tid=3 Runnable");
+        List<List<String>> threads = Arrays.asList(main, other, holder);
+
+        assertEquals("37", AppExits.findLockHolderTid(main));
+        assertEquals(main, AppExits.findThread(threads, "\"main\""));
+        assertEquals(holder, AppExits.findThread(threads, " tid=37 "));
+        assertEquals(other, AppExits.findThread(threads, " tid=3 "));
+        assertNull(AppExits.findThread(threads, " tid=99 "));
+        assertNull(AppExits.findLockHolderTid(holder));
+    }
+
+    private static List<String> thread(int lines) {
+        List<String> thread = new ArrayList<>();
+        thread.add("\"main\" prio=5 tid=1 Waiting");
+
+        for (int i = 1; i < lines; i++) {
+            thread.add("  at com.example.Frame.method" + i + "(Frame.java:" + i + ")");
+        }
+
+        return thread;
     }
 
     private static Context getContext() {

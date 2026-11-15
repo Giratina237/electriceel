@@ -520,6 +520,14 @@
     <string name="shows_desc">Eine Sendung (Podcast) wie die unter „Empfohlene Sendungen“, mit der Anzahl der Folgen dort, wo ein Video seine Länge hat. In jeder Sprache erkannt.</string>
     <string name="shows_sections">Bereiche</string>
     <string name="show_label">Sendung</string>
+    <string name="members">Mitgliedervideos</string>
+    <string name="members_show">Anzeigen</string>
+    <string name="members_mark">Markieren</string>
+    <string name="members_mark_desc">Mitgliedervideos bleiben mit der YouTube-Markierung (nur für Mitglieder oder zuerst für Mitglieder) in den Feeds</string>
+    <string name="members_hide">Ausblenden</string>
+    <string name="members_desc">Videos, die nur Mitglieder eines Kanals ansehen können, jetzt (nur für Mitglieder) oder vor allen anderen (zuerst für Mitglieder). Ausgeblendete werden nie abgespielt, auch nicht als nächstes. In jeder Sprache erkannt.</string>
+    <string name="members_sections">Bereiche</string>
+    <string name="members_only_label">Nur für Mitglieder</string>
     <string name="streamed">Gestreamt oder live</string>
     <string name="streamed_show">Anzeigen</string>
     <string name="streamed_mark">Markieren</string>

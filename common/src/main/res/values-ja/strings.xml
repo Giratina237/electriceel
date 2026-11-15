@@ -519,6 +519,14 @@
     <string name="shows_desc">おすすめの番組にあるような番組 (ポッドキャスト) で、動画の長さの位置にエピソード数があるもの。すべての言語で検出されます。</string>
     <string name="shows_sections">セクション</string>
     <string name="show_label">番組</string>
+    <string name="members">メンバー動画</string>
+    <string name="members_show">表示</string>
+    <string name="members_mark">マーク</string>
+    <string name="members_mark_desc">メンバー動画は YouTube のラベル（メンバー限定またはメンバー先行）付きでフィードに残ります</string>
+    <string name="members_hide">非表示</string>
+    <string name="members_desc">チャンネルのメンバーだけが、今（メンバー限定）またはほかの人より先に（メンバー先行）視聴できる動画。非表示の動画は、次の動画としても再生されません。すべての言語で検出されます。</string>
+    <string name="members_sections">セクション</string>
+    <string name="members_only_label">メンバー限定</string>
     <string name="streamed">配信済みまたはライブ</string>
     <string name="streamed_show">表示</string>
     <string name="streamed_mark">マーク</string>

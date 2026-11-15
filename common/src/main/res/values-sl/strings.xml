@@ -551,6 +551,14 @@
   <string name="shows_desc">Oddaja (podkast), kot tiste v Priporočenih oddajah, s številom epizod tam, kjer ima videoposnetek dolžino. Prepozna se v vsakem jeziku.</string>
   <string name="shows_sections">Razdelki</string>
   <string name="show_label">Oddaja</string>
+  <string name="members">Videoposnetki za člane</string>
+  <string name="members_show">Prikaži</string>
+  <string name="members_mark">Označi</string>
+  <string name="members_mark_desc">Videoposnetki za člane ostanejo v virih z oznako YouTube (samo za člane ali najprej za člane)</string>
+  <string name="members_hide">Skrij</string>
+  <string name="members_desc">Videoposnetki, ki jih lahko gledajo samo člani kanala, zdaj (samo za člane) ali pred vsemi drugimi (najprej za člane). Skriti se nikoli ne predvajajo, niti kot naslednji. Prepozna se v vsakem jeziku.</string>
+  <string name="members_sections">Razdelki</string>
+  <string name="members_only_label">Samo za člane</string>
   <string name="streamed">Predvajano ali v živo</string>
   <string name="streamed_show">Prikaži</string>
   <string name="streamed_mark">Označi</string>

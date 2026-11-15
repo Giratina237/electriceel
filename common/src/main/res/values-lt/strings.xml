@@ -492,6 +492,14 @@
     <string name="shows_desc">Laida (tinklalaidė), kaip skiltyje Rekomenduojamos laidos, su epizodų skaičiumi ten, kur vaizdo įrašas turi trukmę. Atpažįstama bet kuria kalba.</string>
     <string name="shows_sections">Skiltys</string>
     <string name="show_label">Laida</string>
+    <string name="members">Narių vaizdo įrašai</string>
+    <string name="members_show">Rodyti</string>
+    <string name="members_mark">Žymėti</string>
+    <string name="members_mark_desc">Narių vaizdo įrašai lieka srautuose su YouTube žyma (tik nariams arba pirmiausia nariams)</string>
+    <string name="members_hide">Slėpti</string>
+    <string name="members_desc">Vaizdo įrašai, kuriuos gali žiūrėti tik kanalo nariai, dabar (tik nariams) arba anksčiau už visus kitus (pirmiausia nariams). Paslėpti niekada neleidžiami, net kaip kitas. Atpažįstama bet kuria kalba.</string>
+    <string name="members_sections">Skiltys</string>
+    <string name="members_only_label">Tik nariams</string>
     <string name="streamed">Transliuota arba tiesiogiai</string>
     <string name="streamed_show">Rodyti</string>
     <string name="streamed_mark">Žymėti</string>

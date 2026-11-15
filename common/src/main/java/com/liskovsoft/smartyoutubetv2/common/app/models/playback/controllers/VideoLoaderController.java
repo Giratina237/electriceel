@@ -126,6 +126,24 @@ public class VideoLoaderController extends BasePlayerController {
      * The formats came from another client than the one picked, said once (see showPickedClientFallback)
      */
     private boolean mIsPickedClientFallbackShown;
+    /**
+     * The video openVideoInt started last and how (see VideoStart#TRIGGER_AUTOPLAY): a video only the channel's members watch is skipped
+     * when it came next, not when the user opened it (see skipMembersVideo). Null once a video starts another way (see onNewVideo).
+     */
+    private Video mStartVideo;
+    private String mStartTrigger;
+    /**
+     * The videos skipped in a row for only the channel's members watching them (see skipMembersVideo), till one plays
+     */
+    private int mMembersSkips;
+    /**
+     * Skipped before its metadata loaded, which says what's next: the next one plays once it has (see skipMembersVideo)
+     */
+    private String mMembersSkipVideoId;
+    /**
+     * In a row, at most: each one skipped asks for its formats first
+     */
+    private static final int MAX_MEMBERS_SKIPS = 5;
     private final Runnable mReloadVideo = () -> {
         Video video = getVideo();
 
@@ -181,6 +199,12 @@ public class VideoLoaderController extends BasePlayerController {
     public void onNewVideo(Video item) {
         if (item == null) {
             return;
+        }
+
+        // Not started by openVideoInt (a card, a link, the queue): it didn't come next. A reload is of the same video.
+        if (item != mStartVideo) {
+            mStartVideo = null;
+            mStartTrigger = null;
         }
 
         item.isShuffled = false;
@@ -380,7 +404,8 @@ public class VideoLoaderController extends BasePlayerController {
         }
 
         if (current.nextMediaItem != null) {
-            openVideoInt(Video.from(current.nextMediaItem), trigger);
+            // As getNext gives it: past a video only the channel's members watch, which the Members setting hides (see MembersVideos)
+            openVideoInt(mSuggestionsController.getNext(), trigger);
         } else if (!current.isSynced) { // Maybe there's nothing left. E.g. when casting from phone
             // Wait in a loop while suggestions have been loaded...
             if (showLoadingMsg) {
@@ -578,6 +603,10 @@ public class VideoLoaderController extends BasePlayerController {
             VideoStarts.onProtocol(mFormatProtocol); // none: the video isn't played
         }
 
+        if (mFormatProtocol != null) {
+            mMembersSkips = 0; // one plays: the next run of members' videos is skipped again
+        }
+
         FormatAttempts.onSource(mFormatClient, mFormatProtocol);
         player.showBackground(bgImageUrl); // remove bg (if video playing) or set another bg
     }
@@ -596,7 +625,10 @@ public class VideoLoaderController extends BasePlayerController {
         return isFormatOfVideo() ? mFormatProtocol : null;
     }
 
-    private boolean isFormatOfVideo() {
+    /**
+     * The formats the player has are of the video: they reached the player (see processFormatInfo). The video before's until then.
+     */
+    public boolean isFormatOfVideo() {
         return getVideo() != null && mFormatVideoId != null && mFormatVideoId.equals(getVideo().videoId);
     }
 
@@ -846,6 +878,9 @@ public class VideoLoaderController extends BasePlayerController {
         disposeActions();
 
         if (item.hasVideo()) {
+            mStartVideo = item;
+            mStartTrigger = trigger;
+
             if (!isEmbedPlayer()) { // a card's preview isn't timed
                 VideoStarts.start(item.videoId, trigger);
             }
@@ -857,6 +892,59 @@ public class VideoLoaderController extends BasePlayerController {
         } else {
             VideoActionPresenter.instance(getContext()).apply(item);
         }
+    }
+
+    /**
+     * Not played: only the channel's members watch it, and the account can't (its formats) or the Members setting hides it (its
+     * metadata). Started by autoplay or the Next button, the next one plays, as autoplay goes on, past the ones known to be such (see
+     * MembersVideos). Opened by the user (a card, a link, the phone), it stays, with the reason. At most MAX_MEMBERS_SKIPS in a row.
+     * Its formats failed before its metadata loaded (that loads once a video plays, see SuggestionsController.onVideoLoaded): what's
+     * next isn't known, its metadata is loaded first, then the next one plays (see SuggestionsController.syncCurrentVideo).
+     *
+     * @return whether the next one is played, now or once its metadata loaded
+     */
+    public boolean skipMembersVideo(Video video) {
+        boolean isStartedAsNext = video != null && mStartVideo != null && Helpers.equals(video.videoId, mStartVideo.videoId)
+                && Helpers.equalsAny(mStartTrigger, VideoStart.TRIGGER_AUTOPLAY, VideoStart.TRIGGER_NEXT);
+
+        if (getPlayer() == null || !isStartedAsNext) {
+            return false;
+        }
+
+        // Skipped already, before its metadata said what's next: it has now
+        boolean isPending = isMembersSkipPending(video);
+        mMembersSkipVideoId = null;
+
+        if (!isPending && mMembersSkips >= MAX_MEMBERS_SKIPS) {
+            return false;
+        }
+
+        boolean hasNext = mSuggestionsController.getNext() != null;
+
+        // Nothing to play instead (e.g. its suggestions are hidden too): it stays
+        if (!hasNext && (isPending || video.isSynced)) {
+            return false;
+        }
+
+        if (!isPending) {
+            mMembersSkips++;
+        }
+
+        if (hasNext) {
+            loadNext(VideoStart.TRIGGER_AUTOPLAY);
+        } else {
+            mMembersSkipVideoId = video.videoId;
+            mSuggestionsController.loadSuggestions(video);
+        }
+
+        return true;
+    }
+
+    /**
+     * Skipped before its metadata loaded, which says what's next (see skipMembersVideo)
+     */
+    public boolean isMembersSkipPending(@Nullable Video video) {
+        return video != null && mMembersSkipVideoId != null && mMembersSkipVideoId.equals(video.videoId);
     }
 
     private boolean isActionsRunning() {

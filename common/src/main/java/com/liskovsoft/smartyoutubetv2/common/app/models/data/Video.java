@@ -59,6 +59,7 @@ public final class Video {
     public boolean isCollaboration; // marked as a collaboration (see CollaborationManager)
     public boolean isInWatchLater; // marked as in Watch later (see WatchLaterManager)
     public boolean isShowMarked; // marked as a show (see ShowsData)
+    public boolean isMembersMarked; // marked as a video only the channel's members watch (see MembersData)
     public boolean isStreamedMarked; // marked as a live stream that ended (see StreamedData)
     public boolean isLiveMarked; // marked as a stream that's live now (see StreamedData)
     public boolean isTopChannelMarked; // marked as a channel of a row of channels (see TopChannelsData)
@@ -91,6 +92,11 @@ public final class Video {
     public boolean isChapter;
     public boolean isMovie;
     public boolean isShow; // a show (podcast) of episodes, see MediaItem.isShow()
+    /**
+     * Only the channel's members watch it: the label of its badge ("Members only", "Members first", translated), empty without one, null
+     * for any other video (see MediaItem.getMembersLabel)
+     */
+    public String membersLabel;
     public boolean isSubscribed;
     public boolean isRemote;
     public int groupPosition = -1; // group position in multi-grid fragments
@@ -179,6 +185,7 @@ public final class Video {
         video.isShorts = item.isShorts();
         video.isMovie = item.isMovie();
         video.isShow = item.isShow();
+        video.membersLabel = item.getMembersLabel();
         video.clickTrackingParams = item.getClickTrackingParams();
         video.durationMs = item.getDurationMs();
         video.searchQuery = item.getSearchQuery();
@@ -202,6 +209,7 @@ public final class Video {
         video.isCollaboration = item.isCollaboration;
         video.isInWatchLater = item.isInWatchLater;
         video.isShowMarked = item.isShowMarked;
+        video.isMembersMarked = item.isMembersMarked;
         video.isStreamedMarked = item.isStreamedMarked;
         video.isLiveMarked = item.isLiveMarked;
         video.isTopChannelMarked = item.isTopChannelMarked;
@@ -222,6 +230,7 @@ public final class Video {
         video.isLive = item.isLive;
         video.isUpcoming = item.isUpcoming;
         video.isShow = item.isShow;
+        video.membersLabel = item.membersLabel;
         video.clickTrackingParams = item.clickTrackingParams;
         video.mediaItem = item.mediaItem;
         video.group = item.group;
@@ -897,8 +906,24 @@ public final class Video {
         notificationStates = metadata.getNotificationStates();
         author = metadata.getAuthor();
         durationMs = metadata.getDurationMs();
+        // A card may not say it (e.g. the next video of autoplay, a link): the video's own badge does
+        if (metadata.getMembersLabel() != null) {
+            membersLabel = metadata.getMembersLabel();
+        }
         mediaItem = toMediaItem(); // Fix subscribe during playback (see PlayerUIController.callMediaItemObservable)
         isSynced = true;
+    }
+
+    /**
+     * No client gave its formats, each one said why (see ErrorFixerController): as with formats that say so (see
+     * sync(MediaItemFormatInfo)), the reason stays the title once its metadata comes
+     */
+    public void syncUnplayable(@Nullable String reason) {
+        if (reason != null) {
+            metadataTitle = reason;
+        }
+
+        isUnplayable = true;
     }
 
     public void sync(MediaItemFormatInfo formatInfo) {
@@ -961,6 +986,7 @@ public final class Video {
         video.bgImageUrl = bgImageUrl;
         video.isLive = isLive;
         video.isUpcoming = isUpcoming;
+        video.membersLabel = membersLabel;
         video.nextMediaItem = nextMediaItem;
         video.shuffleMediaItem = shuffleMediaItem;
         video.durationMs = durationMs;

@@ -515,6 +515,14 @@
   <string name="shows_desc">O emisiune (podcast) precum cele din Emisiuni recomandate, cu numărul de episoade acolo unde un videoclip are durata. Recunoscută în orice limbă.</string>
   <string name="shows_sections">Secțiuni</string>
   <string name="show_label">Emisiune</string>
+  <string name="members">Videoclipuri pentru membri</string>
+  <string name="members_show">Arată</string>
+  <string name="members_mark">Marchează</string>
+  <string name="members_mark_desc">Videoclipurile pentru membri rămân în fluxuri cu eticheta YouTube (doar pentru membri sau mai întâi pentru membri)</string>
+  <string name="members_hide">Ascunde</string>
+  <string name="members_desc">Videoclipuri pe care doar membrii unui canal le pot viziona, acum (doar pentru membri) sau înaintea tuturor (mai întâi pentru membri). Cele ascunse nu sunt redate niciodată, nici măcar ca următorul. Recunoscute în orice limbă.</string>
+  <string name="members_sections">Secțiuni</string>
+  <string name="members_only_label">Doar pentru membri</string>
   <string name="streamed">Transmis sau în direct</string>
   <string name="streamed_show">Arată</string>
   <string name="streamed_mark">Marchează</string>

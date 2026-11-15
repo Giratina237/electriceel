@@ -27,6 +27,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.views.SplashView;
 import com.liskovsoft.smartyoutubetv2.common.app.views.ViewManager;
 import com.liskovsoft.smartyoutubetv2.common.app.views.WebBrowserView;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.AppExits;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.LastState;
 import com.liskovsoft.smartyoutubetv2.common.prefs.HomeScreenPlaylistsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.NetworkData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
@@ -97,6 +98,8 @@ public class MainApplication extends MultiDexApplication implements Configuratio
         }
 
         setupGlobalExceptionHandler();
+        // A process killed before it showed anything (e.g. started for a job) says so on the next start (see AppExits)
+        LastState.onProcessStart(this);
         setupViewManager();
 
         // The channels can be updated with nothing else of the app running

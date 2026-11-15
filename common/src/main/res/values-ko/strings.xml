@@ -511,6 +511,14 @@
   <string name="shows_desc">추천 프로그램에 있는 것과 같은 프로그램(팟캐스트)으로, 동영상 길이 자리에 에피소드 수가 있는 것. 모든 언어에서 감지됩니다.</string>
   <string name="shows_sections">섹션</string>
   <string name="show_label">프로그램</string>
+  <string name="members">회원 전용 동영상</string>
+  <string name="members_show">보이기</string>
+  <string name="members_mark">표시</string>
+  <string name="members_mark_desc">회원 전용 동영상은 YouTube 라벨(회원 전용 또는 회원 우선 공개)과 함께 피드에 남습니다</string>
+  <string name="members_hide">숨기기</string>
+  <string name="members_desc">채널 회원만 지금(회원 전용) 또는 다른 사람보다 먼저(회원 우선 공개) 볼 수 있는 동영상. 숨긴 동영상은 다음 동영상으로도 재생되지 않습니다. 모든 언어에서 감지됩니다.</string>
+  <string name="members_sections">섹션</string>
+  <string name="members_only_label">회원 전용</string>
   <string name="streamed">스트리밍됨 또는 실시간</string>
   <string name="streamed_show">보이기</string>
   <string name="streamed_mark">표시</string>

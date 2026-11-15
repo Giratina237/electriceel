@@ -517,6 +517,14 @@
   <string name="shows_desc">Program (podcast), taki jak w Polecanych programach, z liczbą odcinków tam, gdzie film ma długość. Wykrywany w każdym języku.</string>
   <string name="shows_sections">Sekcje</string>
   <string name="show_label">Program</string>
+  <string name="members">Filmy dla członków</string>
+  <string name="members_show">Pokazuj</string>
+  <string name="members_mark">Oznaczaj</string>
+  <string name="members_mark_desc">Filmy dla członków zostają w kanałach z etykietą YouTube (tylko dla członków lub najpierw dla członków)</string>
+  <string name="members_hide">Ukrywaj</string>
+  <string name="members_desc">Filmy, które mogą oglądać tylko członkowie kanału, teraz (tylko dla członków) lub przed wszystkimi innymi (najpierw dla członków). Ukryte nigdy nie są odtwarzane, nawet jako następne. Wykrywane w każdym języku.</string>
+  <string name="members_sections">Sekcje</string>
+  <string name="members_only_label">Tylko dla członków</string>
   <string name="streamed">Transmitowane lub na żywo</string>
   <string name="streamed_show">Pokazuj</string>
   <string name="streamed_mark">Oznaczaj</string>

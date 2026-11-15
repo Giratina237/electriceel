@@ -482,6 +482,14 @@
   <string name="shows_desc">یک برنامه (پادکست) مانند آن‌هایی که در برنامه‌های توصیه‌شده هستند، با تعداد قسمت‌ها به جای مدت ویدیو. در همه زبان‌ها شناسایی می‌شود.</string>
   <string name="shows_sections">بخش‌ها</string>
   <string name="show_label">برنامه</string>
+  <string name="members">ویدیوهای اعضا</string>
+  <string name="members_show">نمایش</string>
+  <string name="members_mark">علامت‌گذاری</string>
+  <string name="members_mark_desc">ویدیوهای اعضا با برچسب یوتیوب (فقط اعضا یا اول اعضا) در فیدها می‌مانند</string>
+  <string name="members_hide">پنهان کردن</string>
+  <string name="members_desc">ویدیوهایی که فقط اعضای یک کانال می‌توانند ببینند، اکنون (فقط اعضا) یا پیش از همه (اول اعضا). ویدیوهای پنهان هرگز پخش نمی‌شوند، حتی به‌عنوان بعدی. در همه زبان‌ها شناسایی می‌شود.</string>
+  <string name="members_sections">بخش‌ها</string>
+  <string name="members_only_label">فقط اعضا</string>
   <string name="streamed">پخش‌شده یا زنده</string>
   <string name="streamed_show">نمایش</string>
   <string name="streamed_mark">علامت‌گذاری</string>

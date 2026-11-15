@@ -526,6 +526,14 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="shows_desc">תוכנית (פודקאסט) כמו אלה שבתוכניות המומלצות, עם מספר הפרקים במקום אורך הסרטון. מזוהה בכל שפה.</string>
     <string name="shows_sections">מדורים</string>
     <string name="show_label">תוכנית</string>
+    <string name="members">סרטונים לחברי ערוץ</string>
+    <string name="members_show">הצגה</string>
+    <string name="members_mark">סימון</string>
+    <string name="members_mark_desc">סרטונים לחברי ערוץ נשארים בפידים עם התווית של YouTube (לחברי הערוץ בלבד או קודם לחברי הערוץ)</string>
+    <string name="members_hide">הסתרה</string>
+    <string name="members_desc">סרטונים שרק חברי הערוץ יכולים לצפות בהם, עכשיו (לחברי הערוץ בלבד) או לפני כולם (קודם לחברי הערוץ). סרטונים מוסתרים לעולם לא מופעלים, גם לא כסרטון הבא. מזוהה בכל שפה.</string>
+    <string name="members_sections">מדורים</string>
+    <string name="members_only_label">לחברי הערוץ בלבד</string>
     <string name="streamed">שודר או בשידור חי</string>
     <string name="streamed_show">הצגה</string>
     <string name="streamed_mark">סימון</string>

@@ -483,6 +483,14 @@
   <string name="shows_desc">Ohjelma (podcast), kuten Suositellut ohjelmat -kohdan ohjelmat, jossa jaksojen määrä on kohdassa, jossa videolla on pituus. Tunnistetaan kaikilla kielillä.</string>
   <string name="shows_sections">Osiot</string>
   <string name="show_label">Ohjelma</string>
+  <string name="members">Jäsenvideot</string>
+  <string name="members_show">Näytä</string>
+  <string name="members_mark">Merkitse</string>
+  <string name="members_mark_desc">Jäsenvideot jäävät syötteisiin YouTuben merkinnällä (vain jäsenille tai ensin jäsenille)</string>
+  <string name="members_hide">Piilota</string>
+  <string name="members_desc">Videot, joita vain kanavan jäsenet voivat katsoa, nyt (vain jäsenille) tai ennen muita (ensin jäsenille). Piilotettuja ei koskaan toisteta, ei edes seuraavana. Tunnistetaan kaikilla kielillä.</string>
+  <string name="members_sections">Osiot</string>
+  <string name="members_only_label">Vain jäsenille</string>
   <string name="streamed">Striimattu tai suora</string>
   <string name="streamed_show">Näytä</string>
   <string name="streamed_mark">Merkitse</string>

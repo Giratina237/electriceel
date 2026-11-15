@@ -4,10 +4,12 @@ import android.app.ActivityManager;
 import android.app.ActivityManager.RunningAppProcessInfo;
 import android.app.ApplicationExitInfo;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build.VERSION;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+import androidx.annotation.VisibleForTesting;
 
 import com.liskovsoft.smartyoutubetv2.common.prefs.DebuggingData;
 
@@ -19,7 +21,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The app dying, to the player failure log: a crash when it happens, and on Android 11+ the ANRs, native crashes and kills for
@@ -34,10 +39,21 @@ public final class AppExits {
      */
     private static final long SAME_EXIT_MS = 5_000;
     /**
-     * Of the main thread of an ANR's traces
+     * Of a thread of an ANR's traces, the main one or the one holding the lock it waits for. A longer one keeps its first and last lines:
+     * the frames that tell how the work got there (e.g. a pool's rejection handler) are deep, 30 lines left them out.
      */
-    private static final int MAX_TRACE_LINES = 30;
+    static final int MAX_TRACE_LINES = 100;
+    static final int TRACE_TAIL_LINES = 30;
     private static final int MAX_TRACE_BYTES = 256 * 1024;
+    /**
+     * "- waiting to lock <0x053c914c> (a java.lang.Object) held by thread 37": the thread's tid
+     */
+    private static final Pattern LOCK_HOLDER = Pattern.compile("held by thread (\\d+)");
+    /**
+     * Where the newest exit recorded is kept (see getLastSeenTs)
+     */
+    private static final String PREFS = "app_exits";
+    private static final String KEY_LAST_SEEN_TS = "last_seen_ts";
 
     private AppExits() {
     }
@@ -61,7 +77,7 @@ public final class AppExits {
     /**
      * The exits since the last start (Android 11+), each once. Not on the main thread: an ANR's traces are read.
      */
-    public static void recordNew(Context context) {
+    public static synchronized void recordNew(Context context) {
         if (VERSION.SDK_INT < 30) {
             return;
         }
@@ -81,8 +97,7 @@ public final class AppExits {
             return;
         }
 
-        DebuggingData debuggingData = DebuggingData.instance(context);
-        long lastSeen = debuggingData.getLastAppExitTs();
+        long lastSeen = getLastSeenTs(context);
         long newest = lastSeen;
         List<ApplicationExitInfo> exits = activityManager.getHistoricalProcessExitReasons(context.getPackageName(), 0, MAX_EXITS);
 
@@ -125,7 +140,7 @@ public final class AppExits {
                     .detail("rssMb", exit.getRss() / 1024);
 
             if (exit.getReason() == ApplicationExitInfo.REASON_ANR) {
-                failure.detail("mainThread", readMainThread(exit));
+                addTraces(failure, exit);
             }
 
             // What it was doing (e.g. the remote control's service running, a video playing): Android doesn't say
@@ -139,8 +154,33 @@ public final class AppExits {
         }
 
         if (newest > lastSeen) {
-            debuggingData.setLastAppExitTs(newest);
+            setLastSeenTs(context, newest);
         }
+    }
+
+    /**
+     * The newest exit recorded, kept in its own file and written before recordNew returns. DebuggingData saved it on the main thread:
+     * a process whose main thread hung (an ANR) never did, and the next one recorded the same exits again. Its value is the one until
+     * this file has one.
+     */
+    private static long getLastSeenTs(Context context) {
+        SharedPreferences prefs = getPrefs(context);
+
+        return prefs.contains(KEY_LAST_SEEN_TS) ? prefs.getLong(KEY_LAST_SEEN_TS, 0) : DebuggingData.instance(context).getLastAppExitTs();
+    }
+
+    private static void setLastSeenTs(Context context, long ts) {
+        // On the disk now: the process may hang or die right after
+        getPrefs(context).edit().putLong(KEY_LAST_SEEN_TS, ts).commit();
+    }
+
+    private static SharedPreferences getPrefs(Context context) {
+        return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    @VisibleForTesting
+    static void resetForTesting(Context context) {
+        getPrefs(context).edit().clear().commit();
     }
 
     /**
@@ -193,43 +233,126 @@ public final class AppExits {
     }
 
     /**
-     * The main thread's part of the traces Android took, cut short
+     * The main thread of the traces Android took, and the thread holding the lock it waits for, if it does (e.g. a poToken being made,
+     * which needs the main thread back: a deadlock)
      */
     @RequiresApi(30)
-    @Nullable
-    private static JSONArray readMainThread(ApplicationExitInfo exit) {
+    private static void addTraces(PlayerFailure failure, ApplicationExitInfo exit) {
+        List<List<String>> threads = readThreads(exit);
+        List<String> main = findThread(threads, "\"main\"");
+
+        if (main == null) {
+            return;
+        }
+
+        failure.detail("mainThread", toJson(main));
+
+        String holderTid = findLockHolderTid(main);
+        List<String> holder = holderTid != null ? findThread(threads, " tid=" + holderTid + " ") : null;
+
+        if (holder != null) {
+            failure.detail("lockHolderThread", toJson(holder));
+        }
+    }
+
+    /**
+     * Each thread of the traces, its lines from its header (e.g. "main" prio=5 tid=1 Blocked) to the blank line after it. Empty when
+     * there are none.
+     */
+    @RequiresApi(30)
+    private static List<List<String>> readThreads(ApplicationExitInfo exit) {
+        List<List<String>> threads = new ArrayList<>();
+
         try (InputStream traces = exit.getTraceInputStream()) {
             if (traces == null) {
-                return null;
+                return threads;
             }
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(traces, StandardCharsets.UTF_8));
-            JSONArray result = new JSONArray();
-            boolean isMain = false;
+            List<String> thread = null;
             int bytes = 0;
             String line;
 
             while ((line = reader.readLine()) != null && bytes < MAX_TRACE_BYTES) {
                 bytes += line.length() + 1;
 
-                if (line.startsWith("\"main\"")) {
-                    isMain = true;
-                } else if (isMain && line.trim().isEmpty()) {
-                    break;
+                if (line.startsWith("\"")) {
+                    thread = new ArrayList<>();
+                    threads.add(thread);
+                } else if (line.trim().isEmpty()) {
+                    thread = null;
                 }
 
-                if (isMain) {
-                    result.put(Scrubber.scrub(line));
-
-                    if (result.length() >= MAX_TRACE_LINES) {
-                        break;
-                    }
+                if (thread != null) {
+                    thread.add(line);
                 }
             }
-
-            return result.length() > 0 ? result : null;
         } catch (IOException e) {
-            return null;
+            // What was read
         }
+
+        return threads;
+    }
+
+    /**
+     * @param headerPart in the header line of the thread, e.g. "main" or " tid=37 "
+     */
+    @Nullable
+    static List<String> findThread(List<List<String>> threads, String headerPart) {
+        for (List<String> thread : threads) {
+            String header = thread.get(0) + " ";
+
+            if (header.startsWith(headerPart) || (!headerPart.startsWith("\"") && header.contains(headerPart))) {
+                return thread;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The tid of the thread that holds the lock the thread waits for, null when it doesn't wait for one
+     */
+    @Nullable
+    static String findLockHolderTid(List<String> thread) {
+        for (String line : thread) {
+            Matcher matcher = LOCK_HOLDER.matcher(line);
+
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Scrubbed, its first and last lines when it's longer than MAX_TRACE_LINES, with how many were left out between them
+     */
+    static JSONArray toJson(List<String> thread) {
+        JSONArray result = new JSONArray();
+        int size = thread.size();
+
+        if (size <= MAX_TRACE_LINES) {
+            for (String line : thread) {
+                result.put(Scrubber.scrub(line));
+            }
+
+            return result;
+        }
+
+        int head = MAX_TRACE_LINES - TRACE_TAIL_LINES - 1;
+
+        for (int i = 0; i < head; i++) {
+            result.put(Scrubber.scrub(thread.get(i)));
+        }
+
+        result.put("  ... " + (size - head - TRACE_TAIL_LINES) + " lines left out");
+
+        for (int i = size - TRACE_TAIL_LINES; i < size; i++) {
+            result.put(Scrubber.scrub(thread.get(i)));
+        }
+
+        return result;
     }
 }

@@ -504,6 +504,14 @@
   <string name="shows_desc">Предаване (подкаст) като тези в Препоръчани предавания, с броя епизоди там, където видеоклипът има продължителност. Разпознава се на всеки език.</string>
   <string name="shows_sections">Раздели</string>
   <string name="show_label">Предаване</string>
+  <string name="members">Видеоклипове за членове</string>
+  <string name="members_show">Показване</string>
+  <string name="members_mark">Отбелязване</string>
+  <string name="members_mark_desc">Видеоклиповете за членове остават в емисиите с етикета на YouTube (само за членове или първо за членове)</string>
+  <string name="members_hide">Скриване</string>
+  <string name="members_desc">Видеоклипове, които само членовете на канала могат да гледат, сега (само за членове) или преди всички останали (първо за членове). Скритите никога не се пускат, дори като следващ. Разпознава се на всеки език.</string>
+  <string name="members_sections">Раздели</string>
+  <string name="members_only_label">Само за членове</string>
   <string name="streamed">Излъчено или на живо</string>
   <string name="streamed_show">Показване</string>
   <string name="streamed_mark">Отбелязване</string>

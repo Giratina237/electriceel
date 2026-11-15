@@ -521,6 +521,14 @@
     <string name="shows_desc">Önerilen programlardakiler gibi, bir videonun süresinin yerinde bölüm sayısı olan bir program (podcast). Her dilde tanınır.</string>
     <string name="shows_sections">Bölümler</string>
     <string name="show_label">Program</string>
+    <string name="members">Üye videoları</string>
+    <string name="members_show">Göster</string>
+    <string name="members_mark">İşaretle</string>
+    <string name="members_mark_desc">Üye videoları akışlarda YouTube etiketiyle kalır (yalnızca üyelere veya önce üyelere)</string>
+    <string name="members_hide">Gizle</string>
+    <string name="members_desc">Yalnızca kanal üyelerinin izleyebildiği videolar: şimdi (yalnızca üyelere) veya herkesten önce (önce üyelere). Gizlenenler, sonraki olarak bile asla oynatılmaz. Her dilde tanınır.</string>
+    <string name="members_sections">Bölümler</string>
+    <string name="members_only_label">Yalnızca üyelere</string>
     <string name="streamed">Yayınlanmış veya canlı</string>
     <string name="streamed_show">Göster</string>
     <string name="streamed_mark">İşaretle</string>

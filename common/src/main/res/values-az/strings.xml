@@ -521,6 +521,14 @@
     <string name="shows_desc">Tövsiyə olunan verilişlərdəki kimi, videonun müddətinin yerində epizod sayı olan veriliş (podkast). İstənilən dildə tanınır.</string>
     <string name="shows_sections">Bölmələr</string>
     <string name="show_label">Veriliş</string>
+    <string name="members">Üzv videoları</string>
+    <string name="members_show">Göstər</string>
+    <string name="members_mark">İşarələ</string>
+    <string name="members_mark_desc">Üzv videoları lentlərdə YouTube etiketi ilə qalır (yalnız üzvlər üçün və ya əvvəlcə üzvlər üçün)</string>
+    <string name="members_hide">Gizlət</string>
+    <string name="members_desc">Yalnız kanal üzvlərinin baxa bildiyi videolar: indi (yalnız üzvlər üçün) və ya hamıdan əvvəl (əvvəlcə üzvlər üçün). Gizlədilənlər heç vaxt oynadılmır, növbəti kimi də. İstənilən dildə tanınır.</string>
+    <string name="members_sections">Bölmələr</string>
+    <string name="members_only_label">Yalnız üzvlər üçün</string>
     <string name="streamed">Yayımlanmış və ya canlı</string>
     <string name="streamed_show">Göstər</string>
     <string name="streamed_mark">İşarələ</string>
