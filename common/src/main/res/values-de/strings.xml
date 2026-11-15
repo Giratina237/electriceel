@@ -271,6 +271,7 @@
     <string name="skin_classic">Klassisch</string>
     <string name="skin_modern">Modern</string>
     <string name="skin_hybrid">Hybrid</string>
+    <string name="hide_none_account">„%1$s“ in der Konto-Schaltfläche ausblenden (%2$s)</string>
     <string name="git_repository">Git-Repository</string>
     <string name="hide_content_mixes">Mixe</string>
     <string name="hide_content_watched">Angesehene Videos</string>

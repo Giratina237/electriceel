@@ -261,6 +261,7 @@
   <string name="skin_classic">Klasična</string>
   <string name="skin_modern">Moderna</string>
   <string name="skin_hybrid">Hibridna</string>
+  <string name="hide_none_account">Skrij »%1$s« v gumbu računa (%2$s)</string>
   <string name="git_repository">Repozitorij Git</string>
   <string name="hide_content_mixes">Miksi</string>
   <string name="hide_content_watched">Ogledani videoposnetki</string>

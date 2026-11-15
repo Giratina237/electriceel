@@ -263,6 +263,7 @@
   <string name="skin_classic">클래식</string>
   <string name="skin_modern">모던</string>
   <string name="skin_hybrid">하이브리드</string>
+  <string name="hide_none_account">계정 버튼에서 \"%1$s\" 숨기기 (%2$s)</string>
   <string name="git_repository">Git 저장소</string>
   <string name="hide_content_mixes">믹스</string>
   <string name="hide_content_watched">시청한 동영상</string>

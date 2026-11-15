@@ -361,6 +361,7 @@
   <string name="skin_classic">Klassisk</string>
   <string name="skin_modern">Moderne</string>
   <string name="skin_hybrid">Hybrid</string>
+  <string name="hide_none_account">Skjul \"%1$s\" i kontoknappen (%2$s)</string>
   <string name="git_repository">Git-repository</string>
   <string name="hide_content_mixes">Mix</string>
   <string name="hide_content_watched">Sete videoer</string>

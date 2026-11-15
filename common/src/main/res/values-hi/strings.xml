@@ -254,6 +254,7 @@
   <string name="skin_classic">क्लासिक</string>
   <string name="skin_modern">मॉडर्न</string>
   <string name="skin_hybrid">हाइब्रिड</string>
+  <string name="hide_none_account">खाता बटन में \"%1$s\" छिपाएँ (%2$s)</string>
   <string name="git_repository">Git रिपॉज़िटरी</string>
   <string name="hide_content_mixes">मिक्स</string>
   <string name="hide_content_watched">देखे गए वीडियो</string>

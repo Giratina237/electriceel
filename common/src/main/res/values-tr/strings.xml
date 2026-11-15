@@ -271,6 +271,7 @@
     <string name="skin_classic">Klasik</string>
     <string name="skin_modern">Modern</string>
     <string name="skin_hybrid">Hibrit</string>
+    <string name="hide_none_account">Hesap düğmesinde \"%1$s\" gizlensin (%2$s)</string>
     <string name="git_repository">Git deposu</string>
     <string name="hide_content_mixes">Karışık listeler</string>
     <string name="hide_content_watched">İzlenen videolar</string>

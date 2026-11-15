@@ -267,6 +267,7 @@
   <string name="skin_classic">Clasică</string>
   <string name="skin_modern">Modernă</string>
   <string name="skin_hybrid">Hibridă</string>
+  <string name="hide_none_account">Ascunde „%1$s” în butonul contului (%2$s)</string>
   <string name="git_repository">Depozit Git</string>
   <string name="hide_content_mixes">Mixuri</string>
   <string name="hide_content_watched">Videoclipuri vizionate</string>

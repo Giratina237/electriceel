@@ -259,6 +259,7 @@
   <string name="skin_classic">經典</string>
   <string name="skin_modern">現代</string>
   <string name="skin_hybrid">混合</string>
+  <string name="hide_none_account">帳戶按鈕略過「%1$s」（%2$s）</string>
   <string name="git_repository">Git 存放區</string>
   <string name="hide_content_mixes">合輯</string>
   <string name="hide_content_watched">已觀看的影片</string>

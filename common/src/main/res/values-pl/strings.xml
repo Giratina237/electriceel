@@ -269,6 +269,7 @@
   <string name="skin_classic">Klasyczna</string>
   <string name="skin_modern">Nowoczesna</string>
   <string name="skin_hybrid">Hybrydowa</string>
+  <string name="hide_none_account">Ukryj „%1$s” w przycisku konta (%2$s)</string>
   <string name="git_repository">Repozytorium Git</string>
   <string name="hide_content_mixes">Składanki</string>
   <string name="hide_content_watched">Obejrzane filmy</string>

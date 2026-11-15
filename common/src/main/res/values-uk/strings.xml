@@ -275,6 +275,7 @@
     <string name="skin_classic">Класичне</string>
     <string name="skin_modern">Сучасне</string>
     <string name="skin_hybrid">Гібридне</string>
+    <string name="hide_none_account">Приховати «%1$s» у кнопці облікового запису (%2$s)</string>
     <string name="git_repository">Git-репозиторій</string>
     <string name="hide_content_mixes">Мікси</string>
     <string name="hide_content_watched">Переглянуті відео</string>

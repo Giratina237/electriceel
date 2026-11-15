@@ -269,6 +269,7 @@
     <string name="skin_classic">クラシック</string>
     <string name="skin_modern">モダン</string>
     <string name="skin_hybrid">ハイブリッド</string>
+    <string name="hide_none_account">アカウント ボタンで「%1$s」を飛ばす（%2$s）</string>
     <string name="git_repository">Git リポジトリ</string>
     <string name="hide_content_mixes">ミックス</string>
     <string name="hide_content_watched">視聴済みの動画</string>

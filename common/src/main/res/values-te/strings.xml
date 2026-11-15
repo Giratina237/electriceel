@@ -254,6 +254,7 @@
     <string name="skin_classic">క్లాసిక్</string>
     <string name="skin_modern">మోడర్న్</string>
     <string name="skin_hybrid">హైబ్రిడ్</string>
+    <string name="hide_none_account">ఖాతా బటన్‌లో \"%1$s\"ను దాచు (%2$s)</string>
     <string name="git_repository">Git రిపోజిటరీ</string>
     <string name="hide_content_mixes">మిక్స్‌లు</string>
     <string name="hide_content_watched">చూసిన వీడియోలు</string>

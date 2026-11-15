@@ -254,6 +254,7 @@
   <string name="skin_classic">Cổ điển</string>
   <string name="skin_modern">Hiện đại</string>
   <string name="skin_hybrid">Kết hợp</string>
+  <string name="hide_none_account">Ẩn \"%1$s\" trên nút tài khoản (%2$s)</string>
   <string name="git_repository">Kho Git</string>
   <string name="hide_content_mixes">Danh sách kết hợp</string>
   <string name="hide_content_watched">Video đã xem</string>

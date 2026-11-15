@@ -265,6 +265,7 @@
   <string name="skin_classic">Klasike</string>
   <string name="skin_modern">Moderne</string>
   <string name="skin_hybrid">Hibride</string>
+  <string name="hide_none_account">Fshih \"%1$s\" te butoni i llogarisë (%2$s)</string>
   <string name="git_repository">Depoja Git</string>
   <string name="hide_content_mixes">Përzierjet</string>
   <string name="hide_content_watched">Videot e shikuara</string>

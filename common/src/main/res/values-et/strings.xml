@@ -256,6 +256,7 @@
   <string name="skin_classic">Klassikaline</string>
   <string name="skin_modern">Moodne</string>
   <string name="skin_hybrid">Hübriid</string>
+  <string name="hide_none_account">Peida \"%1$s\" kontonupust (%2$s)</string>
   <string name="git_repository">Giti hoidla</string>
   <string name="hide_content_mixes">Miksid</string>
   <string name="hide_content_watched">Vaadatud videod</string>

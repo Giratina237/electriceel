@@ -270,6 +270,7 @@
     <string name="skin_classic">Դասական</string>
     <string name="skin_modern">Ժամանակակից</string>
     <string name="skin_hybrid">Հիբրիդային</string>
+    <string name="hide_none_account">Թաքցնել «%1$s»-ը հաշվի կոճակում (%2$s)</string>
     <string name="git_repository">Git պահոց</string>
     <string name="hide_content_mixes">Միքսեր</string>
     <string name="hide_content_watched">Դիտված տեսանյութեր</string>

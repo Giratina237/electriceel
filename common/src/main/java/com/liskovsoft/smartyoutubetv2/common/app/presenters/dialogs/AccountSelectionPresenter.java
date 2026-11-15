@@ -5,6 +5,8 @@ import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 
+import androidx.annotation.Nullable;
+
 import com.liskovsoft.mediaserviceinterfaces.ServiceManager;
 import com.liskovsoft.mediaserviceinterfaces.SignInService;
 import com.liskovsoft.mediaserviceinterfaces.oauth.Account;
@@ -113,21 +115,47 @@ public class AccountSelectionPresenter extends BasePresenter<Void> {
             return;
         }
 
-        Account current = null;
+        Account current = getSelected(accounts);
+        Account next = getNext(accounts, current, AccountsData.instance(getContext()).isNoneAccountHidden());
 
+        // One account and None hidden: nothing to switch to
+        if (next == current) {
+            AccountSettingsPresenter.instance(getContext()).show();
+            return;
+        }
+
+        selectAccount(next);
+    }
+
+    /**
+     * @return null for None (no account)
+     */
+    @Nullable
+    static Account getSelected(List<Account> accounts) {
         for (Account account : accounts) {
             if (account.isSelected()) {
-                current = account;
-                break;
+                return account;
             }
         }
 
-        int index = accounts.indexOf(current);
+        return null;
+    }
 
-        int nextIndex = index + 1;
-        // null == 'without account'
-        selectAccount(nextIndex == accounts.size() ? null : accounts.get(nextIndex));
-        //selectAccount(accounts.get(nextIndex == accounts.size() ? 0 : nextIndex));
+    /**
+     * The account the account button switches to: the one after the current, None (null) after the last, the first after None.
+     * With None hidden, the first after the last.
+     *
+     * @param current null for None
+     */
+    @Nullable
+    static Account getNext(List<Account> accounts, @Nullable Account current, boolean isNoneHidden) {
+        int nextIndex = accounts.indexOf(current) + 1;
+
+        if (nextIndex < accounts.size()) {
+            return accounts.get(nextIndex);
+        }
+
+        return isNoneHidden ? accounts.get(0) : null;
     }
 
     public void selectAccount(Account account) {
