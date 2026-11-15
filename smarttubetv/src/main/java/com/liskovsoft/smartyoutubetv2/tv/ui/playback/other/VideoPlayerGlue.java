@@ -554,6 +554,12 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
         } else if (action instanceof MultiAction) {
             ((MultiAction) action).setIndex(actionIndex);
             invalidateUi(action);
+
+            // TwoStateAction.setIndex(ON) turns its bound action OFF (like/dislike), so redraw that one too.
+            // Without it a key remap (e.g. Channel Up/Down -> Like/Dislike) leaves both buttons drawn as on.
+            if (action instanceof TwoStateAction) {
+                invalidateUi(((TwoStateAction) action).getBoundAction());
+            }
         }
     }
 
