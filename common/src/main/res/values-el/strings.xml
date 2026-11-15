@@ -255,6 +255,7 @@
   <string name="skin_classic">Κλασική</string>
   <string name="skin_modern">Μοντέρνα</string>
   <string name="skin_hybrid">Υβριδική</string>
+  <string name="hide_none_account">Απόκρυψη του \"%1$s\" από το κουμπί λογαριασμού (%2$s)</string>
   <string name="git_repository">Αποθετήριο Git</string>
   <string name="hide_content_mixes">Μίξεις</string>
   <string name="hide_content_watched">Βίντεο που παρακολουθήσατε</string>

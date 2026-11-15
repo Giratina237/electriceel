@@ -256,6 +256,7 @@
   <string name="skin_classic">Класически</string>
   <string name="skin_modern">Модерен</string>
   <string name="skin_hybrid">Хибриден</string>
+  <string name="hide_none_account">Скриване на \"%1$s\" от бутона за акаунт (%2$s)</string>
   <string name="git_repository">Git хранилище</string>
   <string name="hide_content_mixes">Миксове</string>
   <string name="hide_content_watched">Гледани видеоклипове</string>

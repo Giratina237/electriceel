@@ -18,6 +18,7 @@ public class AccountsData implements AccountChangeListener {
     private final Context mContext;
     private final AppPrefs mAppPrefs;
     private boolean mIsSelectAccountOnBootEnabled;
+    private boolean mIsNoneAccountHidden;
     private boolean mIsPasswordAccepted;
     private final Map<String, PasswordItem> mPasswords = new HashMap<>();
 
@@ -71,6 +72,19 @@ public class AccountsData implements AccountChangeListener {
         return mIsSelectAccountOnBootEnabled;
     }
 
+    /**
+     * The account button of the classic skin goes from the last account back to the first, never to None (no account).
+     * Kept for the device, not for each account: the button switches between them.
+     */
+    public void setNoneAccountHidden(boolean hidden) {
+        mIsNoneAccountHidden = hidden;
+        persistState();
+    }
+
+    public boolean isNoneAccountHidden() {
+        return mIsNoneAccountHidden;
+    }
+
     public void setAccountPassword(String password) {
         String profileName = getProfileName();
         mPasswords.put(profileName, new PasswordItem(profileName, password));
@@ -112,6 +126,7 @@ public class AccountsData implements AccountChangeListener {
         // mIsAccountProtectedWithPassword
         // mAccountPassword
         String[] passwords = Helpers.parseArray(split, 3);
+        mIsNoneAccountHidden = Helpers.parseBoolean(split, 4, false);
 
         if (passwords != null) {
             for (String passwordSpec : passwords) {
@@ -123,7 +138,7 @@ public class AccountsData implements AccountChangeListener {
 
     private void persistState() {
         mAppPrefs.setData(ACCOUNTS_DATA, Helpers.mergeData(
-                mIsSelectAccountOnBootEnabled, null, null, Helpers.mergeArray(mPasswords.values().toArray())
+                mIsSelectAccountOnBootEnabled, null, null, Helpers.mergeArray(mPasswords.values().toArray()), mIsNoneAccountHidden
         ));
     }
 

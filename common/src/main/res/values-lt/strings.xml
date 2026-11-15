@@ -263,6 +263,7 @@
     <string name="skin_classic">Klasikinis</string>
     <string name="skin_modern">Modernus</string>
     <string name="skin_hybrid">Hibridinis</string>
+    <string name="hide_none_account">Slėpti „%1$s“ paskyros mygtuke (%2$s)</string>
     <string name="git_repository">Git saugykla</string>
     <string name="hide_content_mixes">Rinkiniai</string>
     <string name="hide_content_watched">Peržiūrėti vaizdo įrašai</string>

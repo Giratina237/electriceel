@@ -257,6 +257,7 @@
     <string name="skin_classic">คลาสสิก</string>
     <string name="skin_modern">โมเดิร์น</string>
     <string name="skin_hybrid">ไฮบริด</string>
+    <string name="hide_none_account">ซ่อน \"%1$s\" ในปุ่มบัญชี (%2$s)</string>
     <string name="git_repository">คลัง Git</string>
     <string name="hide_content_mixes">มิกซ์</string>
     <string name="hide_content_watched">วิดีโอที่ดูแล้ว</string>

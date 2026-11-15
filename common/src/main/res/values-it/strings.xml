@@ -271,6 +271,7 @@
     <string name="skin_classic">Classico</string>
     <string name="skin_modern">Moderno</string>
     <string name="skin_hybrid">Ibrido</string>
+    <string name="hide_none_account">Nascondi \"%1$s\" nel pulsante dell\'account (%2$s)</string>
     <string name="git_repository">Repository Git</string>
     <string name="hide_content_mixes">Mix</string>
     <string name="hide_content_watched">Video guardati</string>

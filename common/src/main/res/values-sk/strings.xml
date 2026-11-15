@@ -275,6 +275,7 @@
     <string name="skin_classic">Klasický</string>
     <string name="skin_modern">Moderný</string>
     <string name="skin_hybrid">Hybridný</string>
+    <string name="hide_none_account">Skryť „%1$s“ v tlačidle účtu (%2$s)</string>
     <string name="git_repository">Repozitár Git</string>
     <string name="hide_content_mixes">Mixy</string>
     <string name="hide_content_watched">Pozreté videá</string>

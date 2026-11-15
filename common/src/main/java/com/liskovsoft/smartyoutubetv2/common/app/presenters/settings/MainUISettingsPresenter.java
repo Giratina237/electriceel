@@ -21,6 +21,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.provide
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.providers.ContextMenuProvider;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.providers.channelgroup.ChannelGroupServiceWrapper;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.service.SidebarService;
+import com.liskovsoft.smartyoutubetv2.common.prefs.AccountsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.DeArrowData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.WatchLaterData;
@@ -91,10 +92,15 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
     }
 
     /**
-     * The Skins card of the User interface settings: the look and navigation of the app (see Skins)
+     * The Skins card of the User interface settings: the look and navigation of the app (see Skins), and what's of one skin only
      */
     public void showSkins() {
-        showCategory(R.string.settings_skins, this::appendSkins);
+        AppDialogPresenter settingsPresenter = AppDialogPresenter.instance(getContext());
+
+        appendSkins(settingsPresenter);
+        appendHideNoneAccount(settingsPresenter);
+
+        settingsPresenter.showDialog(getContext().getString(R.string.settings_skins), mOnFinish);
     }
 
     /**
@@ -934,6 +940,17 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
         }
 
         settingsPresenter.appendRadioCategory(getContext().getString(R.string.settings_skins), options);
+    }
+
+    /**
+     * The account button of the classic skin (top left) goes from the last account back to the first, never to None
+     */
+    private void appendHideNoneAccount(AppDialogPresenter settingsPresenter) {
+        AccountsData accountsData = AccountsData.instance(getContext());
+
+        settingsPresenter.appendSingleSwitch(UiOptionItem.from(getContext().getString(R.string.hide_none_account,
+                getContext().getString(R.string.dialog_account_none), getContext().getString(R.string.skin_classic)),
+                option -> accountsData.setNoneAccountHidden(option.isSelected()), accountsData.isNoneAccountHidden()));
     }
 
     private void appendCardPreviews(AppDialogPresenter settingsPresenter) {

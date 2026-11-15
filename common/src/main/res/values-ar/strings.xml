@@ -266,6 +266,7 @@
   <string name="skin_classic">كلاسيكي</string>
   <string name="skin_modern">حديث</string>
   <string name="skin_hybrid">هجين</string>
+  <string name="hide_none_account">إخفاء \"%1$s\" من زر الحساب (%2$s)</string>
   <string name="git_repository">مستودع Git</string>
   <string name="hide_content_mixes">المزيج</string>
   <string name="hide_content_watched">الفيديوهات التي تمت مشاهدتها</string>

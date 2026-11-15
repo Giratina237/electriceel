@@ -277,6 +277,7 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="skin_classic">קלאסי</string>
     <string name="skin_modern">מודרני</string>
     <string name="skin_hybrid">היברידי</string>
+    <string name="hide_none_account">הסתרת \"%1$s\" בכפתור החשבון (%2$s)</string>
     <string name="git_repository">מאגר Git</string>
     <string name="hide_content_mixes">מיקסים</string>
     <string name="hide_content_watched">סרטונים שנצפו</string>

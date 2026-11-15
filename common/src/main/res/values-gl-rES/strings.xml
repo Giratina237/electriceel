@@ -265,6 +265,7 @@
   <string name="skin_classic">Clásica</string>
   <string name="skin_modern">Moderna</string>
   <string name="skin_hybrid">Híbrida</string>
+  <string name="hide_none_account">Ocultar \"%1$s\" no botón da conta (%2$s)</string>
   <string name="git_repository">Repositorio Git</string>
   <string name="hide_content_mixes">Mesturas</string>
   <string name="hide_content_watched">Vídeos vistos</string>
