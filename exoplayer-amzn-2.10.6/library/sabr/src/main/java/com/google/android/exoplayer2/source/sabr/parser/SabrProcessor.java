@@ -3,6 +3,7 @@ package com.google.android.exoplayer2.source.sabr.parser;
 import android.util.Base64;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrStreamError;
@@ -59,7 +60,10 @@ public class SabrProcessor {
     private final int liveSegmentTargetDurationToleranceMs;
     private final int liveSegmentTargetDurationSec;
     private long playerTimeMs;
-    private final String poToken;
+    /**
+     * The session's (see SabrManifest#requestSessionRefresh): a new one comes with the player response fetched again
+     */
+    private volatile String poToken;
     private final boolean postLive;
     private final String videoId;
     private final long durationMs;
@@ -126,6 +130,10 @@ public class SabrProcessor {
 
     public void setPlayerTimeMs(long playerTimeMs) {
         this.playerTimeMs = playerTimeMs;
+    }
+
+    public void setPoToken(@Nullable String poToken) {
+        this.poToken = poToken;
     }
 
     private void initializeFormatSelector() {

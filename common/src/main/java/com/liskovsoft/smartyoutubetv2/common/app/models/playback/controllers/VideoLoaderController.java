@@ -331,6 +331,17 @@ public class VideoLoaderController extends BasePlayerController {
         reloadVideo(0);
     }
 
+    /**
+     * Its formats were fetched again while it played (see SabrSessionRefresher): the streams in use now expire when theirs do. Played
+     * again after a pause, it isn't reloaded for the ones before.
+     */
+    @Override
+    public void onStreamsRefreshed(MediaItemFormatInfo formatInfo) {
+        if (isFormatOfVideo() && Helpers.equals(formatInfo.getVideoId(), mFormatVideoId)) {
+            mStreamsExpireTimeMs = formatInfo.getStreamsExpireTimeMs();
+        }
+    }
+
     @Override
     public void onSeekEnd() {
         prefetchNextIfNeeded();

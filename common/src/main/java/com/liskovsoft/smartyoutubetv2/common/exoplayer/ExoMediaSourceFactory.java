@@ -50,6 +50,7 @@ import com.liskovsoft.googlecommon.common.helpers.DefaultHeaders;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CancelableCalls;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SabrHostPrewarmer;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SabrLiveHeadFetcher;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SabrSessionRefresher;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -79,6 +80,7 @@ public class ExoMediaSourceFactory {
     private static final String HLS_PLAYLIST_EXTENSION = "m3u8";
     private static final boolean USE_BANDWIDTH_METER = false;
     private TrackErrorFixer mTrackErrorFixer;
+    private SabrSessionRefresher.Listener mStreamsRefreshListener;
     private DataSource.Factory mMediaDataSourceFactory;
     private DataSource.Factory mSabrMediaDataSourceFactory;
     private DataSource.Factory mDashMediaDataSourceFactory;
@@ -221,13 +223,21 @@ public class ExoMediaSourceFactory {
     }
 
     private MediaSource buildSabrMediaSource(MediaItemFormatInfo formatInfo) {
+        SabrManifest manifest = getSabrManifest(formatInfo);
+
+        // The server asks for the player response again, e.g. as the session expires about 6 h into a video: a new one is swapped in
+        // while the video plays
+        if (formatInfo.getVideoId() != null) {
+            manifest.setSessionRefresher(new SabrSessionRefresher(formatInfo.getVideoId(), mStreamsRefreshListener));
+        }
+
         // Are you using FrameworkSampleSource or ExtractorSampleSource when you build your player?
         SabrMediaSource sabrSource = new SabrMediaSource.Factory(
                 getSabrChunkSourceFactory(),
                 null
         )
                 .setLoadErrorHandlingPolicy(new SabrDefaultLoadErrorHandlingPolicy())
-                .createMediaSource(getSabrManifest(formatInfo));
+                .createMediaSource(manifest);
         if (mTrackErrorFixer != null) {
             sabrSource.addEventListener(Utils.sHandler, mTrackErrorFixer);
         }
@@ -402,6 +412,13 @@ public class ExoMediaSourceFactory {
 
     public void setTrackErrorFixer(TrackErrorFixer trackErrorFixer) {
         mTrackErrorFixer = trackErrorFixer;
+    }
+
+    /**
+     * Told the formats of a SABR stream's new session, once swapped in (see SabrSessionRefresher)
+     */
+    public void setStreamsRefreshListener(SabrSessionRefresher.Listener listener) {
+        mStreamsRefreshListener = listener;
     }
 
     public void release() {

@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Context;
 
 import com.liskovsoft.mediaserviceinterfaces.data.EndScreenItem;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Playlist;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
@@ -340,6 +341,11 @@ public class PlaybackPresenter extends BasePresenter<PlaybackView> implements Pl
     @Override
     public void onEngineError(int type, int rendererIndex, Throwable error) {
         process(listener -> listener.onEngineError(type, rendererIndex, error));
+    }
+
+    @Override
+    public void onStreamsRefreshed(MediaItemFormatInfo formatInfo) {
+        process(listener -> listener.onStreamsRefreshed(formatInfo));
     }
 
     @Override

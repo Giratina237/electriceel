@@ -208,7 +208,9 @@ public class ExoPlayerController implements Player.EventListener {
 
         mMediaSourceFactory.setTrackErrorFixer(mTrackErrorFixer);
         mEventListener = eventListener;
-        
+        // A SABR stream's new session, swapped in while it plays: its formats' streams expire later
+        mMediaSourceFactory.setStreamsRefreshListener(mEventListener::onStreamsRefreshed);
+
         applyShield720pFix();
         VideoTrack.sIsAltPresetsEnabled = playerTweaksData.isAltPresetsEnabled();
         MediaTrack.setAvcOverVp9Preferred(playerTweaksData.isAvcOverVp9Preferred());

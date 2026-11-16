@@ -1,6 +1,7 @@
 package com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorManager;
@@ -42,6 +43,10 @@ public interface PlayerEngineEventListener {
     void onEngineInitialized();
     void onEngineReleased();
     void onEngineError(int type, int rendererIndex, Throwable error);
+    /**
+     * The video's formats were fetched again and their streams swapped in while it played (see SabrSessionRefresher)
+     */
+    void onStreamsRefreshed(MediaItemFormatInfo formatInfo);
     void onTrackChanged(FormatItem track);
     void onTrackSelected(FormatItem track);
 }

@@ -4,6 +4,7 @@ import android.text.TextUtils;
 import android.util.Pair;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -29,6 +30,7 @@ import com.liskovsoft.youtubeapi.formatbuilders.utils.MediaFormatUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -762,6 +764,38 @@ public class SabrManifestParser {
 
     private static ClientInfo createClientInfo(MediaItemFormatInfo formatInfo) {
         return createClientInfo(formatInfo.getClientInfo());
+    }
+
+    /**
+     * Of the formats fetched again for a new session (see SabrManifest#requestSessionRefresh): null when they have no SABR stream
+     */
+    @Nullable
+    public static SabrSession parseSession(@Nullable MediaItemFormatInfo formatInfo) {
+        if (formatInfo == null || formatInfo.getServerAbrStreamingUrl() == null || formatInfo.getVideoPlaybackUstreamerConfig() == null
+                || formatInfo.getClientInfo() == null || formatInfo.getAdaptiveFormats() == null) {
+            return null;
+        }
+
+        ClientInfo clientInfo;
+
+        try {
+            clientInfo = createClientInfo(formatInfo.getClientInfo());
+        } catch (RuntimeException e) {
+            return null; // not a client the requests know (see ClientName)
+        }
+
+        Set<Integer> itags = new HashSet<>();
+
+        for (MediaFormat format : formatInfo.getAdaptiveFormats()) {
+            int itag = Helpers.parseInt(format.getITag());
+
+            if (itag > 0) {
+                itags.add(itag);
+            }
+        }
+
+        return new SabrSession(formatInfo.getServerAbrStreamingUrl(), formatInfo.getVideoPlaybackUstreamerConfig(),
+                formatInfo.getPoToken(), clientInfo, itags);
     }
 
     /**
