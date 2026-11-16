@@ -287,6 +287,13 @@ public class SabrStream {
         processor.setLive(isLive);
     }
 
+    /**
+     * Of the streams fetched again (see SabrManifest#refreshSession): the requests from now on send it
+     */
+    public void setPoToken(@Nullable String poToken) {
+        processor.setPoToken(poToken);
+    }
+
     public boolean isLive() {
         return processor.isLive();
     }

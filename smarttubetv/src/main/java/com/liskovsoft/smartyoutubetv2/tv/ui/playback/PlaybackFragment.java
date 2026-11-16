@@ -1180,6 +1180,11 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     }
 
     @Override
+    public boolean refreshSabr(MediaItemFormatInfo formatInfo) {
+        return mExoPlayerController != null && mExoPlayerController.refreshSabr(formatInfo);
+    }
+
+    @Override
     public void openDash(MediaItemFormatInfo formatInfo) {
         mExoPlayerController.openDash(formatInfo);
     }

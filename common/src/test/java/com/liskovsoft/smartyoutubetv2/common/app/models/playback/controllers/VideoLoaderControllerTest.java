@@ -27,8 +27,11 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowToast;
 
+import io.reactivex.Observable;
+
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,6 +41,7 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -260,7 +264,7 @@ public class VideoLoaderControllerTest {
     @Test
     public void playedAgainWithTimeLeftItPlaysOn() throws Exception {
         PlayingController controller = new PlayingController(video("bNAlycU0Xzg"));
-        setFormats(controller, "bNAlycU0Xzg", System.currentTimeMillis() + 2 * MediaItemFormatInfo.STREAMS_EXPIRE_MARGIN_MS);
+        setFormats(controller, "bNAlycU0Xzg", System.currentTimeMillis() + 2 * VideoLoaderController.RESUME_REFRESH_BEFORE_EXPIRY_MS);
         controller.onPlay();
 
         // Unknown, or of another video
@@ -277,6 +281,124 @@ public class VideoLoaderControllerTest {
 
         assertEquals(0, controller.mReloads);
         assertEquals(0, live.mReloads);
+    }
+
+    /**
+     * Resumed 7.6 min before its streams expired, a video played 8 min and the server stopped it for a reload (FARAJV5R #100): a SABR
+     * video's are fetched again while it plays on, once for those formats
+     */
+    @Test
+    public void resumedNearItsStreamsExpiryASabrVideoPlaysOnWithThemFetchedAgain() throws Exception {
+        long expireTimeMs = System.currentTimeMillis() + 6 * 60 * 60_000L;
+        StreamsController controller = new StreamsController(video("Y_K5gB18npY"), true, true);
+        setSabrFormats(controller, "Y_K5gB18npY", System.currentTimeMillis() + 8 * 60_000);
+        controller.mFetched = streams("TV", expireTimeMs);
+
+        controller.onPlay();
+        controller.onPlay();
+
+        assertEquals(1, controller.mFetches);
+        assertEquals(1, controller.mRefreshed.size());
+        assertSame(controller.mFetched, controller.mRefreshed.get(0));
+        assertEquals(0, controller.mReloads);
+        assertEquals(expireTimeMs, getField(controller, "mStreamsExpireTimeMs"));
+    }
+
+    /**
+     * Of another client, not taken by the player (e.g. other formats), or not fetched: reloaded, as before
+     */
+    @Test
+    public void resumedWithStreamsThatCantBePlayedOnWithItsReloaded() throws Exception {
+        StreamsController otherClient = new StreamsController(video("Y_K5gB18npY"), true, true);
+        setSabrFormats(otherClient, "Y_K5gB18npY", System.currentTimeMillis() + 8 * 60_000);
+        otherClient.mFetched = streams("WEB", System.currentTimeMillis() + 6 * 60 * 60_000L);
+        otherClient.onPlay();
+
+        StreamsController notTaken = new StreamsController(video("Y_K5gB18npY"), true, false);
+        setSabrFormats(notTaken, "Y_K5gB18npY", System.currentTimeMillis() + 8 * 60_000);
+        notTaken.mFetched = streams("TV", System.currentTimeMillis() + 6 * 60 * 60_000L);
+        notTaken.onPlay();
+
+        StreamsController notFetched = new StreamsController(video("Y_K5gB18npY"), true, true);
+        setSabrFormats(notFetched, "Y_K5gB18npY", System.currentTimeMillis() + 8 * 60_000);
+        notFetched.onPlay();
+
+        assertEquals(1, otherClient.mReloads);
+        assertTrue(otherClient.mRefreshed.isEmpty());
+        assertEquals(1, notTaken.mReloads);
+        assertEquals(1, notFetched.mFetches);
+        assertEquals(1, notFetched.mReloads);
+    }
+
+    /**
+     * Less than a minute left, the streams fetched again might come after the ones in use expired: reloaded at once
+     */
+    @Test
+    public void resumedWithinAMinuteOfItsStreamsExpiryASabrVideoIsReloaded() throws Exception {
+        StreamsController controller = new StreamsController(video("Y_K5gB18npY"), true, true);
+        setSabrFormats(controller, "Y_K5gB18npY", System.currentTimeMillis() + 30_000);
+        controller.mFetched = streams("TV", System.currentTimeMillis() + 6 * 60 * 60_000L);
+
+        controller.onPlay();
+
+        assertEquals(0, controller.mFetches);
+        assertEquals(1, controller.mReloads);
+    }
+
+    /**
+     * Played through the time its streams expire (6 h after they were fetched, SmartTube #6478): fetched again 5 min before and played
+     * on with. Then again before those expire.
+     */
+    @Test
+    public void aPlayingSabrVideosStreamsAreFetchedAgainBeforeTheyExpire() throws Exception {
+        long expireTimeMs = System.currentTimeMillis() + VideoLoaderController.STREAMS_REFRESH_BEFORE_EXPIRY_MS + 10_000;
+        StreamsController controller = new StreamsController(video("Y_K5gB18npY"), true, true);
+        setSabrFormats(controller, "Y_K5gB18npY", expireTimeMs);
+        controller.mFetched = streams("TV", expireTimeMs + 6 * 60 * 60_000L);
+
+        scheduleStreamsRefresh(controller);
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(9));
+        assertEquals(0, controller.mFetches);
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
+        assertEquals(1, controller.mFetches);
+        assertEquals(1, controller.mRefreshed.size());
+        assertEquals(0, controller.mReloads);
+        assertEquals(expireTimeMs + 6 * 60 * 60_000L, getField(controller, "mStreamsExpireTimeMs"));
+
+        // The next time is the new streams'
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(11));
+        assertEquals(1, controller.mFetches);
+    }
+
+    /**
+     * Paused (onPlay sees to them when it plays again), or not over SABR (a URL's streams are fetched again by a reload): not fetched
+     * while it plays. Not played on with, the server's ask for a reload at their expiry reloads it, as before.
+     */
+    @Test
+    public void streamsAreOnlyFetchedAgainWhileASabrVideoPlays() throws Exception {
+        long expireTimeMs = System.currentTimeMillis() + VideoLoaderController.STREAMS_REFRESH_BEFORE_EXPIRY_MS + 1_000;
+        StreamsController paused = new StreamsController(video("Y_K5gB18npY"), false, true);
+        setSabrFormats(paused, "Y_K5gB18npY", expireTimeMs);
+        scheduleStreamsRefresh(paused);
+
+        StreamsController dash = new StreamsController(video("Y_K5gB18npY"), true, true);
+        setSabrFormats(dash, "Y_K5gB18npY", expireTimeMs);
+        setField(dash, "mFormatProtocol", PlayerFailure.PROTOCOL_DASH);
+        scheduleStreamsRefresh(dash);
+
+        StreamsController notTaken = new StreamsController(video("Y_K5gB18npY"), true, false);
+        setSabrFormats(notTaken, "Y_K5gB18npY", expireTimeMs);
+        notTaken.mFetched = streams("TV", expireTimeMs + 6 * 60 * 60_000L);
+        scheduleStreamsRefresh(notTaken);
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
+
+        assertEquals(0, paused.mFetches);
+        assertEquals(0, dash.mFetches);
+        assertEquals(1, notTaken.mFetches);
+        assertEquals(0, notTaken.mReloads);
+        assertEquals(expireTimeMs, getField(notTaken, "mStreamsExpireTimeMs"));
     }
 
     /**
@@ -452,9 +574,36 @@ public class VideoLoaderControllerTest {
         return positionMs[0];
     }
 
+    /**
+     * Streams given for 6 h, as YouTube's are
+     */
     private static void setFormats(VideoLoaderController controller, String videoId, long streamsExpireTimeMs) throws Exception {
         setField(controller, "mFormatVideoId", videoId);
         setField(controller, "mStreamsExpireTimeMs", streamsExpireTimeMs);
+        setField(controller, "mStreamsLifetimeMs", 6 * 60 * 60_000L);
+    }
+
+    private static void setSabrFormats(VideoLoaderController controller, String videoId, long streamsExpireTimeMs) throws Exception {
+        setFormats(controller, videoId, streamsExpireTimeMs);
+        setField(controller, "mFormatProtocol", PlayerFailure.PROTOCOL_SABR);
+        setField(controller, "mFormatClient", "TV");
+    }
+
+    private static void scheduleStreamsRefresh(VideoLoaderController controller) throws Exception {
+        Method method = VideoLoaderController.class.getDeclaredMethod("scheduleStreamsRefresh");
+        method.setAccessible(true);
+        method.invoke(controller);
+    }
+
+    /**
+     * Fetched again, of the client: expiring at the time given
+     */
+    private static MediaItemFormatInfo streams(String client, long streamsExpireTimeMs) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("getClientInfo", stub(MediaItemFormatInfo.ClientInfo.class, Collections.<String, Object>singletonMap("getClientName", client)));
+        values.put("getStreamsExpireTimeMs", streamsExpireTimeMs);
+
+        return formatInfo(values);
     }
 
     private static void setField(VideoLoaderController controller, String name, Object value) throws Exception {
@@ -600,7 +749,7 @@ public class VideoLoaderControllerTest {
      */
     private static class PlayingController extends TestController {
         private final PlaybackView mPlayer = stub(PlaybackView.class, new HashMap<>());
-        private int mReloads;
+        int mReloads;
 
         private PlayingController(Video video) {
             super(video);
@@ -614,6 +763,42 @@ public class VideoLoaderControllerTest {
         @Override
         public void reloadVideo(int delayMs) {
             mReloads++;
+        }
+    }
+
+    /**
+     * Playing (or paused) a SABR video: the streams it fetches again are the ones given (none: the fetch fails), and the player plays on
+     * with them or not
+     */
+    private static class StreamsController extends PlayingController {
+        private final List<MediaItemFormatInfo> mRefreshed = new ArrayList<>();
+        private final PlaybackView mSabrPlayer;
+        private MediaItemFormatInfo mFetched;
+        private int mFetches;
+
+        private StreamsController(Video video, boolean isPlaying, boolean isTaken) {
+            super(video);
+            PlaybackView stub = stub(PlaybackView.class, Collections.<String, Object>singletonMap("isPlaying", isPlaying));
+            mSabrPlayer = (PlaybackView) Proxy.newProxyInstance(PlaybackView.class.getClassLoader(), new Class<?>[]{PlaybackView.class},
+                    (proxy, method, args) -> {
+                        if ("refreshSabr".equals(method.getName())) {
+                            mRefreshed.add((MediaItemFormatInfo) args[0]);
+                            return isTaken;
+                        }
+
+                        return method.invoke(stub, args);
+                    });
+        }
+
+        @Override
+        public PlaybackView getPlayer() {
+            return mSabrPlayer;
+        }
+
+        @Override
+        Observable<MediaItemFormatInfo> fetchStreams(String videoId) {
+            mFetches++;
+            return mFetched != null ? Observable.just(mFetched) : Observable.error(new IllegalStateException("offline"));
         }
     }
 

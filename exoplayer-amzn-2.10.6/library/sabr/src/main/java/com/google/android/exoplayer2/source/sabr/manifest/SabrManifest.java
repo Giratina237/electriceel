@@ -94,9 +94,12 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
     public final int liveSegmentTargetDurationSec;
 
     private final String videoId;
-    private final SabrCdnSelector cdnSelector;
-    private final String videoPlaybackUstreamerConfig;
-    private final String poToken;
+    /**
+     * The streams' session: replaced when they're fetched again (see refreshSession)
+     */
+    private SabrCdnSelector cdnSelector;
+    private volatile String videoPlaybackUstreamerConfig;
+    private String poToken;
     private final ClientInfo clientInfo;
     private final Map<Integer, SabrStream> sabrStreams;
     private int sabrRequestNumber = -1;
@@ -263,6 +266,27 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         }
 
         return true;
+    }
+
+    /**
+     * The streams fetched again before they expire (see SabrManifestParser#refresh): the next request of each track goes to their URL
+     * with their config and poToken, while the media buffered plays on. A request under way keeps the old ones. What the server said of
+     * the streams so far (e.g. the playback cookie, the formats initialized) stays.
+     */
+    public synchronized void refreshSession(String serverAbrStreamingUrl, String videoPlaybackUstreamerConfig, @Nullable String poToken) {
+        cdnSelector = new SabrCdnSelector(serverAbrStreamingUrl);
+        this.videoPlaybackUstreamerConfig = videoPlaybackUstreamerConfig;
+        this.poToken = poToken;
+        String url = cdnSelector.getCurrentUrl();
+
+        for (SabrStream sabrStream : sabrStreams.values()) {
+            sabrStream.setServerAbrStreamingUrl(url);
+            sabrStream.setPoToken(poToken);
+        }
+    }
+
+    public ClientInfo getClientInfo() {
+        return clientInfo;
     }
 
     public int getSabrRequestNumber() {
