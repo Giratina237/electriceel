@@ -85,6 +85,13 @@ public final class SabrMediaSource extends BaseMediaSource {
         manifestLoadErrorThrower = new ManifestLoadErrorThrower();
     }
 
+    /**
+     * What it plays, e.g. for its streams to be fetched again (see SabrManifestParser#refresh)
+     */
+    public SabrManifest getManifest() {
+        return manifest;
+    }
+
     @Override
     protected void prepareSourceInternal(@Nullable TransferListener mediaTransferListener) {
         this.mediaTransferListener = mediaTransferListener;

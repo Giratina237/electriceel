@@ -166,6 +166,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
      * The newest segment's number when the last chunk was made, -1 for none since a seek
      */
     private long livePrefetchSequenceNumber = -1;
+    /**
+     * Of the session the last chunk's request was made with (see SabrManifest#getSessionId): a track loads one chunk at a time, so
+     * a failed load is that chunk's
+     */
+    private int chunkSessionId;
 
     /**
      * @param manifestLoaderErrorThrower Throws errors affecting loading of manifests.
@@ -330,6 +335,13 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     @Override
     public void getNextChunk(long playbackPositionUs, long loadPositionUs, List<? extends MediaChunk> queue, ChunkHolder out) {
         if (fatalError != null) {
+            return;
+        }
+
+        // The server asked for the player response again: the requests wait for the new session (see SabrManifest#requestSessionRefresh)
+        if (sabrStream != null && manifest.isSessionRefreshPending()) {
+            out.chunk = new SessionWaitChunk(dataSource, trackSelection.getSelectedFormat(), trackSelection.getSelectionReason(),
+                    trackSelection.getSelectionData(), manifest);
             return;
         }
 
@@ -513,6 +525,10 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
     @Override
     public void onChunkLoadCompleted(Chunk chunk) {
+        if (chunk instanceof SessionWaitChunk) {
+            return; // it made no request
+        }
+
         if (chunk instanceof InitializationChunk) {
             InitializationChunk initializationChunk = (InitializationChunk) chunk;
             int trackIndex = trackSelection.indexOf(initializationChunk.trackFormat);
@@ -548,10 +564,22 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     public boolean onChunkLoadError(Chunk chunk, boolean cancelable, Exception e, long blacklistDurationMs) {
         Log.e(TAG, "Chunk load failed: " + e.getMessage());
 
+        Throwable cause = e.getCause();
+
+        // FIX: the server asks for the player response again, e.g. as the session expires about 6 h into a video. The chunk is
+        // loaded again with a new session, swapped in while the player plays what it buffered (see SabrManifest#requestSessionRefresh).
+        // Before, the player was failed and the app reloaded the video: the playback stopped for about 3 s (SmartTube #6478). One
+        // that can't be dropped (the player read from it) is failed as before.
+        if (cause instanceof SabrReloadPlayerError && cancelable && sabrStream != null
+                && manifest.requestSessionRefresh(chunkSessionId, ((SabrReloadPlayerError) cause).reloadPlaybackToken)) {
+            Log.w(TAG, "Loading the chunk again with a new SABR session");
+            resetSampleDeduplicator(); // the chunk is discarded with its samples
+            return true;
+        }
+
         // A reload request is not a transport failure. Handing it back as "handled" would
         // retry the very same request at full speed. Let it fall through to the
-        // LoadErrorHandlingPolicy, which stashes the token and fails the load.
-        Throwable cause = e.getCause();
+        // LoadErrorHandlingPolicy, which fails the load: the app reloads the video with the token.
         if (cause instanceof SabrReloadPlayerError || cause instanceof SabrBackoffError || cause instanceof PoTokenError
                 || cause instanceof SabrProtocolError) {
             Log.e(TAG, "SABR control signal, letting the error policy decide: " + cause.getMessage());
@@ -806,6 +834,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         // MOD: add protobuf data
         //DataSpec dataSpec = new DataSpec(requestUri.resolveUri(baseUrl), requestUri.start,
         //        requestUri.length, representationHolder.representation.getCacheKey());
+        chunkSessionId = manifest.getSessionId(); // before the request is made: one swapped in meanwhile is the next one's
         DataSpec dataSpec = new DataSpec(
                 //Uri.parse(sabrStream.getRequestUrl()),
                 Uri.parse(manifest.getRequestUrl(trackType)),
@@ -908,6 +937,12 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         //RangedUri segmentUri = representationHolder.getSegmentUrl(firstSegmentNum);
         //String baseUrl = representation.baseUrl;
         //baseUrl = Utils.updateQuery(baseUrl, "rn", sabrStream.getIncSabrRequestNumber());
+
+        int sessionId = manifest.getSessionId(); // before the request is made: one swapped in meanwhile is the next one's
+        if (sessionId != chunkSessionId && livePrefetcher != null) {
+            livePrefetcher.clear(); // asked for with the session before
+        }
+        chunkSessionId = sessionId;
 
         // A live stream at its head: the next segment doesn't exist yet. The chunk is loaded now, its request waits: a chunk source
         // that gives none isn't asked again until a load ends (the player stalled). Also a seek retried after an answer with no media
@@ -1109,6 +1144,40 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     //        return representationHolder.getSegmentEndTimeUs(getCurrentIndex());
     //    }
     //}
+
+    /**
+     * Loaded while a new session is asked for (see SabrManifest#requestSessionRefresh): it makes no request, and ends once the session
+     * is in or the ask failed. The next chunk is then made with what there is. A chunk source that gives no chunk isn't asked again
+     * until a load ends, and the track would load no more.
+     */
+    /* package */ static final class SessionWaitChunk extends Chunk {
+        private static final long POLL_MS = 50;
+        private final SabrManifest manifest;
+        private volatile boolean canceled;
+
+        SessionWaitChunk(DataSource dataSource, Format trackFormat, int trackSelectionReason, @Nullable Object trackSelectionData,
+                         SabrManifest manifest) {
+            super(dataSource, new DataSpec(Uri.EMPTY), C.DATA_TYPE_UNKNOWN, trackFormat, trackSelectionReason, trackSelectionData,
+                    C.TIME_UNSET, C.TIME_UNSET);
+            this.manifest = manifest;
+        }
+
+        @Override
+        public void cancelLoad() {
+            canceled = true;
+        }
+
+        /**
+         * @throws InterruptedException canceled (the loader interrupts its thread), e.g. by a seek
+         */
+        @Override
+        public void load() throws InterruptedException {
+            // It times out (see SabrManifest#isSessionRefreshPending)
+            while (!canceled && manifest.isSessionRefreshPending()) {
+                Thread.sleep(POLL_MS);
+            }
+        }
+    }
 
     /**
      * Opens no earlier than a time (elapsed realtime): a live stream's request for a segment that doesn't exist yet (see

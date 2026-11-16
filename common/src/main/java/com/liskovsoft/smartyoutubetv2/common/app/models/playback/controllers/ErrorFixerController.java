@@ -520,7 +520,9 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
         failure.action("sabr_reload " + mSabrErrorFixAttempts + "/" + MAX_SABR_ERROR_FIX_ATTEMPTS).action("reload_video");
         YouTubeServiceManager.instance().reloadPlayerResponse(video.videoId, reloadError.reloadPlaybackToken);
-        mVideoLoaderController.reloadVideo();
+        // At once: the error came when the buffer ran out, the picture stands still till the video plays again. A second's wait was
+        // more than the reload took (FARAJV5R #100: 674 ms to its first frame).
+        mVideoLoaderController.reloadVideo(0);
 
         return true;
     }

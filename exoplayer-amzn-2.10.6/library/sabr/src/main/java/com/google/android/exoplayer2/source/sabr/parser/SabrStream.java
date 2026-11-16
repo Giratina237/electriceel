@@ -296,6 +296,13 @@ public class SabrStream {
         processor.setLive(isLive);
     }
 
+    /**
+     * Of the streams fetched again (see SabrManifest#refreshSession, #requestSessionRefresh): the requests from now on send it
+     */
+    public void setPoToken(@Nullable String poToken) {
+        processor.setPoToken(poToken);
+    }
+
     public boolean isLive() {
         return processor.isLive();
     }
@@ -745,14 +752,23 @@ public class SabrStream {
         setUrl(url);
     }
 
+    /**
+     * Whether the stream can go on at the URL: not a live stream's of another broadcast, which it would have to start again at
+     */
+    public boolean acceptsUrl(@Nullable String url) {
+        if (!processor.isLive() || this.url == null) {
+            return true;
+        }
+
+        return url != null && Helpers.equals(UrlQueryStringFactory.parse(url).get("id"), UrlQueryStringFactory.parse(this.url).get("id"));
+    }
+
     private void setUrl(String url) {
         Log.d(TAG, "New URL: %s", url);
         UrlQueryString newQueryString = UrlQueryStringFactory.parse(url);
-        UrlQueryString oldQueryString = UrlQueryStringFactory.parse(this.url);
-        String bn = newQueryString.get("id");
-        String bc = oldQueryString.get("id");
-        if (processor.isLive() && this.url != null && !Helpers.equals(bn, bc)) {
-            throw new SabrStreamError(String.format("Broadcast ID changed from %s to %s. The download will need to be restarted.", bc, bn));
+        if (!acceptsUrl(url)) {
+            String bc = UrlQueryStringFactory.parse(this.url).get("id");
+            throw new SabrStreamError(String.format("Broadcast ID changed from %s to %s. The download will need to be restarted.", bc, newQueryString.get("id")));
         }
         this.url = url;
         if (Helpers.equals(newQueryString.get("source"), "yt_live_broadcast")) {

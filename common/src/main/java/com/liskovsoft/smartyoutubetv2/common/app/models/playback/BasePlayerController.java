@@ -13,6 +13,7 @@ import com.liskovsoft.mediaserviceinterfaces.MediaItemService;
 import com.liskovsoft.mediaserviceinterfaces.NotificationsService;
 import com.liskovsoft.mediaserviceinterfaces.SignInService;
 import com.liskovsoft.mediaserviceinterfaces.data.EndScreenItem;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
@@ -204,6 +205,11 @@ public abstract class BasePlayerController implements PlayerEventListener {
 
     @Override
     public void onEngineError(int type, int rendererIndex, Throwable error) {
+        // NOP
+    }
+
+    @Override
+    public void onStreamsRefreshed(MediaItemFormatInfo formatInfo) {
         // NOP
     }
 

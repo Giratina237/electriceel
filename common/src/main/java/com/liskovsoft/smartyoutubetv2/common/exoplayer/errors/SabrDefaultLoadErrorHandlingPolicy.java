@@ -26,7 +26,8 @@ public class SabrDefaultLoadErrorHandlingPolicy extends DashDefaultLoadErrorHand
 
         Throwable cause = exception.getCause();
 
-        // The server asked for a fresh player response. Retrying the same request is pointless -
+        // The server asked for a fresh player response, and no new session could be swapped in (see
+        // DefaultSabrChunkSource#onChunkLoadError). Retrying the same request is pointless -
         // it just hammers the server. Make the error fatal so the app reloads the video.
         if (cause instanceof SabrReloadPlayerError) {
             Log.e(TAG, "Player response reload requested, errorCount: " + errorCount);

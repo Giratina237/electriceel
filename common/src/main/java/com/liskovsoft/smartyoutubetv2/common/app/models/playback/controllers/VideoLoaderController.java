@@ -72,6 +72,23 @@ public class VideoLoaderController extends BasePlayerController {
     @VisibleForTesting
     static final long PREFETCH_BEFORE_END_MS = 20_000;
     /**
+     * Played again this close to when its streams expire (YouTube gives them about 6 h), the video's are fetched again first. Resumed
+     * 7.6 min before, a video played 8 min and the server stopped it for a reload (FARAJV5R #100). See onPlay.
+     */
+    @VisibleForTesting
+    static final long RESUME_REFRESH_BEFORE_EXPIRY_MS = 30 * 60_000;
+    /**
+     * While a SABR video plays, this long before its streams expire they're fetched again and played on with, without a reload (see
+     * refreshStreamsWhilePlaying). The cached formats are fetched again from then too (see MediaItemFormatInfo#STREAMS_EXPIRE_MARGIN_MS).
+     */
+    @VisibleForTesting
+    static final long STREAMS_REFRESH_BEFORE_EXPIRY_MS = MediaItemFormatInfo.STREAMS_EXPIRE_MARGIN_MS;
+    /**
+     * With less left, the streams fetched again might come after the ones in use expired: the video is reloaded instead (see onPlay)
+     */
+    @VisibleForTesting
+    static final long MIN_REFRESH_WHILE_PLAYING_MS = 60_000;
+    /**
      * What the end of a video does, of the videos (see getEndStep): opens the next one, the previous one, or stays with it (repeats it,
      * stops, closes…)
      */
@@ -85,6 +102,10 @@ public class VideoLoaderController extends BasePlayerController {
     private CensoredWordsController mCensoredWordsController;
     private EndScreenController mEndScreenController;
     private Disposable mFormatInfoAction;
+    /**
+     * The streams of the SABR video playing, fetched again to play on with (see refreshStreams)
+     */
+    private Disposable mRefreshStreamsAction;
     /**
      * Fetched while the engine starts (see prefetchFormatInfo), for the video in mPrefetchVideoId
      */
@@ -108,6 +129,10 @@ public class VideoLoaderController extends BasePlayerController {
      * 0 when unknown, or once they're being fetched again for it
      */
     private long mStreamsExpireTimeMs;
+    /**
+     * How long the server gave them, from when they were made: 0 when unknown (see onPlay)
+     */
+    private long mStreamsLifetimeMs;
     /**
      * The live stream the clients are switched for, and how many times (see MAX_LIVE_CLIENT_SWITCHES)
      */
@@ -182,6 +207,7 @@ public class VideoLoaderController extends BasePlayerController {
         }
     };
     private final Runnable mPrefetchNext = this::prefetchNextIfNeeded;
+    private final Runnable mRefreshStreams = this::refreshStreamsWhilePlaying;
 
     public VideoLoaderController() {
         mPlaylist = Playlist.instance();
@@ -311,24 +337,164 @@ public class VideoLoaderController extends BasePlayerController {
 
     /**
      * Played again, e.g. after a long pause: when its streams expire before long, the server would refuse the next segment (SABR
-     * asks for the player response again, a URL answers 403). Fetched again first, from where it is.
+     * asks for the player response again, a URL answers 403). Fetched again: a SABR video's while it plays on, when they haven't
+     * expired yet; else first, reloaded from where it is.
      */
     @Override
     public void onPlay() {
         Video video = getVideo();
 
+        // Streams given for no longer than that: the ones fetched again would be as close to expiring, fetched again at their start, and
+        // so on. Only their last minutes then, as before.
+        long marginMs = mStreamsLifetimeMs > RESUME_REFRESH_BEFORE_EXPIRY_MS
+                ? RESUME_REFRESH_BEFORE_EXPIRY_MS : MediaItemFormatInfo.STREAMS_EXPIRE_MARGIN_MS;
+
         if (getPlayer() == null || video == null || video.isLive || !isFormatOfVideo() || mStreamsExpireTimeMs <= 0
-                || System.currentTimeMillis() < mStreamsExpireTimeMs - MediaItemFormatInfo.STREAMS_EXPIRE_MARGIN_MS) {
+                || System.currentTimeMillis() < mStreamsExpireTimeMs - marginMs) {
             // Not with a reload: its fetch would wait for the prefetch
             prefetchNextIfNeeded();
             return;
         }
 
-        Log.d(TAG, "The streams expire: fetching them again before playing on");
+        long leftMs = mStreamsExpireTimeMs - System.currentTimeMillis();
         // Once for these formats: the ones fetched have their own time
         mStreamsExpireTimeMs = 0;
+
+        if (PlayerFailure.PROTOCOL_SABR.equals(mFormatProtocol) && leftMs >= MIN_REFRESH_WHILE_PLAYING_MS) {
+            Log.d(TAG, "The streams expire in " + leftMs / 1_000 + " s: fetching them again while it plays on");
+            refreshStreams(video, true);
+            return;
+        }
+
+        Log.d(TAG, "The streams expire: fetching them again before playing on");
         YouTubeServiceManager.instance().reloadPlayerResponse(video.videoId, null);
         reloadVideo(0);
+    }
+
+    /**
+     * Its formats were fetched again as the SABR server asked (see SabrSessionRefresher): the streams in use now expire when theirs do.
+     * Played again after a pause, it isn't reloaded for the ones before, and they're fetched again before they expire.
+     */
+    @Override
+    public void onStreamsRefreshed(MediaItemFormatInfo formatInfo) {
+        if (isFormatOfVideo() && Helpers.equals(formatInfo.getVideoId(), mFormatVideoId)) {
+            setStreamsExpireTime(formatInfo);
+            scheduleStreamsRefresh();
+        }
+    }
+
+    /**
+     * Before the streams of the SABR video playing expire, they're fetched again and played on with: at their expiry the server
+     * would stop it for a reload (6 h after they were fetched, FARAJV5R #100). Not while it's paused: played again, onPlay sees to them.
+     */
+    private void refreshStreamsWhilePlaying() {
+        Video video = getVideo();
+        PlaybackView player = getPlayer();
+
+        if (player == null || video == null || !isStreamsToRefresh() || !player.isPlaying()) {
+            return;
+        }
+
+        Log.d(TAG, "The streams expire soon: fetching them again while it plays");
+        refreshStreams(video, false);
+    }
+
+    /**
+     * Of the formats that reached the player: a SABR video's streams are fetched again before they expire (see
+     * refreshStreamsWhilePlaying)
+     */
+    private void scheduleStreamsRefresh() {
+        Utils.removeCallbacks(mRefreshStreams);
+
+        if (!isStreamsToRefresh()) {
+            return;
+        }
+
+        long delayMs = mStreamsExpireTimeMs - STREAMS_REFRESH_BEFORE_EXPIRY_MS - System.currentTimeMillis();
+
+        // As close to expiring when they came (e.g. streams given for less than that): the ones fetched again would be too, fetched
+        // again at once, and so on. Played again, onPlay sees to them.
+        if (delayMs <= 0) {
+            return;
+        }
+
+        Utils.postDelayed(mRefreshStreams, delayMs);
+    }
+
+    /**
+     * A SABR video's whose streams expire at a known time: a live stream's are fetched again by the player
+     */
+    private boolean isStreamsToRefresh() {
+        Video video = getVideo();
+
+        return video != null && !video.isLive && isFormatOfVideo() && PlayerFailure.PROTOCOL_SABR.equals(mFormatProtocol)
+                && mStreamsExpireTimeMs > 0;
+    }
+
+    /**
+     * The video's streams are fetched again, the cached ones being those in use, and the player plays on with them (see
+     * PlayerEngine#refreshSabr)
+     *
+     * @param reloadOnFailure when they can't be played on with: reloaded (e.g. on a resume, where the video waits anyway), or left to
+     *                        the server's ask for a reload when they expire (see ErrorFixerController#applySabrReloadPlayerAction)
+     */
+    private void refreshStreams(Video video, boolean reloadOnFailure) {
+        Utils.removeCallbacks(mRefreshStreams);
+        RxHelper.disposeActions(mRefreshStreamsAction);
+        String videoId = video.videoId;
+        String client = mFormatClient;
+        YouTubeServiceManager.instance().reloadPlayerResponse(videoId, null);
+        // The cache is cleared: the next video's formats fetched ahead too
+        mNextPrefetchVideoId = null;
+
+        mRefreshStreamsAction = fetchStreams(videoId)
+                .subscribe(formatInfo -> onStreamsRefreshed(videoId, client, formatInfo, reloadOnFailure),
+                           error -> {
+                               Log.e(TAG, "The streams weren't fetched again: " + error.getMessage());
+                               onStreamsRefreshed(videoId, client, null, reloadOnFailure);
+                           });
+    }
+
+    private void setStreamsExpireTime(MediaItemFormatInfo formatInfo) {
+        mStreamsExpireTimeMs = formatInfo.getStreamsExpireTimeMs();
+        mStreamsLifetimeMs = mStreamsExpireTimeMs > 0 && formatInfo.getCreatedTimeMs() > 0
+                ? mStreamsExpireTimeMs - formatInfo.getCreatedTimeMs() : 0;
+    }
+
+    @VisibleForTesting
+    Observable<MediaItemFormatInfo> fetchStreams(String videoId) {
+        return getFormatInfoObserve(videoId);
+    }
+
+    /**
+     * @param formatInfo null when they weren't fetched
+     */
+    private void onStreamsRefreshed(String videoId, @Nullable String client, @Nullable MediaItemFormatInfo formatInfo,
+                                    boolean reloadOnFailure) {
+        PlaybackView player = getPlayer();
+
+        // Another video, or the formats again (e.g. a reload), came meanwhile
+        if (player == null || !isFormatOfVideo() || !videoId.equals(mFormatVideoId) || !PlayerFailure.PROTOCOL_SABR.equals(mFormatProtocol)
+                || !Helpers.equals(client, mFormatClient)) {
+            return;
+        }
+
+        String newClient = formatInfo != null ? getClientName(formatInfo) : null;
+
+        if (formatInfo != null && Helpers.equals(client, newClient) && player.refreshSabr(formatInfo)) {
+            Log.d(TAG, "Playing on with the streams fetched again");
+            setStreamsExpireTime(formatInfo);
+            scheduleStreamsRefresh();
+            return;
+        }
+
+        if (formatInfo != null) {
+            Log.w(TAG, "The streams fetched again don't fit the ones in use: " + client + " → " + newClient);
+        }
+
+        if (reloadOnFailure) {
+            reloadVideo(0);
+        }
     }
 
     @Override
@@ -503,7 +669,7 @@ public class VideoLoaderController extends BasePlayerController {
         mFormatVideoId = getVideo().videoId;
         mFormatClient = getClientName(formatInfo);
         mFormatProtocol = null;
-        mStreamsExpireTimeMs = formatInfo.getStreamsExpireTimeMs();
+        setStreamsExpireTime(formatInfo);
         showPickedClientFallback(formatInfo);
         // Fetched again from another client: the start goes on (see VideoStarts#onFetch)
         boolean isRefetched = false;
@@ -603,6 +769,8 @@ public class VideoLoaderController extends BasePlayerController {
         if (!isRefetched) {
             VideoStarts.onProtocol(mFormatProtocol); // none: the video isn't played
         }
+
+        scheduleStreamsRefresh();
 
         if (mFormatProtocol != null) {
             mMembersSkips = 0; // one plays: the next run of members' videos is skipped again
@@ -957,8 +1125,8 @@ public class VideoLoaderController extends BasePlayerController {
 
     private void disposeActions() {
         MediaServiceManager.instance().disposeActions();
-        RxHelper.disposeActions(mFormatInfoAction, mMusicAutoplayAction);
-        Utils.removeCallbacks(mReloadVideo, mLoadNext, mRestartEngine, mMetadataSync, mPrefetchNext);
+        RxHelper.disposeActions(mFormatInfoAction, mMusicAutoplayAction, mRefreshStreamsAction);
+        Utils.removeCallbacks(mReloadVideo, mLoadNext, mRestartEngine, mMetadataSync, mPrefetchNext, mRefreshStreams);
     }
 
     public void restartEngine() {
