@@ -128,15 +128,46 @@ public class SabrCdnSelectorTest {
         assertEquals(FALLBACK_URL, new SabrCdnSelector(PRIMARY_URL).getCurrentUrl());
     }
 
+    /**
+     * AWHPECZK: the fallback host failed too, while the first stayed skipped for half an hour. Every host failed: the first again.
+     */
     @Test
-    public void lastNetworkIsKeptEvenIfAllFailed() {
+    public void everyNetworkFailedStartsAgainFromTheFirst() {
         SabrCdnSelector first = new SabrCdnSelector(PRIMARY_URL);
         assertTrue(first.maybeAdvance(PRIMARY_URL));
-        GoogleVideoHosts.markNetworkFailed(FALLBACK_URL);
+        GoogleVideoHosts.markNetworkFailed(FALLBACK_URL); // e.g. by the DASH requests
 
         SabrCdnSelector second = new SabrCdnSelector(PRIMARY_URL);
 
-        assertEquals(FALLBACK_URL, second.getCurrentUrl());
+        assertEquals(PRIMARY_URL, second.getCurrentUrl());
+        assertFalse(GoogleVideoHosts.isNetworkFailed(PRIMARY_URL));
+    }
+
+    @Test
+    public void theLastNetworkFailingTooMakesTheNextSelectionStartFromTheFirst() {
+        SabrCdnSelector first = new SabrCdnSelector(PRIMARY_URL);
+        assertTrue(first.maybeAdvance(PRIMARY_URL));
+
+        assertFalse(first.maybeAdvance(FALLBACK_URL)); // nothing left: the player's error handling goes on
+
+        assertFalse(GoogleVideoHosts.isNetworkFailed(PRIMARY_URL));
+        assertFalse(GoogleVideoHosts.isNetworkFailed(FALLBACK_URL));
+        assertEquals(PRIMARY_URL, new SabrCdnSelector(PRIMARY_URL).getCurrentUrl());
+    }
+
+    /**
+     * The first one's skip ran out while the fallback host played: the fallback failing now leaves only itself skipped
+     */
+    @Test
+    public void theLastNetworkFailingIsSkippedWhileTheFirstWorks() {
+        SabrCdnSelector first = new SabrCdnSelector(PRIMARY_URL);
+        assertTrue(first.maybeAdvance(PRIMARY_URL));
+        GoogleVideoHosts.clearNetworkFailed(PRIMARY_URL);
+
+        assertFalse(first.maybeAdvance(FALLBACK_URL));
+
+        assertTrue(GoogleVideoHosts.isNetworkFailed(FALLBACK_URL));
+        assertEquals(PRIMARY_URL, new SabrCdnSelector(PRIMARY_URL).getCurrentUrl());
     }
 
     @Test

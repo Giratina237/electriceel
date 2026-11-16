@@ -18,6 +18,12 @@ public interface PlayerEngine extends PlayerConstants {
     void openMerged(InputStream dashManifest, String hlsPlaylistUrl);
     long getPositionMs();
     void setPositionMs(long positionMs);
+    /**
+     * A resume's position: played from the keyframe before it (see ExoPlayerController#setResumePositionMs)
+     */
+    default void setResumePositionMs(long positionMs) {
+        setPositionMs(positionMs);
+    }
     long getDurationMs();
     /**
      * Up to where the media is loaded: a seek before it plays at once

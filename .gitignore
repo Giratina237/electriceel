@@ -81,4 +81,4 @@ changelog_override.txt
 
 .env
 
-.settings/
+.settings

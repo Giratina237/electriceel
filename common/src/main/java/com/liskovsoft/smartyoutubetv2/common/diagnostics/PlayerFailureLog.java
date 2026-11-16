@@ -215,6 +215,17 @@ public final class PlayerFailureLog {
      */
     void countPlayback(@Nullable String video, @Nullable String audio, @Nullable String videoStatus, @Nullable String audioStatus,
                        long playedMs) {
+        countPlayback(video, audio, 1, playedMs,
+                is(videoStatus, FormatAttempts.STATUS_WORKED), is(videoStatus, FormatAttempts.STATUS_FAILED),
+                is(audioStatus, FormatAttempts.STATUS_WORKED), is(audioStatus, FormatAttempts.STATUS_FAILED));
+    }
+
+    /**
+     * Added to the counts of the video and audio as given: a playback counted before (see FormatAttempts#flush) adds what changed
+     * since, with no play more (0), and its statuses moved (-1 for the one it had)
+     */
+    void countPlayback(@Nullable String video, @Nullable String audio, int plays, long playedMs, int videoWorked, int videoFailed,
+                       int audioWorked, int audioFailed) {
         mExecutor.execute(() -> {
             try {
                 JSONObject stats = getStats();
@@ -223,7 +234,8 @@ public final class PlayerFailureLog {
                 JSONObject entry = formats.optJSONObject(key);
 
                 if (entry == null) {
-                    if (formats.length() >= MAX_STATS_FORMATS) {
+                    // Of a playback not counted at first (see MAX_STATS_FORMATS): nothing to add to
+                    if (plays <= 0 || formats.length() >= MAX_STATS_FORMATS) {
                         return; // Kept for the ones counted first: they're the device's usual ones
                     }
 
@@ -233,12 +245,12 @@ public final class PlayerFailureLog {
                     formats.put(key, entry);
                 }
 
-                increment(entry, "plays", 1);
+                increment(entry, "plays", plays);
                 increment(entry, "playedMs", playedMs);
-                increment(entry, "videoWorked", FormatAttempts.STATUS_WORKED.equals(videoStatus) ? 1 : 0);
-                increment(entry, "videoFailed", FormatAttempts.STATUS_FAILED.equals(videoStatus) ? 1 : 0);
-                increment(entry, "audioWorked", FormatAttempts.STATUS_WORKED.equals(audioStatus) ? 1 : 0);
-                increment(entry, "audioFailed", FormatAttempts.STATUS_FAILED.equals(audioStatus) ? 1 : 0);
+                increment(entry, "videoWorked", videoWorked);
+                increment(entry, "videoFailed", videoFailed);
+                increment(entry, "audioWorked", audioWorked);
+                increment(entry, "audioFailed", audioFailed);
 
                 writeStats(stats);
             } catch (JSONException e) {
@@ -305,6 +317,13 @@ public final class PlayerFailureLog {
         }
 
         return mStats;
+    }
+
+    /**
+     * 1 for the status, 0 otherwise
+     */
+    static int is(@Nullable String status, String expected) {
+        return expected.equals(status) ? 1 : 0;
     }
 
     private static void increment(JSONObject entry, String name, long by) throws JSONException {

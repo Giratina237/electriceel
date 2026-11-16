@@ -113,6 +113,10 @@ public class ExoPlayerInitializer {
         int bufferForPlaybackMs = 2_500;
         int bufferForPlaybackAfterRebufferMs = 5_000;
 
+        // The samples from the keyframe before the position are kept: a resume goes back to it inside the buffer, rather than loading
+        // its segment again (see ExoPlayerController#setResumePositionMs). Up to a keyframe interval of video played.
+        baseBuilder.setBackBuffer(0, true);
+
         switch (mPlayerData.getVideoBufferType()) {
             case PlayerData.BUFFER_HIGHEST:
                 minBufferMs = 50_000;

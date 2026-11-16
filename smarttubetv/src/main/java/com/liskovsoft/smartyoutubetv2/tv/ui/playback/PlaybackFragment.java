@@ -1225,6 +1225,11 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     }
 
     @Override
+    public void setResumePositionMs(long positionMs) {
+        mExoPlayerController.setResumePositionMs(positionMs);
+    }
+
+    @Override
     public long getBufferedPositionMs() {
         return mExoPlayerController.getBufferedPositionMs();
     }

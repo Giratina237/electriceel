@@ -508,8 +508,9 @@ public class VideoLoaderController extends BasePlayerController {
         // Fetched again from another client: the start goes on (see VideoStarts#onFetch)
         boolean isRefetched = false;
 
-        mCensoredWordsController.onFormatInfo(getVideo(), formatInfo);
-        mEndScreenController.onFormatInfo(getVideo(), formatInfo);
+        Video video = getVideo();
+        VideoStarts.timeOpenStep(VideoStarts.STAGE_CENSORED_WORDS, null, () -> mCensoredWordsController.onFormatInfo(video, formatInfo));
+        VideoStarts.timeOpenStep(VideoStarts.STAGE_END_SCREEN, null, () -> mEndScreenController.onFormatInfo(video, formatInfo));
 
         // Fix stretched video for a couple milliseconds (before the onVideoSizeChanged gets called)
         applyAspectRatio(formatInfo);

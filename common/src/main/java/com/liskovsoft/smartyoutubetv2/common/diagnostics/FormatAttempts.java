@@ -181,7 +181,18 @@ public final class FormatAttempts {
         long audioLoadedToMs = -1;
         boolean hasPlayed;
         boolean isVideoRendered;
+        /**
+         * Counted for good: done with (see #count)
+         */
         boolean isCounted;
+        /**
+         * Counted so far while it played on (see #countSoFar): how long it had played, and its statuses then. -1 till it's counted.
+         */
+        long countedMs = -1;
+        @Nullable
+        String countedVideoStatus;
+        @Nullable
+        String countedAudioStatus;
         long playingSince = -1;
         long stallSince = -1;
         /**
@@ -642,6 +653,8 @@ public final class FormatAttempts {
      * @param isNow before it returns: the app is about to die (a crash)
      */
     public static void flush(Context context, boolean isNow) {
+        countSoFar(getLast());
+
         if (sVideoId != null && sHasFailed && isChangedSinceFailure()) {
             PlayerFailureLog.instance(context).recordFormats(sVideoId, sSessionStart, toJson(context), isNow);
             sIsChangedSinceFailure = false;
@@ -743,28 +756,68 @@ public final class FormatAttempts {
     }
 
     /**
-     * A format tried is done with: how it played is counted (see PlayerFailureLog#countPlayback). Not one switched from right away.
+     * A format tried is done with: how it played is counted (see PlayerFailureLog#countPlayback), what's left of it when it was
+     * counted so far (see #countSoFar). Not one switched from right away.
      */
     private static void count(@Nullable Attempt attempt) {
         if (attempt == null || sContext == null || attempt.isCounted) {
             return;
         }
 
-        boolean hasFailed = STATUS_FAILED.equals(attempt.videoStatus) || STATUS_FAILED.equals(attempt.audioStatus);
+        if (countPlayed(attempt, attempt.playedMs)) {
+            attempt.isCounted = true;
+        }
+    }
 
-        if (attempt.playedMs < COUNTED_PLAYED_MS && !hasFailed) {
+    /**
+     * The one playing, in the background, where the app may be killed: how it played up to now is counted, the rest when it's done
+     * with (see #count). Before, a video left to the background and killed there was never counted (AWHPECZK: ZJMM3fSIykY).
+     */
+    private static void countSoFar(@Nullable Attempt attempt) {
+        if (attempt == null || sContext == null || attempt.isCounted) {
             return;
         }
 
-        attempt.isCounted = true;
+        countPlayed(attempt, attempt.playedMs + (attempt.playingSince >= 0 ? sClock.now() - attempt.playingSince : 0));
+    }
+
+    /**
+     * What it played since it was last counted, once it played long enough or failed: a play the first time, then the time added and
+     * its statuses' change
+     *
+     * @return whether it's counted (now or before)
+     */
+    private static boolean countPlayed(Attempt attempt, long playedMs) {
+        String videoStatus = attempt.video != null ? attempt.videoStatus : null;
+        String audioStatus = attempt.audio != null ? attempt.audioStatus : null;
+        boolean isFirst = attempt.countedMs < 0;
+        boolean hasFailed = STATUS_FAILED.equals(attempt.videoStatus) || STATUS_FAILED.equals(attempt.audioStatus);
+
+        if (isFirst && playedMs < COUNTED_PLAYED_MS && !hasFailed) {
+            return false;
+        }
+
+        long addedMs = playedMs - Math.max(attempt.countedMs, 0);
+        int videoWorked = PlayerFailureLog.is(videoStatus, STATUS_WORKED) - PlayerFailureLog.is(attempt.countedVideoStatus, STATUS_WORKED);
+        int videoFailed = PlayerFailureLog.is(videoStatus, STATUS_FAILED) - PlayerFailureLog.is(attempt.countedVideoStatus, STATUS_FAILED);
+        int audioWorked = PlayerFailureLog.is(audioStatus, STATUS_WORKED) - PlayerFailureLog.is(attempt.countedAudioStatus, STATUS_WORKED);
+        int audioFailed = PlayerFailureLog.is(audioStatus, STATUS_FAILED) - PlayerFailureLog.is(attempt.countedAudioStatus, STATUS_FAILED);
+        attempt.countedMs = playedMs;
+        attempt.countedVideoStatus = videoStatus;
+        attempt.countedAudioStatus = audioStatus;
+
+        if (!isFirst && addedMs == 0 && videoWorked == 0 && videoFailed == 0 && audioWorked == 0 && audioFailed == 0) {
+            return true; // nothing new
+        }
 
         try {
             PlayerFailureLog.instance(sContext).countPlayback(getStatsVideo(attempt.video), getStatsAudio(attempt.audio),
-                    attempt.video != null ? attempt.videoStatus : null, attempt.audio != null ? attempt.audioStatus : null,
-                    attempt.playedMs);
+                    isFirst ? 1 : 0, addedMs, videoWorked, videoFailed, audioWorked, audioFailed);
         } catch (RuntimeException e) {
             // Not counted
         }
+
+        return true;
     }
 
     /**

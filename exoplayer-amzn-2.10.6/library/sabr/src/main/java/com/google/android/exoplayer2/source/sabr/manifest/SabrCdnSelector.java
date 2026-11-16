@@ -50,21 +50,48 @@ final class SabrCdnSelector {
             return true;
         }
 
+        GoogleVideoHosts.markNetworkFailed(failedUrl);
+
         if (selectedIndex + 1 >= candidateUrls.size()) {
+            // The last one failed too: with every host failed, the next selection starts again from the first (see
+            // skipFailedNetworks). Before, the first stayed skipped for half an hour, and the next playbacks went to the one that
+            // failed last (AWHPECZK).
+            forgetFailuresIfAllFailed();
             return false;
         }
 
-        GoogleVideoHosts.markNetworkFailed(failedUrl);
         selectedIndex++;
         return true;
     }
 
     private void skipFailedNetworks() {
+        // Every host failed lately (e.g. the DASH requests' marks): the first one again
+        if (forgetFailuresIfAllFailed()) {
+            return;
+        }
+
         // Keep the last candidate as a fallback even if it failed too.
         while (selectedIndex + 1 < candidateUrls.size()
                 && GoogleVideoHosts.isNetworkFailed(candidateUrls.get(selectedIndex))) {
             selectedIndex++;
         }
+    }
+
+    /**
+     * @return whether every host had failed: none is skipped then
+     */
+    private boolean forgetFailuresIfAllFailed() {
+        for (String url : candidateUrls) {
+            if (!GoogleVideoHosts.isNetworkFailed(url)) {
+                return false;
+            }
+        }
+
+        for (String url : candidateUrls) {
+            GoogleVideoHosts.clearNetworkFailed(url);
+        }
+
+        return true;
     }
 
     private int findCandidateIndex(@Nullable String url) {

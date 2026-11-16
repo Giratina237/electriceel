@@ -61,6 +61,20 @@ public final class VideoStarts {
     static final String STAGE_QUEUE = "queue";
     static final String STAGE_TO_PLAYER = "to the player";
     static final String STAGE_OPEN = "open";
+    /**
+     * Steps of the open stage, on the main thread (see timeOpenStep): the controllers' handling of the formats, the build of the
+     * media source, and the controllers' handling of the source change, each of those that takes long
+     */
+    public static final String STAGE_CENSORED_WORDS = "censored words";
+    public static final String STAGE_END_SCREEN = "end screen";
+    public static final String STAGE_MEDIA_SOURCE = "media source";
+    public static final String STAGE_SOURCE_CHANGED = "source changed";
+    public static final String STAGE_CONTROLLER = "controller";
+    /**
+     * A step inside another (e.g. a controller's part of the source change) shorter than this isn't a stage of its own: some twenty
+     * controllers take ~0 ms each
+     */
+    private static final long MIN_INNER_STEP_MS = 2;
     static final String STAGE_BUFFERING = "buffering";
     static final String STAGE_FIRST_VIDEO_CHUNK = "first video chunk";
     static final String STAGE_FIRST_AUDIO_CHUNK = "first audio chunk";
@@ -215,6 +229,10 @@ public final class VideoStarts {
      * When the player was prepared, in the clock's time: a load of the source before is told after it
      */
     private static long sPreparedMs = -1;
+    /**
+     * Of the open stage's steps running (see timeOpenValue): main thread only
+     */
+    private static int sOpenStepDepth;
 
     interface Clock {
         long now();
@@ -610,6 +628,53 @@ public final class VideoStarts {
 
         timer.client = client;
         timer.open(STAGE_OPEN, null, now);
+    }
+
+    /**
+     * Of a step's result (see timeOpenValue)
+     */
+    public interface Step<T> {
+        T run();
+    }
+
+    /**
+     * A step of the open stage (see STAGE_OPEN), on the main thread: its time is a stage in it, inside the step it runs in. On the
+     * first start after a launch, open took 1374 ms (AWHPECZK NWQCGxvVVeo) with nothing to say where the main thread went.
+     *
+     * @param detail e.g. a controller's name, null for none
+     */
+    public static void timeOpenStep(String name, @Nullable String detail, Runnable step) {
+        timeOpenValue(name, detail, () -> {
+            step.run();
+            return null;
+        });
+    }
+
+    /**
+     * A step of the open stage that gives a result, e.g. the media source (see timeOpenStep)
+     */
+    public static <T> T timeOpenValue(String name, @Nullable String detail, Step<T> step) {
+        Timer timer = getTimer();
+        Group open = timer != null ? timer.findOpen(STAGE_OPEN) : null;
+
+        if (open == null) {
+            return step.run();
+        }
+
+        long startMs = sClock.now();
+        sOpenStepDepth++;
+
+        try {
+            return step.run();
+        } finally {
+            sOpenStepDepth--;
+            long endMs = sClock.now();
+            int depth = sOpenStepDepth + 1;
+
+            if (depth == 1 || endMs - startMs >= MIN_INNER_STEP_MS) {
+                open.children.add(new VideoStart.Stage(name, detail, depth, startMs, endMs));
+            }
+        }
     }
 
     /**
@@ -1361,6 +1426,7 @@ public final class VideoStarts {
     @VisibleForTesting
     static void resetForTesting() {
         sTimer = null;
+        sOpenStepDepth = 0;
         sPlayed.clear();
         sReloadableId = null;
         Arrays.fill(sIsChunkStarted, false);

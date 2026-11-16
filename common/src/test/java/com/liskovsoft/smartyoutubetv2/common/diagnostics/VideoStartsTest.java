@@ -52,6 +52,67 @@ public class VideoStartsTest {
     }
 
     /**
+     * AWHPECZK NWQCGxvVVeo: open took 1374 ms on the first start after a launch, with nothing to say where the main thread went. Its
+     * steps are its stages: the controllers' handling of the formats, the build of the media source, the source change, and in it each
+     * controller that takes long.
+     */
+    @Test
+    public void theOpenStagesStepsAreItsStages() {
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(160);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+        VideoStarts.timeOpenStep(VideoStarts.STAGE_CENSORED_WORDS, null, () -> mFixture.at(200));
+        VideoStarts.timeOpenStep(VideoStarts.STAGE_END_SCREEN, null, () -> mFixture.at(210));
+        assertEquals("source", VideoStarts.timeOpenValue(VideoStarts.STAGE_MEDIA_SOURCE, null, () -> {
+            mFixture.at(600);
+            return "source";
+        }));
+        VideoStarts.timeOpenStep(VideoStarts.STAGE_SOURCE_CHANGED, null, () -> {
+            VideoStarts.timeOpenStep(VideoStarts.STAGE_CONTROLLER, "SuggestionsController", () -> mFixture.at(900));
+            VideoStarts.timeOpenStep(VideoStarts.STAGE_CONTROLLER, "QuickController", () -> mFixture.at(901));
+        });
+        VideoStarts.onPrepare();
+        mFixture.at(1_000);
+        VideoStarts.onLoad(false, true, false, T0 + 930, T0 + 1_000, 1_000_000);
+        mFixture.at(1_100);
+        VideoStarts.onFirstFrame(new VideoStarts.FirstFrame(0, null, -1, 0, -1));
+        VideoStarts.onPlaying(true);
+
+        VideoStart start = last();
+
+        assertStage(find(start, VideoStarts.STAGE_OPEN), VideoStarts.STAGE_OPEN, null, 0, 160, 901);
+        assertStage(find(start, VideoStarts.STAGE_CENSORED_WORDS), VideoStarts.STAGE_CENSORED_WORDS, null, 1, 160, 200);
+        assertStage(find(start, VideoStarts.STAGE_END_SCREEN), VideoStarts.STAGE_END_SCREEN, null, 1, 200, 210);
+        assertStage(find(start, VideoStarts.STAGE_MEDIA_SOURCE), VideoStarts.STAGE_MEDIA_SOURCE, null, 1, 210, 600);
+        assertStage(find(start, VideoStarts.STAGE_SOURCE_CHANGED), VideoStarts.STAGE_SOURCE_CHANGED, null, 1, 600, 901);
+        assertStage(find(start, VideoStarts.STAGE_CONTROLLER), VideoStarts.STAGE_CONTROLLER, "SuggestionsController", 2, 600, 900);
+        assertEquals(VideoStart.Category.APP, find(start, VideoStarts.STAGE_MEDIA_SOURCE).getCategory());
+        assertEquals(VideoStart.Category.APP, find(start, VideoStarts.STAGE_CONTROLLER).getCategory());
+
+        int controllers = 0;
+
+        for (VideoStart.Stage stage : start.stages) {
+            controllers += VideoStarts.STAGE_CONTROLLER.equals(stage.name) ? 1 : 0;
+        }
+
+        assertEquals("a controller's 1 ms isn't a stage", 1, controllers);
+    }
+
+    /**
+     * Outside a start's open stage (e.g. a quality switch rebuilds the source): run, not timed
+     */
+    @Test
+    public void aStepOutsideTheOpenStageIsJustRun() {
+        boolean[] ran = {false};
+
+        VideoStarts.timeOpenStep(VideoStarts.STAGE_SOURCE_CHANGED, null, () -> ran[0] = true);
+
+        assertTrue(ran[0]);
+    }
+
+    /**
      * A resume 41 s in: 1.7 s on a Shield went by with no row, the frames from the keyframe before decoded first. Where it started,
      * with what, and that time are the start's.
      */

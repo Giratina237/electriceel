@@ -101,6 +101,15 @@ public class ExoPlayerController implements Player.EventListener {
     @Nullable
     private DebugInfoMediaCodecVideoRenderer mVideoRenderer;
     /**
+     * A keyframe closer than this to a resume's position isn't gone back to: its frames are decoded quickly
+     */
+    private static final long MIN_RESUME_KEYFRAME_GAP_MS = 500;
+    /**
+     * Of the resume going on (see #setResumePositionMs), till it goes back to its keyframe or another seek is made: -1 for none.
+     * Main thread only.
+     */
+    private long mResumePositionMs = -1;
+    /**
      * How the formats tried do (see FormatAttempts): a frame shown means the video works, plus the decoders, the frames dropped
      * and the throughput of the segments
      */
@@ -403,48 +412,56 @@ public class ExoPlayerController implements Player.EventListener {
     }
 
     public void openSabr(MediaItemFormatInfo formatInfo) {
-        MediaSource mediaSource = mMediaSourceFactory.fromSabrFormatInfo(formatInfo);
+        MediaSource mediaSource = buildSource(() -> mMediaSourceFactory.fromSabrFormatInfo(formatInfo));
         openMediaSource(mediaSource);
     }
 
     public void openDash(MediaItemFormatInfo formatInfo) {
-        MediaSource mediaSource = mMediaSourceFactory.fromDashFormatInfo(formatInfo);
+        MediaSource mediaSource = buildSource(() -> mMediaSourceFactory.fromDashFormatInfo(formatInfo));
         openMediaSource(mediaSource);
     }
 
     public void openDash(InputStream dashManifest) {
-        MediaSource mediaSource = mMediaSourceFactory.fromDashManifest(dashManifest);
+        MediaSource mediaSource = buildSource(() -> mMediaSourceFactory.fromDashManifest(dashManifest));
         openMediaSource(mediaSource);
     }
 
     public void openDashUrl(String dashManifestUrl) {
-        MediaSource mediaSource = mMediaSourceFactory.fromDashManifestUrl(dashManifestUrl);
+        MediaSource mediaSource = buildSource(() -> mMediaSourceFactory.fromDashManifestUrl(dashManifestUrl));
         openMediaSource(mediaSource);
     }
 
     public void openHlsUrl(String hlsPlaylistUrl) {
-        MediaSource mediaSource = mMediaSourceFactory.fromHlsPlaylist(hlsPlaylistUrl);
+        MediaSource mediaSource = buildSource(() -> mMediaSourceFactory.fromHlsPlaylist(hlsPlaylistUrl));
         openMediaSource(mediaSource);
     }
 
     public void openUrlList(List<String> urlList) {
-        MediaSource mediaSource = mMediaSourceFactory.fromUrlList(urlList);
+        MediaSource mediaSource = buildSource(() -> mMediaSourceFactory.fromUrlList(urlList));
         openMediaSource(mediaSource);
     }
 
     public void openMerged(MediaItemFormatInfo formatInfo, String hlsPlaylistUrl) {
-        MediaSource dashMediaSource = mMediaSourceFactory.fromDashFormatInfo(formatInfo);
-        MediaSource hlsMediaSource = mMediaSourceFactory.fromHlsPlaylist(hlsPlaylistUrl);
+        MediaSource dashMediaSource = buildSource(() -> mMediaSourceFactory.fromDashFormatInfo(formatInfo));
+        MediaSource hlsMediaSource = buildSource(() -> mMediaSourceFactory.fromHlsPlaylist(hlsPlaylistUrl));
         openMediaSource(new MergingMediaSource(dashMediaSource, hlsMediaSource));
     }
 
     public void openMerged(InputStream dashManifest, String hlsPlaylistUrl) {
-        MediaSource dashMediaSource = mMediaSourceFactory.fromDashManifest(dashManifest);
-        MediaSource hlsMediaSource = mMediaSourceFactory.fromHlsPlaylist(hlsPlaylistUrl);
+        MediaSource dashMediaSource = buildSource(() -> mMediaSourceFactory.fromDashManifest(dashManifest));
+        MediaSource hlsMediaSource = buildSource(() -> mMediaSourceFactory.fromHlsPlaylist(hlsPlaylistUrl));
         openMediaSource(new MergingMediaSource(dashMediaSource, hlsMediaSource));
     }
 
+    /**
+     * Its time, a step of the start's open stage (see VideoStarts#timeOpenValue)
+     */
+    private static MediaSource buildSource(VideoStarts.Step<MediaSource> build) {
+        return VideoStarts.timeOpenValue(VideoStarts.STAGE_MEDIA_SOURCE, null, build);
+    }
+
     private void openMediaSource(MediaSource mediaSource) {
+        mResumePositionMs = -1; // the previous source's
         mFrameStepper.reset();
         mRangeMuter.reset();
         resetPlayerState(); // fixes occasional video artifacts and problems with quality switching
@@ -453,7 +470,9 @@ public class ExoPlayerController implements Player.EventListener {
         mTrackSelectorManager.setMergedSource(mediaSource instanceof MergingMediaSource);
         mTrackSelectorManager.invalidate();
         mOnSourceChanged = true;
-        mEventListener.onSourceChanged(getVideo());
+        Video video = getVideo();
+        // Each controller's part, of those that take long (see PlaybackPresenter#onSourceChanged)
+        VideoStarts.timeOpenStep(VideoStarts.STAGE_SOURCE_CHANGED, null, () -> mEventListener.onSourceChanged(video));
         VideoStarts.onPrepare();
         FormatAttempts.onPrepare();
         mHasPlayedSource = false;
@@ -478,12 +497,62 @@ public class ExoPlayerController implements Player.EventListener {
      * (e.g. 302200 when duration is 302000).
      */
     public void setPositionMs(long positionMs) {
+        mResumePositionMs = -1; // another seek: the resume's is done with
+
         // Url list videos at load stage has undefined (-1) length. So, we need to remove length check.
-        if (mPlayer != null && positionMs >= 0 && positionMs <= getDurationMs()) {
+        if (canSeekTo(positionMs)) {
             PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, positionMs);
             VideoStarts.onSeek(positionMs);
             mPlayer.seekTo(positionMs);
         }
+    }
+
+    /**
+     * A resume (see VideoStateController): played from the keyframe before the position, once it's known (see #onDecodedFromKeyframe).
+     * Before, every frame from that keyframe to the position was decoded unseen first (AWHPECZK zTkEMVxv6F8: 1661 ms for 210 frames
+     * of a 4K stream on a Shield). Its keyframes aren't known before the seek (SABR has no segment index, DASH loads it later), so
+     * SeekParameters.PREVIOUS_SYNC can't do it, and a global one would make SponsorBlock skip again and again.
+     */
+    public void setResumePositionMs(long positionMs) {
+        setPositionMs(positionMs);
+        mResumePositionMs = canSeekTo(positionMs) ? positionMs : -1;
+    }
+
+    private boolean canSeekTo(long positionMs) {
+        return mPlayer != null && positionMs >= 0 && positionMs <= getDurationMs();
+    }
+
+    /**
+     * On the playback thread: the decoder started from this keyframe to reach the position (see DebugInfoMediaCodecVideoRenderer)
+     */
+    private void onDecodedFromKeyframe(long keyframeUs, long positionUs) {
+        Utils.post(() -> maybeResumeFromKeyframe(keyframeUs, positionUs));
+    }
+
+    /**
+     * The resume goes back to the keyframe: its frames are shown from there at once. Inside the buffer: the samples from the keyframe
+     * before the position are kept (see ExoPlayerInitializer#createLoadControl).
+     */
+    private void maybeResumeFromKeyframe(long keyframeUs, long positionUs) {
+        long resumeMs = mResumePositionMs;
+
+        // Decoded to another position: not the resume's (e.g. the video track enabled later, where a resume had none)
+        if (resumeMs < 0 || Math.abs(positionUs / 1_000 - resumeMs) > 1) {
+            return;
+        }
+
+        mResumePositionMs = -1;
+        // At or just past it, in ms: a seek before it would find no keyframe in the buffer, and load the segment again
+        long keyframeMs = (keyframeUs + 999) / 1_000;
+
+        if (mPlayer == null || keyframeUs < 0 || resumeMs - keyframeMs < MIN_RESUME_KEYFRAME_GAP_MS) {
+            return;
+        }
+
+        Log.d(TAG, "Resume from the keyframe at %s ms, not %s ms", keyframeMs, resumeMs);
+        PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, keyframeMs);
+        VideoStarts.onSeek(keyframeMs);
+        mPlayer.seekTo(keyframeMs);
     }
 
     public long getBufferedPositionMs() {
@@ -562,6 +631,10 @@ public class ExoPlayerController implements Player.EventListener {
     public void setVideoRenderer(DebugInfoMediaCodecVideoRenderer renderer) {
         mFrameStepper.setPlayer(mPlayer, renderer);
         mVideoRenderer = renderer;
+
+        if (renderer != null) {
+            renderer.setKeyframeListener(this::onDecodedFromKeyframe);
+        }
     }
 
     /**

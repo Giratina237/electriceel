@@ -599,6 +599,62 @@ public class FormatAttemptsTest {
         assertEquals(1, formats.getJSONObject(0).getInt("videoWorked"));
     }
 
+    /**
+     * AWHPECZK: ZJMM3fSIykY played, the app went to the background and was killed there: it was never counted. Counted when the app
+     * goes to the background, and only the rest when it's done with: one play.
+     */
+    @Test
+    public void aFormatPlayingInTheBackgroundIsCountedThenAndTheRestLater() throws Exception {
+        long[] now = {1_000_000};
+        FormatAttempts.sClock = () -> now[0];
+        FormatAttempts.onNewVideo(getContext(), "video");
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onVideoRendered();
+        FormatAttempts.onPlaying(true);
+        now[0] += 30_000;
+
+        FormatAttempts.flush(getContext(), false);
+
+        JSONObject entry = mLog.readStats().getJSONArray("formats").getJSONObject(0);
+        assertEquals(1, entry.getInt("plays"));
+        assertEquals(30_000, entry.getLong("playedMs"));
+
+        FormatAttempts.flush(getContext(), false); // nothing new
+        now[0] += 20_000;
+        FormatAttempts.end(getContext());
+
+        org.json.JSONArray formats = mLog.readStats().getJSONArray("formats");
+        assertEquals(1, formats.length());
+        assertEquals(1, formats.getJSONObject(0).getInt("plays"));
+        assertEquals(50_000, formats.getJSONObject(0).getLong("playedMs"));
+        assertEquals(1, formats.getJSONObject(0).getInt("videoWorked") + formats.getJSONObject(0).getInt("videoFailed"));
+    }
+
+    /**
+     * Too short to count when the app went to the background: counted once when it's done with, all of it
+     */
+    @Test
+    public void aShortPlayInTheBackgroundIsCountedWhenItsDoneWith() throws Exception {
+        long[] now = {1_000_000};
+        FormatAttempts.sClock = () -> now[0];
+        FormatAttempts.onNewVideo(getContext(), "video");
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onVideoRendered();
+        FormatAttempts.onPlaying(true);
+        now[0] += 5_000;
+
+        FormatAttempts.flush(getContext(), false);
+
+        assertEquals(0, mLog.readStats().getJSONArray("formats").length());
+
+        now[0] += 10_000;
+        FormatAttempts.end(getContext());
+
+        JSONObject entry = mLog.readStats().getJSONArray("formats").getJSONObject(0);
+        assertEquals(1, entry.getInt("plays"));
+        assertEquals(15_000, entry.getLong("playedMs"));
+    }
+
     @Test
     public void statsNamesAreShort() {
         assertEquals("vp9 1080p60", FormatAttempts.getStatsVideo("1920x1080 vp09 60fps"));

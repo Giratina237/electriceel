@@ -498,6 +498,11 @@ public final class VideoStart {
             case VideoStarts.STAGE_ENGINE_RESTART:
             case VideoStarts.STAGE_TO_PLAYER:
             case VideoStarts.STAGE_OPEN:
+            case VideoStarts.STAGE_CENSORED_WORDS:
+            case VideoStarts.STAGE_END_SCREEN:
+            case VideoStarts.STAGE_MEDIA_SOURCE:
+            case VideoStarts.STAGE_SOURCE_CHANGED:
+            case VideoStarts.STAGE_CONTROLLER:
                 return Category.APP;
             case VideoStarts.STAGE_QUEUE:
             case VideoStarts.STAGE_LOADING_HELD:

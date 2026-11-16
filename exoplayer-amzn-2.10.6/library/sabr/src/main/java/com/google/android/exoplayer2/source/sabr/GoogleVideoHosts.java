@@ -153,6 +153,21 @@ public final class GoogleVideoHosts {
         }
     }
 
+    /**
+     * Not skipped anymore: e.g. every host of a URL failed, and the first is tried again (see SabrCdnSelector)
+     */
+    public static void clearNetworkFailed(@Nullable String url) {
+        String network = extractNetwork(getHost(url));
+
+        if (network == null) {
+            return;
+        }
+
+        synchronized (sFailedNetworks) {
+            sFailedNetworks.remove(network);
+        }
+    }
+
     @VisibleForTesting
     public static void clearFailedNetworks() {
         synchronized (sFailedNetworks) {

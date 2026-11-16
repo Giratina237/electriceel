@@ -318,7 +318,9 @@ public class PlaybackPresenter extends BasePresenter<PlaybackView> implements Pl
 
     @Override
     public void onSourceChanged(Video item) {
-        process(listener -> listener.onSourceChanged(item));
+        // Each one's time, a step of the start's open stage (see VideoStarts#timeOpenStep)
+        process(listener -> VideoStarts.timeOpenStep(VideoStarts.STAGE_CONTROLLER, listener.getClass().getSimpleName(),
+                () -> listener.onSourceChanged(item)));
     }
 
     @Override

@@ -25,6 +25,19 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
+    /**
+     * Told, on the playback thread, of the keyframe the decoder started from to reach a position (see #setKeyframeListener)
+     */
+    public interface KeyframeListener {
+        /**
+         * @param keyframeUs its time, as a seek's (the period's)
+         * @param positionUs the position it's decoded to, as a seek's
+         */
+        void onDecodedFromKeyframe(long keyframeUs, long positionUs);
+    }
+
+    @Nullable
+    private volatile KeyframeListener mKeyframeListener;
     private static final String TAG = DebugInfoMediaCodecVideoRenderer.class.getSimpleName();
     /**
      * Shows the next decoded frame while paused. Payload: the request number, see {@link #getLastFrameStepRequest()}.
@@ -200,6 +213,13 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         if (isDecodeOnlyBuffer && !isLastBuffer) {
             if (mSkipStartMs < 0) {
                 mSkipStartMs = SystemClock.elapsedRealtime();
+                // The first frame decoded since the position was set: the keyframe before it
+                KeyframeListener listener = mKeyframeListener;
+
+                if (listener != null) {
+                    long offsetUs = getOutputStreamOffsetUs();
+                    listener.onDecodedFromKeyframe(bufferPresentationTimeUs - offsetUs, positionUs - offsetUs);
+                }
             }
 
             mSkippedToPosition++;
@@ -233,6 +253,14 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
      */
     public boolean isRenderedCountKnown() {
         return mIsRenderedCountKnown;
+    }
+
+    /**
+     * E.g. a resume goes back to the keyframe (see ExoPlayerController#setResumePositionMs). Not told in tunneling, where the decoder
+     * shows the frames itself.
+     */
+    public void setKeyframeListener(@Nullable KeyframeListener listener) {
+        mKeyframeListener = listener;
     }
 
     /**

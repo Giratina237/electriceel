@@ -620,7 +620,12 @@ public class VideoStateController extends BasePlayerController {
 
         // Do I need to check that item isn't live? (state != null && !item.isLive)
         if (state != null) {
-            getPlayer().setPositionMs(item.isLive ? state.positionMs : getBeforeEndMs(state.positionMs));
+            if (item.isLive) {
+                getPlayer().setPositionMs(state.positionMs);
+            } else {
+                // From the keyframe before it, without decoding every frame to it first
+                getPlayer().setResumePositionMs(getBeforeEndMs(state.positionMs));
+            }
         }
 
         if (!mIsPlayBlocked) {

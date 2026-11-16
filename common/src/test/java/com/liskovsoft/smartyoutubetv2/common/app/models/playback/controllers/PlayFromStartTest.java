@@ -146,6 +146,7 @@ public class PlayFromStartTest {
                 new Class<?>[]{PlaybackView.class}, (proxy, method, args) -> {
                     switch (method.getName()) {
                         case "setPositionMs":
+                        case "setResumePositionMs": // a resume (see ExoPlayerController#setResumePositionMs)
                             positionMs = (Long) args[0];
                             return null;
                         case "getPositionMs":
