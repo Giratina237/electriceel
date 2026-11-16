@@ -482,6 +482,8 @@ public final class PlayerFailure {
                     putOpt(item, "status", attempt.status);
                     putOpt(item, "reason", attempt.reason);
                     putOpt(item, "error", scrub(attempt.error));
+                    // It couldn't connect, e.g. "refused": the network's, not the client's
+                    putOpt(item, "connectionError", attempt.connectionError);
                     attempts.put(item);
                 }
 

@@ -1661,7 +1661,7 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
 
             getView().showError(errorFragmentData);
 
-            if (Utils.fixRetrofitErrors(getContext(), error) || mIsChannelContent) {
+            if (mIsChannelContent) {
                 return;
             }
 

@@ -28,6 +28,7 @@ import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
@@ -140,6 +141,9 @@ public class ConnectionsTest {
         assertEquals(1_500, stages.get(1).endMs);
     }
 
+    /**
+     * It says it failed: a slow answer and none look the same otherwise
+     */
     @Test
     public void aFailedCallEndsItsResponse() {
         EventListener listener = Connections.LISTENER.create(mCall);
@@ -151,8 +155,58 @@ public class ConnectionsTest {
         List<VideoStart.Stage> stages = Connections.take(500, 3_000);
 
         assertEquals(1, stages.size());
-        assertNull(stages.get(0).detail);
+        assertEquals("failed", stages.get(0).detail);
         assertEquals(2_000, stages.get(0).endMs);
+    }
+
+    /**
+     * Its headers timed out (S4PGCB6X: a video chunk's "response 4002" twice, OkHttp's read timeout)
+     */
+    @Test
+    public void aResponseThatTimedOutSaysSo() {
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.requestHeadersStart(mCall);
+        mNow.set(5_002);
+        listener.responseFailed(mCall, new SocketTimeoutException("timeout"));
+
+        List<VideoStart.Stage> stages = Connections.take(500, 6_000);
+
+        assertEquals(1, stages.size());
+        assertEquals("timed out", stages.get(0).detail);
+        assertEquals(5_002, stages.get(0).endMs);
+    }
+
+    /**
+     * A failure shorter than a slow answer is there too: one that fails at once (e.g. the connection reset) is what the player waited
+     * on after it
+     */
+    @Test
+    public void aShortFailureIsThere() {
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.requestHeadersStart(mCall);
+        mNow.set(1_020);
+        listener.responseFailed(mCall, new SocketException("Connection reset"));
+
+        List<VideoStart.Stage> stages = Connections.take(500, 3_000);
+
+        assertEquals(1, stages.size());
+        assertEquals("failed", stages.get(0).detail);
+    }
+
+    /**
+     * One cancelled (e.g. a seek's) isn't a failure: short, it's left out as before
+     */
+    @Test
+    public void aShortCancelIsLeftOut() {
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.requestHeadersStart(mCall);
+        mNow.set(1_020);
+        listener.callFailed(mCall, new IOException("Canceled"));
+
+        assertTrue(Connections.take(500, 3_000).isEmpty());
     }
 
     /**
@@ -209,9 +263,26 @@ public class ConnectionsTest {
         List<VideoStart.Stage> stages = Connections.take(500, 7_000);
 
         assertEquals(1, stages.size());
-        assertNull(stages.get(0).detail);
+        assertEquals("failed", stages.get(0).detail);
         assertEquals(1_000, stages.get(0).startMs);
         assertEquals(6_000, stages.get(0).endMs);
+    }
+
+    /**
+     * Cronet wraps its connect timeout (S4PGCB6X #4: an OpenException of a SocketTimeoutException)
+     */
+    @Test
+    public void aWrappedTimeoutOfAnOpeningSaysSo() {
+        DataSource source = Connections.timeOpenings(new FakeDataSource(8_000, new IOException(new SocketTimeoutException())));
+        mNow.set(1_000);
+
+        try {
+            source.open(new DataSpec(Uri.parse("https://example.com/videoplayback")));
+        } catch (IOException e) {
+            // As the player gets it
+        }
+
+        assertEquals("timed out", Connections.take(500, 10_000).get(0).detail);
     }
 
     /**
@@ -378,6 +449,90 @@ public class ConnectionsTest {
 
         assertEquals("DNS 0 ms, IPv4 refused after 20 ms", stages.get(0).detail);
         assertEquals(1_020, stages.get(0).endMs);
+    }
+
+    /**
+     * Nothing ended since the player was prepared: nothing to tell of the lookups
+     */
+    @Test
+    public void noConnectionTellsNothing() {
+        Connections.onPrepare();
+
+        assertEquals(Connections.Lookup.UNKNOWN, Connections.getLookup());
+    }
+
+    @Test
+    public void aNameThatDidntResolveIsAFailingLookup() {
+        Connections.onPrepare();
+        EventListener listener = Connections.LISTENER.create(mCall);
+        listener.dnsStart(mCall, HOST);
+        listener.callFailed(mCall, new UnknownHostException(HOST));
+
+        assertEquals(Connections.Lookup.FAILING, Connections.getLookup());
+    }
+
+    @Test
+    public void addressesThatAllFailAreAFailingLookup() throws IOException {
+        Connections.onPrepare();
+        failEveryAddress(Connections.LISTENER.create(mCall));
+
+        assertEquals(Connections.Lookup.FAILING, Connections.getLookup());
+    }
+
+    /**
+     * One connected: the lookup gave an address that answers, whatever failed before it
+     */
+    @Test
+    public void oneThatConnectedIsAWorkingLookup() throws IOException {
+        Connections.onPrepare();
+        failEveryAddress(Connections.LISTENER.create(mCall));
+        EventListener listener = Connections.LISTENER.create(mCall);
+        listener.dnsStart(mCall, HOST);
+        listener.dnsEnd(mCall, HOST, Collections.singletonList(IPV6));
+        listener.connectStart(mCall, new InetSocketAddress(IPV6, 443), Proxy.NO_PROXY);
+        listener.connectEnd(mCall, new InetSocketAddress(IPV6, 443), Proxy.NO_PROXY, Protocol.HTTP_2);
+        listener.callEnd(mCall);
+
+        assertEquals(Connections.Lookup.WORKING, Connections.getLookup());
+    }
+
+    /**
+     * Cancelled (e.g. by a seek) or still going: they tell nothing
+     */
+    @Test
+    public void aCancelledOrGoingOneTellsNothing() throws IOException {
+        Connections.onPrepare();
+        EventListener cancelled = Connections.LISTENER.create(mCall);
+        cancelled.dnsStart(mCall, HOST);
+        cancelled.dnsEnd(mCall, HOST, Collections.singletonList(IPV4));
+        cancelled.connectStart(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY);
+        cancelled.connectFailed(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY, null, new IOException("Canceled"));
+        cancelled.callFailed(mCall, new IOException("Canceled"));
+        EventListener going = Connections.LISTENER.create(mCall);
+        going.dnsStart(mCall, HOST);
+
+        assertEquals(Connections.Lookup.UNKNOWN, Connections.getLookup());
+    }
+
+    /**
+     * Made before the player was prepared again, they're of the source before
+     */
+    @Test
+    public void theOnesOfTheSourceBeforeTellNothing() throws IOException {
+        failEveryAddress(Connections.LISTENER.create(mCall));
+        mNow.set(5_000);
+        Connections.onPrepare();
+
+        assertEquals(Connections.Lookup.UNKNOWN, Connections.getLookup());
+    }
+
+    private void failEveryAddress(EventListener listener) {
+        listener.dnsStart(mCall, HOST);
+        listener.dnsEnd(mCall, HOST, Collections.singletonList(IPV4));
+        listener.connectStart(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY);
+        listener.connectFailed(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY, null,
+                new SocketTimeoutException("connect timed out"));
+        listener.callFailed(mCall, new SocketTimeoutException("connect timed out"));
     }
 
     @Test

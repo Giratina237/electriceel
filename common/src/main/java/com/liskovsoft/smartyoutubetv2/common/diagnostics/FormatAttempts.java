@@ -267,6 +267,14 @@ public final class FormatAttempts {
         stopTimers(last);
         count(last);
 
+        if (last != null && REASON_AFTER_FAILURE.equals(attempt.reason) && last.countedMs >= 0) {
+            // The same formats again after it failed (e.g. a restart, in a loop of them): the play it goes on with, not another. Each
+            // restart was a play whose sound failed (FARAJV5R: 885 of 997 plays of vp9 720p24 + mp4a). Its time and how it ends count.
+            attempt.countedMs = 0;
+            attempt.countedVideoStatus = last.countedVideoStatus;
+            attempt.countedAudioStatus = last.countedAudioStatus;
+        }
+
         if (isPlaying) {
             attempt.playingSince = sClock.now();
         }
@@ -782,14 +790,22 @@ public final class FormatAttempts {
     }
 
     /**
+     * Not known yet (e.g. a retry that goes on with the play before, see onTracks): what was counted stands
+     */
+    @Nullable
+    private static String known(String status, @Nullable String counted) {
+        return STATUS_UNKNOWN.equals(status) && counted != null ? counted : status;
+    }
+
+    /**
      * What it played since it was last counted, once it played long enough or failed: a play the first time, then the time added and
      * its statuses' change
      *
      * @return whether it's counted (now or before)
      */
     private static boolean countPlayed(Attempt attempt, long playedMs) {
-        String videoStatus = attempt.video != null ? attempt.videoStatus : null;
-        String audioStatus = attempt.audio != null ? attempt.audioStatus : null;
+        String videoStatus = attempt.video != null ? known(attempt.videoStatus, attempt.countedVideoStatus) : null;
+        String audioStatus = attempt.audio != null ? known(attempt.audioStatus, attempt.countedAudioStatus) : null;
         boolean isFirst = attempt.countedMs < 0;
         boolean hasFailed = STATUS_FAILED.equals(attempt.videoStatus) || STATUS_FAILED.equals(attempt.audioStatus);
 

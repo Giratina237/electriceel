@@ -536,6 +536,7 @@ public final class VideoStart {
             case VideoStarts.STAGE_FIRST_FRAME:
             case VideoStarts.STAGE_PROTECTION:
             case VideoStarts.STAGE_SEEK:
+            case VideoStarts.STAGE_REUSED:
             case "cached":
                 return Category.MARK;
             default:

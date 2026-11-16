@@ -655,6 +655,91 @@ public class FormatAttemptsTest {
         assertEquals(15_000, entry.getLong("playedMs"));
     }
 
+    /**
+     * The device refused each AudioTrack and the engine was restarted with the same formats, again and again: one play whose sound
+     * failed, not one a restart (FARAJV5R: 885 of 997 plays of vp9 720p24 + mp4a "failed")
+     */
+    @Test
+    public void aLoopOfRetriesAfterFailuresIsOnePlay() throws Exception {
+        FormatAttempts.onNewVideo(getContext(), "QQQQmXXTm1g");
+
+        for (int i = 0; i < 5; i++) {
+            FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+            FormatAttempts.onVideoRendered();
+            FormatAttempts.onStreamFailed(false);
+        }
+
+        FormatAttempts.end(getContext());
+
+        JSONArray formats = mLog.readStats().getJSONArray("formats");
+        assertEquals(1, formats.length());
+        assertEquals(1, formats.getJSONObject(0).getInt("plays"));
+        assertEquals(1, formats.getJSONObject(0).getInt("audioFailed"));
+        assertEquals(1, formats.getJSONObject(0).getInt("videoWorked"));
+    }
+
+    /**
+     * The retry that played in the end: the play's sound worked
+     */
+    @Test
+    public void aLoopThatPlaysInTheEndIsOnePlayThatWorked() throws Exception {
+        long[] now = {1_000_000};
+        FormatAttempts.sClock = () -> now[0];
+        FormatAttempts.onNewVideo(getContext(), "QQQQmXXTm1g");
+
+        for (int i = 0; i < 3; i++) {
+            FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+            FormatAttempts.onStreamFailed(false);
+        }
+
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onVideoRendered();
+        FormatAttempts.onPlaying(true);
+        FormatAttempts.onAudioPlayed();
+        now[0] += 30_000;
+        FormatAttempts.end(getContext());
+
+        JSONObject entry = mLog.readStats().getJSONArray("formats").getJSONObject(0);
+        assertEquals(1, entry.getInt("plays"));
+        assertEquals(30_000, entry.getLong("playedMs"));
+        assertEquals(1, entry.getInt("audioWorked"));
+        assertEquals(0, entry.getInt("audioFailed"));
+    }
+
+    /**
+     * A retry left before anything was known of it: the play's failure stands
+     */
+    @Test
+    public void aRetryLeftBeforeItsKnownKeepsTheFailure() throws Exception {
+        FormatAttempts.onNewVideo(getContext(), "QQQQmXXTm1g");
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onStreamFailed(false);
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.end(getContext());
+
+        JSONObject entry = mLog.readStats().getJSONArray("formats").getJSONObject(0);
+        assertEquals(1, entry.getInt("plays"));
+        assertEquals(1, entry.getInt("audioFailed"));
+    }
+
+    /**
+     * Other formats after the failure (a fallback) are another play
+     */
+    @Test
+    public void otherFormatsAfterAFailureAreAnotherPlay() throws Exception {
+        FormatAttempts.onNewVideo(getContext(), "video");
+        FormatAttempts.onTracks(VP9_4K, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onStreamFailed(true);
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onStreamFailed(true);
+        FormatAttempts.end(getContext());
+
+        JSONArray formats = mLog.readStats().getJSONArray("formats");
+        assertEquals(2, formats.length());
+        assertEquals(1, formats.getJSONObject(0).getInt("plays"));
+        assertEquals(1, formats.getJSONObject(1).getInt("plays"));
+    }
+
     @Test
     public void statsNamesAreShort() {
         assertEquals("vp9 1080p60", FormatAttempts.getStatsVideo("1920x1080 vp09 60fps"));

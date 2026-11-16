@@ -120,6 +120,10 @@ public final class PlaybackHealth {
      */
     private long mClockStillMs;
     private boolean mIsStartClockStill;
+    /**
+     * The freeze reported as KIND_VIDEO_FROZEN had the position stand still too, and it still did (see #isClockStuck)
+     */
+    private boolean mIsClockStuck;
     private long mCatchUpEndMs = -1;
     private long mCatchUpDropped = -1;
     /**
@@ -450,6 +454,11 @@ public final class PlaybackHealth {
                 report(result, KIND_START_FROZEN);
                 mCatchUpEndMs = sample.nowMs + CATCH_UP_MS;
                 mCatchUpDropped = -1;
+            } else if (!hasMoved && mClockStillMs >= START_STUCK_MS && !mReported.contains(KIND_VIDEO_FROZEN)) {
+                // The clock stood still with the picture while it played, and still does: a start freeze is reported only once it
+                // goes on (above), so one that never did wasn't (51AQC7FS: 2 frames in 10.4 s after a reload, then on and on)
+                mIsClockStuck = true;
+                report(result, KIND_VIDEO_FROZEN);
             }
         }
 
@@ -624,6 +633,21 @@ public final class PlaybackHealth {
     }
 
     /**
+     * The freeze reported as KIND_VIDEO_FROZEN is the position's too, standing still while it plays: the clock's (e.g. the audio's
+     * timestamp), not the video stream's
+     */
+    public boolean isClockStuck() {
+        return mIsClockStuck;
+    }
+
+    /**
+     * How long the position and the frames have stood still while it plays
+     */
+    public long getClockStillMs() {
+        return mClockStillMs;
+    }
+
+    /**
      * Each sample of the start, oldest first: {played, position, rendered, dropped, given to the decoder, dropped to a keyframe, audio
      * timestamp state, audio playhead, audio latency}. Empty past it: it doesn't tell about what happens later.
      */
@@ -703,6 +727,7 @@ public final class PlaybackHealth {
         mFrozenMs = 0;
         mClockStillMs = 0;
         mIsStartClockStill = false;
+        mIsClockStuck = false;
         mCatchUpEndMs = -1;
         mCatchUpDropped = -1;
         mSeekMs = -1;

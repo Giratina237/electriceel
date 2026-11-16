@@ -4,6 +4,8 @@ import android.net.Uri;
 import android.os.Looper;
 import android.os.SystemClock;
 
+import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
@@ -17,6 +19,8 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.Connections;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
@@ -43,7 +47,11 @@ import org.robolectric.shadows.ShadowToast;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
+import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,12 +60,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.net.ssl.SSLHandshakeException;
+
+import okhttp3.Call;
+import okhttp3.EventListener;
+import okhttp3.OkHttpClient;
+import okhttp3.Protocol;
+import okhttp3.Request;
+
 import static org.junit.Assert.assertEquals;
 import static org.robolectric.Shadows.shadowOf;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
 public class ErrorFixerControllerTest {
+    private static final String HOST = "rr1---sn-test.googlevideo.com";
     private static final List<FormatItem> QUALITIES = Arrays.asList(
             ExoFormatItem.fromVideoSpec("3840,2160,30,vp9", false),
             ExoFormatItem.fromVideoSpec("3840,2160,30,avc", false),
@@ -83,6 +100,10 @@ public class ErrorFixerControllerTest {
         getPlayerData().setTempVideoFormat(null);
         // No segment loaded or loading
         VideoStarts.onPrepare();
+        LoadErrors.resetForTesting();
+        Connections.resetForTesting();
+        Connections.onPrepare();
+        ShadowToast.reset();
     }
 
     @After
@@ -95,6 +116,8 @@ public class ErrorFixerControllerTest {
         setTvPotRejected(false);
         setIpv6Working(null);
         VideoStarts.onPrepare();
+        LoadErrors.resetForTesting();
+        Connections.resetForTesting();
     }
 
     /**
@@ -271,7 +294,8 @@ public class ErrorFixerControllerTest {
     }
 
     /**
-     * IPv6 doesn't connect: the player uses OkHttp whatever is chosen. The DNS is switched, the engine chosen isn't.
+     * IPv6 doesn't connect: the player uses OkHttp whatever is chosen, and its lookups tell. The DNS is switched, the engine chosen
+     * isn't.
      */
     @Test
     public void theDnsFixKeepsTheEngineChosenWhenOkHttpIsInUse() throws Exception {
@@ -280,6 +304,7 @@ public class ErrorFixerControllerTest {
         getGlobalPrefs().setIpv6TestEnabled(true);
         setIpv6Working(false);
         TestController controller = new TestController(video("p5miU3x4Sr8"));
+        lookupFails();
 
         controller.onLongBuffering();
 
@@ -291,22 +316,88 @@ public class ErrorFixerControllerTest {
     }
 
     /**
-     * The DNS isn't Google's at the start of a video: it's switched, and the engine restarted (the DNS is read at each lookup)
+     * The player's lookups failed (the formats came, so the network is up), and the DNS isn't Google's: it's switched, and the
+     * engine restarted (the DNS is read at each lookup). What it went by is in the failure.
      */
     @Test
     public void aStartThatHangsSwitchesTheDns() throws Exception {
         getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
         TestController controller = new TestController(video("p5miU3x4Sr8"));
+        lookupFails();
 
         controller.onLongBuffering();
 
-        assertEquals(Arrays.asList("dns_google", "restart_engine"), getActions(mLog.readAll().get(0)));
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Arrays.asList("dns_google", "restart_engine"), getActions(event));
+        assertEquals("failing", event.getJSONObject("details").getString("lookup"));
         assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
     }
 
     /**
-     * A resumed video that hangs: a hang there is more likely the poToken's (no attestation grace period on resume) than the DNS's.
-     * The client is switched, the DNS left as it is.
+     * Every address the lookup gave timed out: the DNS may give dead ones, it's switched
+     */
+    @Test
+    public void aStartWhoseAddressesDontAnswerSwitchesTheDns() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("p5miU3x4Sr8"));
+        addressesFail();
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("dns_google", "restart_engine"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * A connection of the player connected: the lookup gave an address that answers, the hang isn't the DNS's. It isn't touched.
+     */
+    @Test
+    public void aStartWhoseConnectionsWorkKeepsTheDns() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("p5miU3x4Sr8"));
+        addressesFail();
+        connectionWorks();
+
+        controller.onLongBuffering();
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(event));
+        assertEquals("working", event.getJSONObject("details").getString("lookup"));
+        assertEquals(PlayerTweaksData.DNS_TYPE_SYSTEM, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * No connection of the player told anything (e.g. Cronet's, S4PGCB6X #7): the DNS can't be told to fail, it isn't touched
+     */
+    @Test
+    public void aStartWithNothingToTellKeepsTheDns() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("p5miU3x4Sr8"));
+
+        controller.onLongBuffering();
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(event));
+        assertEquals("unknown", event.getJSONObject("details").getString("lookup"));
+        assertEquals(PlayerTweaksData.DNS_TYPE_SYSTEM, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * The lookups of the source before (e.g. the video before's) aren't this one's
+     */
+    @Test
+    public void theLookupsOfTheSourceBeforeArentThisOnes() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("p5miU3x4Sr8"));
+        lookupFails();
+        restarted();
+
+        controller.onLongBuffering();
+
+        assertEquals(PlayerTweaksData.DNS_TYPE_SYSTEM, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * A resumed video that hangs, with nothing to tell the DNS failed: the client is switched, the DNS left as it is
      */
     @Test
     public void aResumedVideoThatHangsSwitchesTheClientNotTheDns() throws Exception {
@@ -640,6 +731,378 @@ public class ErrorFixerControllerTest {
         assertEquals("vp9", com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil.codecNameShort(format.getTrack().format.codecs));
     }
 
+    /**
+     * The device refuses every AudioTrack, and the sound is AAC already: nothing left to fall back to (FARAJV5R #17–#35: 40 engine
+     * restarts a minute for 10 minutes). Past two restarts at once, each waits twice as long, up to 30 s, and the error is told once more.
+     */
+    @Test
+    public void aRefusedAudioTrackLoopWaitsLongerEachTime() throws Exception {
+        TestController controller = new TestController(video("QQQQmXXTm1g"));
+
+        for (int i = 0; i < 8; i++) {
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_RENDERER, PlayerEventListener.RENDERER_INDEX_AUDIO,
+                    new AudioSink.InitializationException(0, 44_100, 12, 56_720));
+        }
+
+        assertEquals(Collections.singletonList(1_000), controller.mReloads);
+        assertEquals(Arrays.asList(1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000), controller.mRestarts);
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("audio_reload", "reload_video"), getActions(events.get(0)));
+        assertEquals(Arrays.asList("audio_fallback:none", "restart_engine_30s"), getActions(events.get(events.size() - 1)));
+        // The second's, and the first that waits
+        assertEquals(2, ShadowToast.shownToastCount());
+    }
+
+    /**
+     * Another video starts over: at once
+     */
+    @Test
+    public void theAudioTrackWaitsAreOfTheVideo() throws Exception {
+        TestController first = new TestController(video("QQQQmXXTm1g"));
+        TestController controller = new TestController(video("iadNU7fJx6w"));
+
+        for (int i = 0; i < 3; i++) {
+            first.onEngineError(PlayerEventListener.ERROR_TYPE_RENDERER, PlayerEventListener.RENDERER_INDEX_AUDIO,
+                    new AudioSink.InitializationException(0, 44_100, 12, 56_720));
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_RENDERER, PlayerEventListener.RENDERER_INDEX_AUDIO,
+                    new AudioSink.InitializationException(0, 44_100, 12, 56_720));
+        }
+
+        assertEquals(Arrays.asList(1_000, 2_000), first.mRestarts);
+        assertEquals(Arrays.asList(1_000, 2_000), controller.mRestarts);
+    }
+
+    /**
+     * A start that hangs while a load fails on its connection (FARAJV5R #46: the network was down; S4PGCB6X #10: a server's reads timed
+     * out): another client streams from the same servers. The same client again, later each time.
+     */
+    @Test
+    public void aStartThatHangsOnAFailingConnectionWaitsWithTheSameClient() throws Exception {
+        TestController controller = new TestController(video("HWYxNVugkCA"), null, playerStub(null, null, 2_348_311));
+        long now = SystemClock.elapsedRealtime();
+        LoadErrors.onLoadError(now - 5_000, now, C.DATA_TYPE_MEDIA, C.TRACK_TYPE_VIDEO, new SocketTimeoutException("timeout"));
+
+        controller.onLongBuffering();
+        controller.onLongBuffering();
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList(1_000, 2_000, 4_000), controller.mReloads);
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(events.get(0)));
+        assertEquals(Arrays.asList("network_wait", "reload_video_4s"), getActions(events.get(events.size() - 1)));
+    }
+
+    /**
+     * Played, the waits start over
+     */
+    @Test
+    public void aStartThatPlayedWaitsTheFirstWaitAgain() throws Exception {
+        TestController controller = new TestController(video("HWYxNVugkCA"), null, playerStub(null, null, 2_348_311));
+        long now = SystemClock.elapsedRealtime();
+        LoadErrors.onLoadError(now - 5_000, now, C.DATA_TYPE_MEDIA, C.TRACK_TYPE_VIDEO, new SocketTimeoutException("timeout"));
+
+        controller.onLongBuffering();
+        controller.onLongBuffering();
+        controller.onPlay();
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList(1_000, 2_000, 1_000), controller.mReloads);
+    }
+
+    /**
+     * A load that failed long before isn't this hang's: the client is switched, as before
+     */
+    @Test
+    public void aConnectionErrorLongBeforeTheHangSwitchesTheClient() throws Exception {
+        TestController controller = new TestController(video("HWYxNVugkCA"), null, playerStub(null, null, 2_348_311));
+        long now = SystemClock.elapsedRealtime();
+        LoadErrors.onLoadError(now - 65_000, now - 60_000, C.DATA_TYPE_MEDIA, C.TRACK_TYPE_VIDEO, new SocketTimeoutException("timeout"));
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * The lookups fail the same way with Google's DNS: it didn't help (S4PGCB6X #7–#19, and 500 ms more a lookup since). It's put
+     * back, and the next fix is tried.
+     */
+    @Test
+    public void theDnsFixIsUndoneWhenTheLookupsFailWithItToo() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("qrLjwKPRw3s"));
+        lookupFails();
+
+        controller.onLongBuffering();
+        assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+        restarted();
+        lookupFails();
+        controller.onLongBuffering();
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("dns_google", "restart_engine"), getActions(events.get(0)));
+        assertEquals(Arrays.asList("dns_revert", "switch_next_client_now", "reload_video"), getActions(events.get(1)));
+        assertEquals(PlayerTweaksData.DNS_TYPE_SYSTEM, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * With Google's DNS the player connects, and the start hangs anyway: the DNS fix may be what made the lookups work, it stays
+     */
+    @Test
+    public void theDnsFixStaysWhenTheLookupsWorkWithIt() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("qrLjwKPRw3s"));
+        lookupFails();
+
+        controller.onLongBuffering();
+        restarted();
+        connectionWorks();
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(1)));
+        assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * Nothing told after the switch (no connection of the player): no reason to put it back
+     */
+    @Test
+    public void theDnsFixStaysWithNothingToTell() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("qrLjwKPRw3s"));
+        lookupFails();
+
+        controller.onLongBuffering();
+        restarted();
+        controller.onLongBuffering();
+
+        assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * Undone, it isn't tried again
+     */
+    @Test
+    public void anUndoneDnsFixIsntTriedAgain() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("qrLjwKPRw3s"));
+        lookupFails();
+
+        controller.onLongBuffering();
+        restarted();
+        lookupFails();
+        controller.onLongBuffering();
+        restarted();
+        lookupFails();
+        controller.onLongBuffering();
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(events.get(events.size() - 1)));
+        assertEquals(PlayerTweaksData.DNS_TYPE_SYSTEM, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * A video played after it: the DNS fix stays, and the next start that hangs gets the next fix
+     */
+    @Test
+    public void aDnsFixThatPlayedStays() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("qrLjwKPRw3s"));
+        lookupFails();
+
+        controller.onLongBuffering();
+        controller.onPlay();
+        controller.onNewVideo(video("w2r-ETPghLs"));
+        restarted();
+        lookupFails();
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(1)));
+        assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * The fetch didn't connect (FARAJV5R #47–#99: 55 a minute for 15 minutes): tried again later each time, up to 30 s, and told once
+     */
+    @Test
+    public void aFetchThatFailsOnTheNetworkIsTriedAgainLaterEachTime() throws Exception {
+        TestController controller = new TestController(video("HWYxNVugkCA"));
+
+        for (int i = 0; i < 7; i++) {
+            controller.runFormatErrorAction(new IllegalStateException(i % 2 == 0
+                    ? new SocketTimeoutException("failed to connect to www.youtube.com after 5000ms")
+                    : new SSLHandshakeException("Trust anchor for certification path not found.")));
+        }
+
+        assertEquals(Arrays.asList(1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000), controller.mReloads);
+        assertEquals(1, ShadowToast.shownToastCount());
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(events.get(0)));
+    }
+
+    /**
+     * The poToken's BotGuard request couldn't connect (see PoTokenWebView#keepInitError): the network's, told by its cause. The client
+     * isn't switched (FARAJV5R #60, #61).
+     */
+    @Test
+    public void aPoTokenRequestThatCouldntConnectIsTheNetworks() throws Exception {
+        TestController controller = new TestController(video("HWYxNVugkCA"));
+
+        controller.runFormatErrorAction(new IllegalStateException("Interrupted OkHttp request to https://www.youtube.com/api/jnn/v1/Create",
+                new ConnectException("ECONNREFUSED")));
+
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * A name that didn't resolve is the network's: the DNS isn't switched to IPv4 and the app isn't restarted for it. Every DNS type
+     * ends in the system's lookup, which had just failed.
+     */
+    @Test
+    public void aNameThatDidntResolveIsTheNetworks() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_GOOGLE);
+        TestController controller = new TestController(video("HWYxNVugkCA"));
+
+        controller.runFormatErrorAction(new UnknownHostException("Unable to resolve host \"www.youtube.com\": No address associated with hostname"));
+
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * A broken WebView after a fetch that couldn't connect is still a broken WebView: what failed before tells nothing of it
+     */
+    @Test
+    public void aBrokenWebViewAfterTheNetworkFailedIsTheWebViews() throws Exception {
+        TestController controller = new TestController(video("HWYxNVugkCA"));
+
+        controller.runFormatErrorAction(new IllegalStateException(new SocketTimeoutException("failed to connect")));
+        controller.runFormatErrorAction(new BadWebViewException("Uncaught SyntaxError: Unexpected token"));
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("switch_next_client", "reload_video"), getActions(events.get(events.size() - 1)));
+    }
+
+    /**
+     * Every client failed to connect, and the fetch's error says only that no formats came: the network's (a dead proxy: each
+     * attempt refused, which used to read null_response)
+     */
+    @Test
+    public void everyClientThatCouldntConnectIsTheNetworks() throws Exception {
+        ClientAttempts.clear("offline");
+        ClientAttempts.record("offline", ClientAttempts.Attempt.exception("TV", new ConnectException("ECONNREFUSED")));
+        ClientAttempts.record("offline", ClientAttempts.Attempt.exception("WEB", new IllegalStateException(
+                new ConnectException("ECONNREFUSED"))));
+        TestController controller = new TestController(video("offline"));
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * One client got an answer: not the network's, whatever the others did
+     */
+    @Test
+    public void oneClientThatGotAnAnswerIsntTheNetworks() throws Exception {
+        ClientAttempts.clear("partly");
+        ClientAttempts.record("partly", ClientAttempts.Attempt.exception("TV", new ConnectException("ECONNREFUSED")));
+        ClientAttempts.record("partly", ClientAttempts.Attempt.http("WEB", 500));
+        TestController controller = new TestController(video("partly"));
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        assertEquals(Collections.singletonList("reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * With the network up, a poToken error is the client's, as before
+     */
+    @Test
+    public void aPoTokenErrorSwitchesTheClient() throws Exception {
+        TestController controller = new TestController(video("HWYxNVugkCA"));
+
+        controller.runFormatErrorAction(new BadWebViewException("Error invoking downloadAndRunBotguard"));
+
+        assertEquals(Arrays.asList("switch_next_client", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * Its formats came: a fetch that fails after that is tried again at once
+     */
+    @Test
+    public void theFetchWaitsStartOverWhenTheFormatsCame() throws Exception {
+        Video video = video("HWYxNVugkCA");
+        TestController controller = new TestController(video);
+
+        controller.runFormatErrorAction(new IllegalStateException(new SocketTimeoutException("failed to connect")));
+        controller.runFormatErrorAction(new IllegalStateException(new SocketTimeoutException("failed to connect")));
+        controller.onSourceChanged(video);
+        controller.runFormatErrorAction(new IllegalStateException(new SocketTimeoutException("failed to connect")));
+
+        assertEquals(Arrays.asList(1_000, 2_000, 1_000), controller.mReloads);
+    }
+
+    /**
+     * Named as the WebView's (see PoTokenWebView): the fix tells it by its name
+     */
+    private static class BadWebViewException extends RuntimeException {
+        BadWebViewException(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * A connection of the player whose name didn't resolve
+     */
+    private static void lookupFails() {
+        Call call = newCall();
+        EventListener listener = Connections.LISTENER.create(call);
+        listener.dnsStart(call, HOST);
+        listener.callFailed(call, new UnknownHostException(HOST));
+    }
+
+    /**
+     * A connection of the player where every address the lookup gave timed out
+     */
+    private static void addressesFail() throws Exception {
+        Call call = newCall();
+        EventListener listener = Connections.LISTENER.create(call);
+        InetSocketAddress address = new InetSocketAddress(InetAddress.getByAddress(new byte[]{(byte) 142, (byte) 250, 1, 1}), 443);
+        listener.dnsStart(call, HOST);
+        listener.dnsEnd(call, HOST, Collections.singletonList(address.getAddress()));
+        listener.connectStart(call, address, java.net.Proxy.NO_PROXY);
+        listener.connectFailed(call, address, java.net.Proxy.NO_PROXY, null, new SocketTimeoutException("connect timed out"));
+        listener.callFailed(call, new SocketTimeoutException("connect timed out"));
+    }
+
+    /**
+     * A connection of the player that connected
+     */
+    private static void connectionWorks() throws Exception {
+        Call call = newCall();
+        EventListener listener = Connections.LISTENER.create(call);
+        InetSocketAddress address = new InetSocketAddress(InetAddress.getByAddress(new byte[]{(byte) 142, (byte) 250, 1, 2}), 443);
+        listener.dnsStart(call, HOST);
+        listener.dnsEnd(call, HOST, Collections.singletonList(address.getAddress()));
+        listener.connectStart(call, address, java.net.Proxy.NO_PROXY);
+        listener.connectEnd(call, address, java.net.Proxy.NO_PROXY, Protocol.HTTP_1_1);
+        listener.callEnd(call);
+    }
+
+    /**
+     * The engine restarted (e.g. by the DNS fix): the player is prepared with a new source, its connections are the new ones
+     */
+    private static void restarted() {
+        // Robolectric's clock moves on with the main looper
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+        Connections.onPrepare();
+    }
+
+    private static Call newCall() {
+        return new OkHttpClient().newCall(new Request.Builder().url("https://" + HOST + "/videoplayback").build());
+    }
+
     private static PlayerData getPlayerData() {
         return PlayerData.instance(RuntimeEnvironment.getApplication());
     }
@@ -766,6 +1229,11 @@ public class ErrorFixerControllerTest {
         private final PlaybackView mPlayer;
         private final Video mVideo;
         private int mPlayEnds;
+        /**
+         * The waits of the reloads and the engine restarts asked for, in order
+         */
+        private final List<Integer> mReloads = new ArrayList<>();
+        private final List<Integer> mRestarts = new ArrayList<>();
 
         private TestController(Video video) throws Exception {
             this(video, (String) null);
@@ -794,6 +1262,16 @@ public class ErrorFixerControllerTest {
                 @Override
                 public String getFormatClient() {
                     return formatClient;
+                }
+
+                @Override
+                public void reloadVideo(int delayMs) {
+                    mReloads.add(delayMs);
+                }
+
+                @Override
+                void restartEngine(int delayMs) {
+                    mRestarts.add(delayMs);
                 }
             });
         }

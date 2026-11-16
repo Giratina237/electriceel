@@ -422,6 +422,59 @@ public class PlaybackHealthTest {
         assertTrue(mFound.isEmpty());
     }
 
+    /**
+     * The position and the picture stood still while it played, and never went on (51AQC7FS: 2 frames in 10.4 s after a reload): a
+     * freeze of the clock, reported while it lasts, not only when it ends
+     */
+    @Test
+    public void aClockThatStaysStillIsAFreeze() {
+        mSample.isVideoRendered = true;
+        tick(500, 0, 2, 0);
+
+        for (int i = 0; i < 15; i++) {
+            tick(500, 0, 2, 0);
+        }
+
+        assertTrue(mFound.isEmpty());
+
+        tick(500, 0, 2, 0);
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_VIDEO_FROZEN), mFound);
+        assertTrue(mHealth.isClockStuck());
+        assertEquals(8_000, mHealth.getClockStillMs());
+
+        tick(500, 0, 2, 0);
+        assertEquals(1, mFound.size());
+    }
+
+    @Test
+    public void aClockThatStaysStillPastTheStartIsAFreeze() {
+        mSample.isVideoRendered = true;
+        playPastTheStart();
+
+        for (int i = 0; i < 4; i++) {
+            tick(2_000, 0, 360, 0);
+        }
+
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_VIDEO_FROZEN), mFound);
+        assertTrue(mHealth.isClockStuck());
+    }
+
+    /**
+     * The picture stood still while the position went on: the renderer's, as before, not the clock's
+     */
+    @Test
+    public void aPictureStillWhileTheClockGoesOnIsntTheClocks() {
+        mSample.isVideoRendered = true;
+        playPastTheStart();
+
+        for (int i = 0; i < 4; i++) {
+            tick(2_000, 2_000, 360, 0);
+        }
+
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_VIDEO_FROZEN), mFound);
+        assertFalse(mHealth.isClockStuck());
+    }
+
     @Test
     public void aShortStillPictureAtTheStartIsNothing() {
         mSample.isVideoRendered = true;

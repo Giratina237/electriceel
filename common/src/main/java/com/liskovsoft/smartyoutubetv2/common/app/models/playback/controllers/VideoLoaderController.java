@@ -497,7 +497,7 @@ public class VideoLoaderController extends BasePlayerController {
 
         String bgImageUrl = null;
 
-        VideoStarts.onFormats(getVideo().videoId, getClientName(formatInfo));
+        VideoStarts.onFormats(getVideo().videoId, getClientName(formatInfo), formatInfo.getCreatedTimeMs());
         getVideo().sync(formatInfo);
 
         mFormatVideoId = getVideo().videoId;
@@ -861,7 +861,10 @@ public class VideoLoaderController extends BasePlayerController {
         }
     }
 
-    private void restartEngine(int delayMs) {
+    /**
+     * @param delayMs e.g. longer each time a restart didn't help (see ErrorFixerController)
+     */
+    void restartEngine(int delayMs) {
         if (getPlayer() != null) {
             Log.d(TAG, "Restarting the engine...");
             Utils.postDelayed(mRestartEngine, delayMs);

@@ -59,7 +59,6 @@ import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.PeriodicWorkRequest;
 import com.liskovsoft.leanbackassistant.utils.SafeWorkManager;
 
-import com.jakewharton.processphoenix.ProcessPhoenix;
 import com.liskovsoft.sharedutils.cronet.CronetManager;
 import com.liskovsoft.sharedutils.helpers.AppInfoHelpers;
 import com.liskovsoft.sharedutils.helpers.DeviceHelpers;
@@ -70,7 +69,6 @@ import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.okhttp.OkHttpManager;
 import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
 import com.liskovsoft.smartyoutubetv2.common.R;
-import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerConstants;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerManager;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.service.VideoStateService;
@@ -133,7 +131,6 @@ public class Utils {
     private static final int RANDOM_FAIL_REPEAT_TIMES = 10;
     private static final String REMOTE_CONTROL_RECEIVER_CLASS_NAME = "com.liskovsoft.smartyoutubetv2.common.misc.RemoteControlReceiver";
     private static final String UPDATE_CHANNELS_RECEIVER_CLASS_NAME = "com.liskovsoft.leanbackassistant.channels.UpdateChannelsReceiver";
-    private static final String BOOTSTRAP_ACTIVITY_CLASS_NAME = "com.liskovsoft.smartyoutubetv2.tv.ui.main.SplashActivity";
     private static final String TASK_ID = RemoteControlWorker.class.getSimpleName();
     private static final String TAG = Utils.class.getSimpleName();
     private static final String QR_CODE_URL_TEMPLATE = "https://api.qrserver.com/v1/create-qr-code/?data=%s";
@@ -963,46 +960,6 @@ public class Utils {
         removeCallbacks(sForceFinishTheApp);
     }
 
-    public static void restartTheApp(Context context) {
-        persistData(context);
-        postDelayed(() -> restartTheAppInt(context), 1_000);
-    }
-
-    private static void restartTheAppInt(Context context) {
-        try {
-            Intent intent = new Intent(context, Class.forName(BOOTSTRAP_ACTIVITY_CLASS_NAME));
-            intent.putExtra(IntentExtractor.RESTART_INTENT, true);
-            ProcessPhoenix.triggerRebirth(context, intent);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void restartTheApp(Context context, Video video, long posMs) {
-        persistData(context);
-        postDelayed(() -> restartTheAppInt(context, video, posMs), 1_000);
-    }
-
-    private static void restartTheAppInt(Context context, Video video, long posMs) {
-        if (video == null || !video.hasVideo()) {
-            return;
-        }
-
-        try {
-            Intent intent = new Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse(String.format("https://www.youtube.com/watch?v=%s&t=%ss", video.videoId, posMs / 1_000)),
-                    context,
-                    Class.forName(BOOTSTRAP_ACTIVITY_CLASS_NAME)
-            );
-            intent.putExtra(IntentExtractor.RESTART_INTENT, true);
-            intent.putExtra(IntentExtractor.INCOGNITO_INTENT, video.incognito);
-            ProcessPhoenix.triggerRebirth(context, intent);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        }
-    }
-
     private static void startReceiver(Context context, String receiverClassName) {
         // Can't use class directly! ATV module is disabled for some flavors.
         Class<?> clazz = null;
@@ -1349,20 +1306,6 @@ public class Utils {
     public static boolean isSharedDirRestricted(Context context) {
         // Android 11+: only backup through the file manager (no shared dir)
         return AppInfoHelpers.getRealSdkVersion(context) > 29;
-    }
-
-    public static boolean fixRetrofitErrors(@NonNull Context context, Throwable error) {
-        if (error != null && Helpers.contains(error.getMessage(), "No address associated with hostname")) {
-            // java.net.UnknownHostException: Unable to resolve host "www.youtube.com": No address associated with hostname
-            PlayerTweaksData playerTweaksData = PlayerTweaksData.instance(context);
-            if (playerTweaksData.getPreferredDnsType() != PlayerTweaksData.DNS_TYPE_IPV4) {
-                playerTweaksData.setPreferredDnsType(PlayerTweaksData.DNS_TYPE_IPV4);
-                // Restart app to reinit OkHttp internal objects
-                Utils.restartTheApp(context);
-                return true;
-            }
-        }
-        return false;
     }
 
     public static void testUrl(String url, Runnable onSuccess) {

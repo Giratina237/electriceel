@@ -478,6 +478,77 @@ public class VideoStartsTest {
     }
 
     /**
+     * A load that failed is in the buffering: the player's wait before it tried again had no row (S4PGCB6X: 4.4 s with none)
+     */
+    @Test
+    public void loadErrorsAreInTheBuffering() {
+        VideoStarts.sLoadErrors = (fromMs, toMs) -> Collections.singletonList(
+                new VideoStart.Stage(VideoStarts.STAGE_LOAD_ERROR, "video chunk, timed out", 1, fromMs + 10, fromMs + 4_010));
+        VideoStart start = mFixture.slowStart();
+        boolean isFound = false;
+
+        for (VideoStart.Stage stage : start.stages) {
+            isFound |= VideoStarts.STAGE_LOAD_ERROR.equals(stage.name) && "video chunk, timed out".equals(stage.detail)
+                    && stage.depth == 1 && stage.getDurationMs() == 4_000 && stage.getCategory() == VideoStart.Category.NETWORK;
+        }
+
+        assertTrue(isFound);
+    }
+
+    /**
+     * S4PGCB6X #1: a reload 11.5 h after a pause got formats in 13 ms, with no row to say where from. Made before the fetch began,
+     * they say how long before.
+     */
+    @Test
+    public void formatsMadeBeforeTheFetchSayHowOld() {
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(13);
+        VideoStarts.onFormats(VIDEO_ID, "TV", VideoStarts.sWallClock.now() - (11 * 60 + 36) * 60_000L);
+        finish();
+
+        VideoStart.Stage reused = find(last(), VideoStarts.STAGE_REUSED);
+
+        assertStage(reused, VideoStarts.STAGE_REUSED, "made 11h36m ago", 1, 13, 13);
+        assertEquals(VideoStart.Category.MARK, reused.getCategory());
+    }
+
+    /**
+     * Made by the fetch: no row
+     */
+    @Test
+    public void formatsTheFetchMadeArentReused() {
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(700);
+        VideoStarts.onFormats(VIDEO_ID, "TV", VideoStarts.sWallClock.now() - 50);
+        finish();
+
+        assertNull(find(last(), VideoStarts.STAGE_REUSED));
+    }
+
+    @Test
+    public void anAgeIsShort() {
+        assertEquals("35s", VideoStarts.formatAge(35_400));
+        assertEquals("4m05s", VideoStarts.formatAge(245_000));
+        assertEquals("11h36m", VideoStarts.formatAge(41_790_000));
+    }
+
+    /**
+     * The start goes on to its first frame and plays
+     */
+    private void finish() {
+        VideoStarts.onPrepare();
+        mFixture.at(1_000);
+        VideoStarts.onLoad(false, true, false, T0 + 930, T0 + 1_000, 1_000_000);
+        mFixture.at(1_100);
+        VideoStarts.onFirstFrame(new VideoStarts.FirstFrame(0, null, -1, 0, -1));
+        VideoStarts.onPlaying(true);
+    }
+
+    /**
      * What the server made of the poToken is a moment of the buffering, of the start's video
      */
     @Test

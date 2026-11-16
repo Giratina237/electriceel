@@ -30,8 +30,10 @@ import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
 import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.Connections;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LastState;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
@@ -59,6 +61,7 @@ import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 
 import org.json.JSONArray;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.List;
@@ -164,6 +167,16 @@ public class ExoPlayerController implements Player.EventListener {
                         mediaLoadData.trackType == C.TRACK_TYPE_AUDIO, loadEventInfo.elapsedRealtimeMs - loadEventInfo.loadDurationMs,
                         loadEventInfo.elapsedRealtimeMs, loadEventInfo.bytesLoaded);
             }
+        }
+
+        /**
+         * The player tries it again after a wait, or fails: either is a gap in the start without it (see LoadErrors)
+         */
+        @Override
+        public void onLoadError(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData, IOException error,
+                                boolean wasCanceled) {
+            LoadErrors.onLoadError(loadEventInfo.elapsedRealtimeMs - loadEventInfo.loadDurationMs, loadEventInfo.elapsedRealtimeMs,
+                    mediaLoadData.dataType, mediaLoadData.trackType, error);
         }
 
         /**
@@ -328,7 +341,15 @@ public class ExoPlayerController implements Player.EventListener {
             failure.detail("clockStill", mHealth.isStartClockStill());
         }
 
-        if (PlaybackHealth.KIND_START_FROZEN.equals(kind) || PlaybackHealth.KIND_FRAME_DROPS.equals(kind)) {
+        // The position stands still with the picture: the clock's, as a start freeze whose clock stood still (see above)
+        boolean isClockStuck = PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && mHealth.isClockStuck();
+
+        if (isClockStuck) {
+            failure.detail("frozenMs", mHealth.getClockStillMs());
+            failure.detail("clockStill", true);
+        }
+
+        if (PlaybackHealth.KIND_START_FROZEN.equals(kind) || PlaybackHealth.KIND_FRAME_DROPS.equals(kind) || isClockStuck) {
             JSONArray trail = toJson(mHealth.getStartTrail());
 
             if (trail.length() > 0) {
@@ -352,8 +373,8 @@ public class ExoPlayerController implements Player.EventListener {
             }
         }
 
-        // The stream that didn't work: frame drops and stalls play, worse
-        if (PlaybackHealth.KIND_NO_VIDEO.equals(kind) || PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind)) {
+        // The stream that didn't work: frame drops and stalls play, worse. A clock that stands still isn't the video stream's.
+        if (PlaybackHealth.KIND_NO_VIDEO.equals(kind) || PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && !isClockStuck) {
             FormatAttempts.onStreamFailed(true);
         } else if (PlaybackHealth.KIND_AUDIO_SILENT.equals(kind) && PlaybackHealth.isSilentFromStart(sample)) {
             FormatAttempts.onStreamFailed(false);
@@ -475,6 +496,8 @@ public class ExoPlayerController implements Player.EventListener {
         VideoStarts.timeOpenStep(VideoStarts.STAGE_SOURCE_CHANGED, null, () -> mEventListener.onSourceChanged(video));
         VideoStarts.onPrepare();
         FormatAttempts.onPrepare();
+        LoadErrors.onPrepare();
+        Connections.onPrepare();
         mHasPlayedSource = false;
         mPlayer.prepare(mediaSource);
         // Its first seconds are looked at closely: the check may be 2 s away, past its first frame

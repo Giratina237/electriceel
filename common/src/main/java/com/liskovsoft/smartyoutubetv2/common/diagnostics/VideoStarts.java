@@ -103,6 +103,20 @@ public final class VideoStarts {
      */
     static final String STAGE_PROTECTION = "protection";
     /**
+     * A load of the player that failed, from when it was asked for, its detail the load and why, e.g. "video chunk, timed out" (see
+     * LoadErrors): the player tries it again after a wait
+     */
+    static final String STAGE_LOAD_ERROR = "load error";
+    /**
+     * A moment of the formats stage: the formats the player got were made before this start's fetch began (e.g. cached, or the ones a
+     * reload took), its detail how long before, e.g. "made 11h36m ago" (see #onFormats)
+     */
+    static final String STAGE_REUSED = "reused";
+    /**
+     * Made this much before the fetch began, formats are another fetch's
+     */
+    private static final long REUSED_MIN_MS = 1_000;
+    /**
      * The first segments of a start, by kind: each its own row
      */
     private static final String[] CHUNK_STAGES = {STAGE_VIDEO_INIT_CHUNK, STAGE_AUDIO_INIT_CHUNK, STAGE_FIRST_VIDEO_CHUNK,
@@ -184,6 +198,8 @@ public final class VideoStarts {
     static LoadHoldSource sBackoffs = ServerBackoffs::take;
     @VisibleForTesting
     static ProtectionSource sProtection = ProtectionStatuses::take;
+    @VisibleForTesting
+    static LoadHoldSource sLoadErrors = LoadErrors::take;
     @VisibleForTesting
     static Recorder sRecorder = VideoStarts::save;
     @VisibleForTesting
@@ -613,6 +629,13 @@ public final class VideoStarts {
      * @param client the one they're from, e.g. TV
      */
     public static void onFormats(String videoId, @Nullable String client) {
+        onFormats(videoId, client, 0);
+    }
+
+    /**
+     * @param createdTimeMs when the formats were made, on the wall clock (see MediaItemFormatInfo#getCreatedTimeMs), 0 for not known
+     */
+    public static void onFormats(String videoId, @Nullable String client, long createdTimeMs) {
         Timer timer = getTimer(videoId);
 
         if (timer == null || timer.fetchMs < 0) {
@@ -626,8 +649,37 @@ public final class VideoStarts {
             timer.findLast(STAGE_FORMATS).children.add(new VideoStart.Stage(STAGE_TO_PLAYER, null, 1, lastFetchEndMs, now));
         }
 
+        // Made before the fetch began: how old they are. A reload 11.5 h after a pause got formats in 13 ms with no row to say where
+        // from, and the server sent it no media (S4PGCB6X #1).
+        long ageMs = createdTimeMs > 0 ? sWallClock.now() - createdTimeMs : -1;
+
+        if (ageMs - (now - timer.fetchMs) >= REUSED_MIN_MS) {
+            timer.findLast(STAGE_FORMATS).children.add(new VideoStart.Stage(STAGE_REUSED, "made " + formatAge(ageMs) + " ago", 1, now,
+                    now));
+        }
+
         timer.client = client;
         timer.open(STAGE_OPEN, null, now);
+    }
+
+    /**
+     * E.g. "11h36m", "4m05s", "35s"
+     */
+    @VisibleForTesting
+    static String formatAge(long ageMs) {
+        long seconds = ageMs / 1_000;
+
+        if (seconds < 60) {
+            return seconds + "s";
+        }
+
+        long minutes = seconds / 60;
+
+        if (minutes < 60) {
+            return String.format(Locale.US, "%dm%02ds", minutes, seconds % 60);
+        }
+
+        return String.format(Locale.US, "%dh%02dm", minutes / 60, minutes % 60);
     }
 
     /**
@@ -1300,6 +1352,8 @@ public final class VideoStarts {
             result.addAll(sBackoffs.take(timer.prepareMs, endMs));
             // Whether the server took the poToken: past its grace period, it sends no media with one it hasn't
             result.addAll(sProtection.take(timer.videoId, timer.prepareMs, endMs));
+            // A load that failed: the player waits before it tries again, a gap with no row of its own
+            result.addAll(sLoadErrors.take(timer.prepareMs, endMs));
         }
 
         return result;
@@ -1454,6 +1508,7 @@ public final class VideoStarts {
         sConnections = Connections::take;
         sBackoffs = ServerBackoffs::take;
         sProtection = ProtectionStatuses::take;
+        sLoadErrors = LoadErrors::take;
         sRecorder = VideoStarts::save;
         sFramesRecorder = VideoStarts::saveFrames;
         sWarmUps = WarmUps::snapshot;

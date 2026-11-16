@@ -13,7 +13,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class IntentExtractor {
-    public static final String RESTART_INTENT = "RESTART_INTENT";
     public static final String INCOGNITO_INTENT = "INCOGNITO_INTENT";
     public static final String ADD_TO_QUEUE_INTENT = "add_to_queue";
     private static final String TAG = IntentExtractor.class.getSimpleName();
@@ -342,10 +341,6 @@ public class IntentExtractor {
         } catch (NumberFormatException e) {
             return -1;
         }
-    }
-
-    public static boolean isRestartIntent(Intent intent) {
-        return intent != null && intent.getBooleanExtra(RESTART_INTENT, false);
     }
 
     /**

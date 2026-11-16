@@ -120,7 +120,12 @@ public class TrackSelectorManager implements TrackSelectorCallback {
      * @param parameters supplied externally from {@link RestoreTrackSelector}
      */
     private void initRenderer(int rendererIndex, TrackGroupArray groups, Parameters parameters) {
-        if (mRenderers[rendererIndex] != null && mRenderers[rendererIndex].mediaTracks != null) {
+        Renderer renderer = mRenderers[rendererIndex];
+
+        // Of other groups, it's of a source before: the main thread can make it again after invalidate() (e.g. the track list asked for
+        // with the mapped tracks of the period before) while this one is selected for. Its tracks' indexes aren't these groups'
+        // (FARAJV5R #4: index 1 of 1 group, after a SABR reload).
+        if (renderer != null && renderer.mediaTracks != null && (groups == null || groups.equals(renderer.trackGroups))) {
             return;
         }
 
@@ -321,7 +326,9 @@ public class TrackSelectorManager implements TrackSelectorCallback {
 
         MediaTrack matchedTrack = findBestMatch(selectedTrack);
 
-        if (matchedTrack.groupIndex != -1) {
+        if (!isInGroups(matchedTrack, groups)) {
+            Log.e(TAG, "Can't create selection. The track %s isn't in the groups", matchedTrack);
+        } else if (matchedTrack.groupIndex != -1) {
             Definition definition = new Definition(groups.get(matchedTrack.groupIndex), matchedTrack.trackIndex);
             definitionPair = new Pair<>(definition, matchedTrack);
             setSelection(matchedTrack.rendererIndex, matchedTrack.groupIndex, matchedTrack.trackIndex);
@@ -330,6 +337,18 @@ public class TrackSelectorManager implements TrackSelectorCallback {
         }
 
         return definitionPair;
+    }
+
+    /**
+     * Its indexes are of these groups' (see initRenderer). A group index of -1 is none.
+     */
+    private static boolean isInGroups(MediaTrack track, TrackGroupArray groups) {
+        if (track.groupIndex == -1) {
+            return true;
+        }
+
+        return groups != null && track.groupIndex >= 0 && track.groupIndex < groups.length && track.trackIndex >= 0
+                && track.trackIndex < groups.get(track.groupIndex).length;
     }
 
     private Pair<Definition, MediaTrack> createRendererSelection(int rendererIndex, TrackGroupArray groups, Parameters params) {

@@ -19,6 +19,7 @@ import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.MimeTypes;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.ConnectException;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -33,6 +34,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import javax.net.ssl.SSLException;
 
 import okhttp3.Call;
 import okhttp3.EventListener;
@@ -97,6 +100,30 @@ public final class Connections {
     private static final ArrayDeque<TimedRequest> sOpenings = new ArrayDeque<>();
     @VisibleForTesting
     static VideoStarts.Clock sClock = SystemClock::elapsedRealtime;
+    /**
+     * When the player was last prepared with a source, in the clock's time, -1 for not yet (see getLookup)
+     */
+    private static long sPreparedMs = -1;
+
+    /**
+     * What the player's new connections since it was prepared say of their name's lookup (see getLookup)
+     */
+    public enum Lookup {
+        /**
+         * None ended, or none made by OkHttp (the default and Cronet engines tell nothing of their connections, see timeOpenings):
+         * nothing to tell
+         */
+        UNKNOWN,
+        /**
+         * One connected: the lookup gave an address that answers. A hang isn't the DNS's.
+         */
+        WORKING,
+        /**
+         * Each one that ended failed in its lookup, or at every address it gave: the DNS can be what fails (or the network: told by
+         * the formats' fetch, which connected)
+         */
+        FAILING
+    }
 
     private Connections() {
     }
@@ -135,6 +162,10 @@ public final class Connections {
          */
         @Nullable
         Protocol protocol;
+        /**
+         * Its call was cancelled (e.g. a seek's): where it ended (its lookup, an address) says nothing of them (see getLookup)
+         */
+        boolean isCancelled;
 
         Connection(long startMs, @Nullable String load) {
             this.startMs = startMs;
@@ -202,6 +233,11 @@ public final class Connections {
          */
         @Nullable
         final String load;
+        /**
+         * Why its answer didn't come, e.g. "timed out" (see describeFailure), null for one that came or waits
+         */
+        @Nullable
+        String failure;
 
         TimedRequest(long startMs, long endMs, @Nullable String load) {
             this.startMs = startMs;
@@ -277,10 +313,17 @@ public final class Connections {
         }
 
         private void onResponseEnd() {
+            onResponseEnd(null);
+        }
+
+        /**
+         * @param failure why its answer didn't come, null for one that did
+         */
+        private void onResponseEnd(@Nullable IOException failure) {
             TimedRequest response = mResponse;
 
             if (response != null) {
-                end(response);
+                end(response, failure);
                 mResponse = null;
             }
         }
@@ -350,12 +393,15 @@ public final class Connections {
 
         @Override
         public void requestFailed(@NonNull Call call, @NonNull IOException ioe) {
-            onResponseEnd();
+            onResponseEnd(ioe);
         }
 
+        /**
+         * E.g. its headers timed out (S4PGCB6X: a video chunk's "response 4002" twice, OkHttp's read timeout)
+         */
         @Override
         public void responseFailed(@NonNull Call call, @NonNull IOException ioe) {
-            onResponseEnd();
+            onResponseEnd(ioe);
         }
 
         @Override
@@ -366,9 +412,78 @@ public final class Connections {
 
         @Override
         public void callFailed(@NonNull Call call, @NonNull IOException ioe) {
+            Connection connection = mConnection;
+
+            if (connection != null && FAILURE_CANCELLED.equals(describeFailure(ioe))) {
+                setCancelled(connection);
+            }
+
             onEnd();
-            onResponseEnd();
+            onResponseEnd(ioe);
         }
+    }
+
+    /**
+     * The player was prepared with a source (e.g. another video, or the same one again by a reload)
+     */
+    public static synchronized void onPrepare() {
+        sPreparedMs = sClock.now();
+    }
+
+    /**
+     * What the player's new connections since it was prepared say of their name's lookup. One cancelled (e.g. a seek's, or another
+     * address that connected first) tells nothing.
+     */
+    public static synchronized Lookup getLookup() {
+        boolean isFailing = false;
+
+        for (Connection connection : sConnections) {
+            if (connection.startMs < sPreparedMs) {
+                continue;
+            }
+
+            if (isConnected(connection)) {
+                return Lookup.WORKING;
+            }
+
+            isFailing |= isLookupFailed(connection) || isEveryAddressFailed(connection);
+        }
+
+        return isFailing ? Lookup.FAILING : Lookup.UNKNOWN;
+    }
+
+    private static boolean isConnected(Connection connection) {
+        for (Attempt attempt : connection.attempts) {
+            if (attempt.endMs >= 0 && attempt.failure == null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * It ended in its lookup: the name didn't resolve (OkHttp tells no end of a lookup that fails)
+     */
+    private static boolean isLookupFailed(Connection connection) {
+        return connection.endMs >= 0 && !connection.isCancelled && connection.isDnsStarted && connection.dnsEndMs < 0;
+    }
+
+    /**
+     * It ended, each address the lookup gave tried and failed (not cancelled): none answers
+     */
+    private static boolean isEveryAddressFailed(Connection connection) {
+        if (connection.endMs < 0 || connection.isCancelled || connection.attempts.isEmpty()) {
+            return false;
+        }
+
+        for (Attempt attempt : connection.attempts) {
+            if (attempt.endMs < 0 || attempt.failure == null || FAILURE_CANCELLED.equals(attempt.failure)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     @VisibleForTesting
@@ -421,12 +536,17 @@ public final class Connections {
         public long open(DataSpec dataSpec) throws IOException {
             // Made on the thread of the load it's of
             TimedRequest opening = isNetwork(dataSpec) ? addOpening(sClock.now(), -1, describeLoad(Loader.getCurrentLoadable())) : null;
+            IOException failure = null;
 
             try {
                 return mDataSource.open(dataSpec);
+            } catch (IOException e) {
+                // E.g. Cronet's connect timed out (S4PGCB6X #4)
+                failure = e;
+                throw e;
             } finally {
                 if (opening != null) {
-                    end(opening);
+                    end(opening, failure);
                 }
             }
         }
@@ -474,12 +594,20 @@ public final class Connections {
         return opening;
     }
 
-    private static synchronized void end(TimedRequest request) {
+    /**
+     * @param failure why its answer didn't come, null for one that did
+     */
+    private static synchronized void end(TimedRequest request, @Nullable IOException failure) {
         request.endMs = sClock.now();
+        request.failure = failure != null ? describeFailure(failure) : null;
     }
 
     private static synchronized void end(Connection connection) {
         connection.endMs = sClock.now();
+    }
+
+    private static synchronized void setCancelled(Connection connection) {
+        connection.isCancelled = true;
     }
 
     private static synchronized void setHost(Connection connection, String host) {
@@ -543,22 +671,36 @@ public final class Connections {
     }
 
     /**
-     * E.g. "timed out": the connect timeout (5 s, see OkHttpCommons) on an address that doesn't answer
+     * E.g. "timed out": the connect timeout (5 s, see OkHttpCommons) on an address that doesn't answer, or a response's read timeout.
+     * Its causes too: an engine wraps it (e.g. Cronet's open in an OpenException).
      */
     private static String describeFailure(IOException ioe) {
-        if (ioe instanceof SocketTimeoutException) {
-            return "timed out";
-        }
+        for (Throwable cause = ioe; cause != null && cause.getCause() != cause; cause = cause.getCause()) {
+            if (cause instanceof SocketTimeoutException) {
+                return "timed out";
+            }
 
-        if (ioe instanceof NoRouteToHostException) {
-            return "unreachable";
+            // The load was cancelled (e.g. by a seek): its thread was interrupted
+            if (cause instanceof InterruptedIOException) {
+                return FAILURE_CANCELLED;
+            }
+
+            if (cause instanceof NoRouteToHostException) {
+                return "unreachable";
+            }
+
+            if (cause instanceof ConnectException) {
+                String message = cause.getMessage();
+                return message != null && message.contains("ENETUNREACH") ? "unreachable" : "refused";
+            }
+
+            // E.g. "Trust anchor for certification path not found": something else answered for the server
+            if (cause instanceof SSLException) {
+                return "TLS failed";
+            }
         }
 
         String message = ioe.getMessage();
-
-        if (ioe instanceof ConnectException) {
-            return message != null && message.contains("ENETUNREACH") ? "unreachable" : "refused";
-        }
 
         // OkHttp closes the socket of an attempt it cancels ("Socket closed"), or stops one not started yet ("canceled"). Not a
         // handshake's "Connection closed by peer": the server ended that one.
@@ -595,7 +737,7 @@ public final class Connections {
     }
 
     /**
-     * The ones that waited long (see MIN_RESPONSE_MS)
+     * The ones that waited long (see MIN_RESPONSE_MS), and the ones that failed: one cancelled isn't (e.g. a seek's)
      */
     private static void addRequests(List<VideoStart.Stage> result, ArrayDeque<TimedRequest> requests, String name, long fromMs,
                                     long toMs) {
@@ -607,23 +749,30 @@ public final class Connections {
 
             boolean isGoing = request.endMs < 0;
             long endMs = isGoing ? toMs : Math.min(request.endMs, toMs);
+            boolean isFailed = !isGoing && request.failure != null && !FAILURE_CANCELLED.equals(request.failure);
 
-            if (endMs - request.startMs >= MIN_RESPONSE_MS) {
-                result.add(new VideoStart.Stage(name, describeRequest(request.load, isGoing), 1, request.startMs, endMs));
+            if (endMs - request.startMs >= MIN_RESPONSE_MS || isFailed && endMs >= request.startMs) {
+                result.add(new VideoStart.Stage(name, describeRequest(request.load, isGoing, isFailed ? request.failure : null), 1,
+                        request.startMs, endMs));
             }
         }
     }
 
     /**
-     * E.g. "audio init chunk", "audio init chunk, still going", "still going" (its load not known). Null for nothing known.
+     * E.g. "audio init chunk", "audio init chunk, still going", "video chunk, timed out", "still going" (its load not known). Null for
+     * nothing known.
+     *
+     * @param failure why its answer didn't come, e.g. "timed out", null for one that came or waits
      */
     @Nullable
-    private static String describeRequest(@Nullable String load, boolean isGoing) {
-        if (!isGoing) {
+    private static String describeRequest(@Nullable String load, boolean isGoing, @Nullable String failure) {
+        String state = isGoing ? VideoStarts.DETAIL_GOING : failure;
+
+        if (state == null) {
             return load;
         }
 
-        return load != null ? load + ", " + VideoStarts.DETAIL_GOING : VideoStarts.DETAIL_GOING;
+        return load != null ? load + ", " + state : state;
     }
 
     /**
@@ -672,8 +821,12 @@ public final class Connections {
         }
     }
 
+    /**
+     * Also for the error fixer's tests, in another package
+     */
     @VisibleForTesting
-    static synchronized void resetForTesting() {
+    public static synchronized void resetForTesting() {
+        sPreparedMs = -1;
         sConnections.clear();
         sResponses.clear();
         sOpenings.clear();

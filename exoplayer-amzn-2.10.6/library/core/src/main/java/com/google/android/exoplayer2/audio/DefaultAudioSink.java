@@ -588,6 +588,7 @@ public final class DefaultAudioSink implements AudioSink {
         }
         if (keepSessionIdAudioTrack == null) {
           keepSessionIdAudioTrack = initializeKeepSessionIdAudioTrack(audioSessionId);
+          AudioTrackCounts.onBuilt();
         }
       }
     }
@@ -1102,6 +1103,7 @@ public final class DefaultAudioSink implements AudioSink {
       }
       audioTrackPositionTracker.reset();
       releasingConditionVariable.close();
+      AudioTrackCounts.onReleaseStarted();
       new Thread() {
         @Override
         public void run() {
@@ -1111,6 +1113,7 @@ public final class DefaultAudioSink implements AudioSink {
             log.i("audioTrack.release");
             toRelease.release();
           } finally {
+            AudioTrackCounts.onReleased();
             releasingConditionVariable.open();
           }
         }
@@ -1144,11 +1147,16 @@ public final class DefaultAudioSink implements AudioSink {
     // AudioTrack.release can take some time, so we call it on a background thread.
     final AudioTrack toRelease = keepSessionIdAudioTrack;
     keepSessionIdAudioTrack = null;
+    AudioTrackCounts.onReleaseStarted();
     new Thread() {
       @Override
       public void run() {
-        log.i("audioTrack.release");
-        toRelease.release();
+        try {
+          log.i("audioTrack.release");
+          toRelease.release();
+        } finally {
+          AudioTrackCounts.onReleased();
+        }
       }
     }.start();
   }
@@ -1562,6 +1570,7 @@ public final class DefaultAudioSink implements AudioSink {
       }
       int state = audioTrack.getState();
       if (state != STATE_INITIALIZED) {
+        AudioTrackCounts.onRefused();
         try {
           audioTrack.release();
         } catch (Exception e) {
@@ -1570,6 +1579,7 @@ public final class DefaultAudioSink implements AudioSink {
         }
         throw new InitializationException(state, outputSampleRate, outputChannelConfig, bufferSize);
       }
+      AudioTrackCounts.onBuilt();
       return audioTrack;
     }
 

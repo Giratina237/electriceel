@@ -28,7 +28,9 @@ import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.BasePlayerController;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.Connections;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
@@ -71,6 +73,22 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     private static final long AUDIO_PLAYED_MS = 1_000;
     private static final int UNPLAYABLE_RELOAD_MS = 30_000;
     private static final long AUDIO_PLAYED_CHECK_MS = 2_000;
+    /**
+     * Of a reload or an engine restart, as before: the player's error passes first
+     */
+    private static final long RETRY_MS = 1_000;
+    /**
+     * The longest wait before a fix is tried again (see RetryBackoff)
+     */
+    private static final long MAX_RETRY_MS = 30_000;
+    /**
+     * Refused AudioTracks of a video, with nothing left to fall back to, restarted at once: past them, each restart waits longer
+     */
+    private static final int MAX_AUDIO_INIT_RESTARTS = 2;
+    /**
+     * A load failed on its connection this recently: the connection is what fails a start that hangs (see LoadErrors)
+     */
+    private static final long CONNECTION_ERROR_WINDOW_MS = 30_000;
     private final BufferingDetector mBufferingDetector = new BufferingDetector(this);
     private VideoLoaderController mVideoLoaderController;
     private int mDecoderErrorCount;
@@ -81,9 +99,33 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     private FormatItem mVideoFallback;
     private FormatItem mAudioFallback;
     /**
-     * Refused AudioTracks on the video in mDecoderErrorVideoId
+     * Refused AudioTracks on the video in mDecoderErrorVideoId, since its sound last played
      */
     private int mAudioInitErrorCount;
+    /**
+     * Of the video, the engine restarts for refused AudioTracks past MAX_AUDIO_INIT_RESTARTS: the device refused each track for 20
+     * minutes (FARAJV5R #16–#41), restarted 40 times a minute
+     */
+    private final RetryBackoff mAudioInitRetries = new RetryBackoff(2 * RETRY_MS, MAX_RETRY_MS);
+    /**
+     * Of the video, the fetches of its formats that failed, till its formats come (see onSourceChanged): 55 fetches a minute for 15
+     * minutes while the network was down (FARAJV5R #47–#99)
+     */
+    private final RetryBackoff mFetchRetries = new RetryBackoff(RETRY_MS, MAX_RETRY_MS);
+    /**
+     * Of the video, the reloads of a start that hangs on a connection that fails, till it plays (see runLongBufferingAction)
+     */
+    private final RetryBackoff mStallRetries = new RetryBackoff(RETRY_MS, MAX_RETRY_MS);
+    /**
+     * The DNS the DNS fix switched from (see runLongBufferingAction), till a video plays, -1 for none: put back when the player's
+     * connections fail the same way with Google's (it didn't help). Before, it stayed after the same timeouts went on (S4PGCB6X
+     * #7–#19), each lookup 500 ms longer from then on.
+     */
+    private int mDnsFixFrom = -1;
+    /**
+     * A DNS fix was undone: not tried again (see mDnsFixFrom)
+     */
+    private boolean mIsDnsFixRefuted;
     private String mSabrErrorFixVideoId;
     private int mSabrErrorFixAttempts;
     /**
@@ -115,8 +157,12 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     private final Runnable mCheckAudioPlayed = () -> {
         if (getPlayer() != null && getPlayer().isPlaying() && getPlayer().getPositionMs() - mPlayStartPositionMs >= AUDIO_PLAYED_MS) {
             FormatAttempts.onAudioPlayed();
+            // A track refused after this is another time's
+            mAudioInitErrorCount = 0;
+            mAudioInitRetries.reset();
         }
     };
+
 
     @Override
     public void onInit() {
@@ -171,32 +217,45 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             failure.action("stuck_load_reload").action("reload_video");
             mVideoLoaderController.reloadVideo();
         } else if (isOfflineVideo() && !mBufferingDetector.isPlayable()) {
-            int requiredEngine = PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP;
             int customDns = PlayerTweaksData.DNS_TYPE_GOOGLE;
-            // The one the player uses: OkHttp while IPv6 doesn't connect, whatever is chosen (see ExoMediaSourceFactory)
-            boolean isRequiredEngineInUse = getPlayerTweaksData().getPlayerDataSource() == requiredEngine || OkHttpManager.isIpv6Disabled();
-            boolean isCustomDnsActive = isRequiredEngineInUse && getPlayerTweaksData().getPreferredDnsType() == customDns;
-            // A resumed video doesn't start at 0: a hang there is more likely the poToken's (no attestation grace period on resume) than the DNS's
-            if (getPlayer().getPositionMs() == 0 && !isCustomDnsActive && !getPlayerTweaksData().isNetworkErrorFixingDisabled()) {
-                // Wrong DNS resolving could cause hanging at start
-                // Do switch to only engine that respects custom DNS settings
+            // What the player's new connections say of their lookup: only OkHttp's are told (the DNS setting is OkHttp's too), so
+            // another engine's hang has nothing to go by, and the DNS isn't touched for it (S4PGCB6X #7: Cronet, the same timeouts
+            // after the switch)
+            Connections.Lookup lookup = Connections.getLookup();
+            failure.detail("lookup", lookup.name().toLowerCase(Locale.US));
+
+            if (lookup == Connections.Lookup.FAILING && getPlayerTweaksData().getPreferredDnsType() != customDns
+                    && !mIsDnsFixRefuted && !getPlayerTweaksData().isNetworkErrorFixingDisabled()) {
+                // The formats came, so the network is up, and the player's lookups failed or gave addresses none of which answer:
+                // Google's DNS may give working ones. Kept if a video plays, put back if they fail the same way with it.
                 // The DNS is read at each lookup (see PreferredDns in SharedModules): the engine's restart applies it, not the app's
                 MessageHelpers.showLongMessage(getContext(), "Fixing incorrect DNS resolution...");
-
-                if (!isRequiredEngineInUse) {
-                    failure.action("switch_engine:" + Utils.getNetworkEngineId(requiredEngine));
-                    getPlayerTweaksData().setPlayerDataSource(requiredEngine);
-                }
-
+                mDnsFixFrom = getPlayerTweaksData().getPreferredDnsType();
                 failure.action("dns_google").action("restart_engine");
                 getPlayerTweaksData().setPreferredDnsType(customDns);
                 mVideoLoaderController.restartEngine();
             } else {
-                // Also, some clients like ANDROID_REEL may just hang at start
-                MessageHelpers.showLongMessage(getContext(), "Fixing stalled client...");
-                failure.action("switch_next_client_now").action("reload_video");
-                YouTubeServiceManager.instance().switchNextClientNow();
-                mVideoLoaderController.reloadVideo();
+                // The DNS fix of the last start that hung didn't help: the lookups fail the same way with Google's
+                if (lookup == Connections.Lookup.FAILING) {
+                    undoDnsFix(failure);
+                }
+
+                long delayMs = RETRY_MS;
+
+                if (LoadErrors.hasConnectionErrorWithin(CONNECTION_ERROR_WINDOW_MS)) {
+                    // A load's connection failed (it didn't connect, or no answer came): every client streams from the same servers,
+                    // another one wouldn't help (FARAJV5R #46, S4PGCB6X #10, #11, #15). Tried again later each time.
+                    failure.action("network_wait");
+                    delayMs = mStallRetries.next(getVideo().videoId);
+                } else {
+                    // Also, some clients like ANDROID_REEL may just hang at start
+                    MessageHelpers.showLongMessage(getContext(), "Fixing stalled client...");
+                    failure.action("switch_next_client_now");
+                    YouTubeServiceManager.instance().switchNextClientNow();
+                }
+
+                failure.action(delayed("reload_video", delayMs));
+                mVideoLoaderController.reloadVideo((int) delayMs);
             }
         } else if (isOfflineVideo() && isRepeatedStall() && lowerVideoQuality()) {
             // A reload didn't help: the connection can't keep up with this format right now. For this video only.
@@ -244,6 +303,9 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     public void onPlay() {
         mBufferingDetector.onStopBuffering();
         mSabrErrorFixAttempts = 0;
+        mStallRetries.reset();
+        // A video played after it: the DNS fix stays
+        mDnsFixFrom = -1;
         // It came: stuck again another time (e.g. opened again), it's reloaded again
         mStuckLoadVideoId = null;
         FormatAttempts.onPlaying(true);
@@ -260,6 +322,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mBufferingDetector.onStopBuffering();
         Utils.removeCallbacks(mCheckAudioPlayed);
         FormatAttempts.onPlaying(false);
+    }
+
+    /**
+     * The formats reached the player: a fetch that fails after this is another time's
+     */
+    @Override
+    public void onSourceChanged(Video item) {
+        mFetchRetries.reset();
     }
 
     @Override
@@ -609,6 +679,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
     private void applyEngineErrorAction(int type, int rendererIndex, Throwable error, PlayerFailure failure) {
         boolean restartEngine = true;
+        long restartDelayMs = RETRY_MS;
         boolean showMessage = true;
         String errorContent = error != null ? error.getMessage() : null;
         String errorTitle = getErrorTitle(type, rendererIndex, error);
@@ -706,6 +777,13 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 FormatItem audioFormat = getPlayer() != null ? getPlayer().getAudioFormat() : null;
                 FormatItem fallback = applyAudioFallback(audioFormat != null && audioFormat.getTrack() != null ? audioFormat.getTrack().format : null);
                 failure.action("audio_fallback:" + getFallbackName(fallback));
+
+                if (fallback == null && mAudioInitErrorCount > MAX_AUDIO_INIT_RESTARTS && getVideo() != null) {
+                    // Nothing left to change, and refused again: each restart waits longer for the device to have room for a track
+                    // (FARAJV5R #17–#35: 40 restarts a minute for 10 minutes). Told once.
+                    restartDelayMs = mAudioInitRetries.next(getVideo().videoId);
+                    showMessage = mAudioInitRetries.getCount(getVideo().videoId) == 1;
+                }
             }
         } else if (type == PlayerEventListener.ERROR_TYPE_RENDERER && rendererIndex == PlayerEventListener.RENDERER_INDEX_AUDIO) {
             failure.action("audio_hq_mp4a");
@@ -741,8 +819,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
 
         if (restartEngine) {
-            failure.action("restart_engine");
-            mVideoLoaderController.restartEngine();
+            failure.action(delayed("restart_engine", restartDelayMs));
+            mVideoLoaderController.restartEngine((int) restartDelayMs);
         } else {
             // Need at least to reload the video because the player becomes idle after error
             failure.action("reload_video");
@@ -827,7 +905,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 failure.playability(unplayable.status, unplayable.reason);
                 runUnplayableAction(unplayable, isMembers(attempts), failure);
             } else {
-                runFormatErrorAction(error, failure);
+                runFormatErrorAction(error, attempts, failure);
             }
         } finally {
             failure.record();
@@ -932,7 +1010,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mVideoLoaderController.reloadVideo(UNPLAYABLE_RELOAD_MS);
     }
 
-    private void runFormatErrorAction(Throwable error, PlayerFailure failure) {
+    /**
+     * @param attempts of the fetch that failed, each client's (see ClientAttempts)
+     */
+    private void runFormatErrorAction(Throwable error, @Nullable List<ClientAttempts.Attempt> attempts, PlayerFailure failure) {
         if (isEmbedPlayer()) {
             failure.action("finish_embed");
             getPlayer().finish();
@@ -943,23 +1024,31 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         String className = error.getClass().getSimpleName();
         String fullMsg = String.format("loadFormatInfo error: %s: %s", className, Utils.getStackTraceAsString(error));
         Log.e(TAG, fullMsg);
+        String videoId = getVideo() != null ? getVideo().videoId : null;
+        // Told by the failures themselves, not by what failed before: the fetch's error didn't connect or got no answer (e.g. FARAJV5R
+        // #55: something else answered for youtube.com), or every client's attempt didn't (a refused one gives no exception, see
+        // RetrofitHelper#takeConnectException). The poToken's WebView keeps what its request failed with (see
+        // PoTokenWebView#keepInitError): a broken WebView isn't one that couldn't connect. Another client wouldn't help.
+        boolean isNetworkDown = LoadErrors.isConnectionError(error) || isEveryAttemptUnconnected(attempts);
 
         if (!Helpers.containsAny(message, "fromNullable result is null")) {
-            MessageHelpers.showLongMessage(getContext(), fullMsg);
+            // Once a run, not each time it's tried again (a stack trace a second for 15 minutes)
+            if (mFetchRetries.getCount(videoId) == 0) {
+                MessageHelpers.showLongMessage(getContext(), fullMsg);
+            }
+
             if (getPlayer() != null) {
                 getPlayer().setTitle(fullMsg);
             }
         }
 
-        if (Utils.fixRetrofitErrors(getContext(), error)) {
-            failure.action("dns_ipv4").action("restart_app");
-            // The restart kills the app: what's in memory is written first
-            failure.recordNow();
-            flushDiagnostics();
-            return;
-        }
-
-        if (Helpers.containsAny(message, "Unexpected token", "Syntax error", "invalid argument") || // temporal fix
+        // A name that didn't resolve ("No address associated with hostname") is one of these, as the network's: the DNS isn't switched
+        // to IPv4 and the app restarted for it anymore. Every DNS type ends in the system's lookup, which had just failed (IPv4 is the
+        // system's, its addresses reordered; Google's falls back to it), and the DNS is read at each lookup.
+        if (isNetworkDown) {
+            failure.action("network_wait");
+            reloadLater(failure, mFetchRetries.next(videoId));
+        } else if (Helpers.containsAny(message, "Unexpected token", "Syntax error", "invalid argument") || // temporal fix
                 Helpers.equalsAny(className, "PoTokenException", "BadWebViewException")) {
             failure.action("switch_next_client").action("reload_video");
             YouTubeServiceManager.instance().switchNextClient();
@@ -970,9 +1059,55 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             mVideoLoaderController.reloadVideo();
         } else {
             Log.e(TAG, "Probably no internet connection");
-            failure.action("reload_video");
-            mVideoLoaderController.reloadVideo();
+            reloadLater(failure, mFetchRetries.next(videoId));
         }
+    }
+
+    /**
+     * Each client tried failed on its connection (see ClientAttempts.Attempt#connectionError): none got an answer
+     */
+    private static boolean isEveryAttemptUnconnected(@Nullable List<ClientAttempts.Attempt> attempts) {
+        if (attempts == null || attempts.isEmpty()) {
+            return false;
+        }
+
+        for (ClientAttempts.Attempt attempt : attempts) {
+            if (attempt.connectionError == null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * The video loaded again, after the wait (see RetryBackoff)
+     */
+    private void reloadLater(PlayerFailure failure, long delayMs) {
+        failure.action(delayed("reload_video", delayMs));
+        mVideoLoaderController.reloadVideo((int) delayMs);
+    }
+
+    /**
+     * For the failure's actions: e.g. "reload_video", "reload_video_4s" for a wait longer than the usual one (see RETRY_MS)
+     */
+    private static String delayed(String action, long delayMs) {
+        return delayMs > RETRY_MS ? action + "_" + delayMs / 1_000 + "s" : action;
+    }
+
+    /**
+     * The DNS the DNS fix switched from (see mDnsFixFrom) is put back, and the fix isn't tried again. A lookup reads it, so the reload
+     * after this applies it.
+     */
+    private void undoDnsFix(PlayerFailure failure) {
+        if (mDnsFixFrom < 0) {
+            return;
+        }
+
+        failure.action("dns_revert");
+        getPlayerTweaksData().setPreferredDnsType(mDnsFixFrom);
+        mDnsFixFrom = -1;
+        mIsDnsFixRefuted = true;
     }
 
     /**

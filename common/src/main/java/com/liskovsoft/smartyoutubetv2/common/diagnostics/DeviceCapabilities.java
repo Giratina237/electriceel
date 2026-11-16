@@ -26,6 +26,7 @@ import androidx.webkit.WebViewCompat;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.audio.AudioCapabilities;
+import com.google.android.exoplayer2.audio.AudioTrackCounts;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -166,9 +167,25 @@ public final class DeviceCapabilities {
                 // E.g. a Bluetooth speaker connected
                 result.put("mediaOutput", nullable(getMediaOutput(audioManager)));
             }
+
+            // A refused AudioTrack: the ones the app holds, or the device's (FARAJV5R: refused for 20 minutes, a new process played)
+            result.put("audioTracks", buildAudioTracks());
         } catch (JSONException | RuntimeException e) {
             putError(result, e);
         }
+
+        return result;
+    }
+
+    /**
+     * The AudioTracks of the app's players since its process started (see AudioTrackCounts)
+     */
+    private static JSONObject buildAudioTracks() throws JSONException {
+        JSONObject result = new JSONObject();
+        result.put("open", AudioTrackCounts.getOpen());
+        result.put("releasing", AudioTrackCounts.getReleasing());
+        result.put("built", AudioTrackCounts.getBuilt());
+        result.put("refused", AudioTrackCounts.getRefused());
 
         return result;
     }
