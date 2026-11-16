@@ -21,7 +21,8 @@ import java.util.Map;
  * What SABR's server made of the poToken of each video it streamed (see SabrStream#setProtectionStatusListener): OK, it took it;
  * PENDING, not yet (it sends media for a grace period, about a minute); INVALID, it rejected it; MISSING and PENDING_MISSING, it wants
  * one and none was sent; NOT_REQUIRED, none was sent or needed. Shown in a start's buffering (see VideoStarts) and with a failure of
- * the video (see PlayerFailure). Told on the loaders' threads, read on others.
+ * the video (see PlayerFailure), and a stall of a pending one switches the client (see ErrorFixerController). Told on the loaders'
+ * threads, read on others.
  */
 public final class ProtectionStatuses {
     static final int MAX_VIDEOS = 20;
@@ -72,6 +73,19 @@ public final class ProtectionStatuses {
         if (statuses.size() > MAX_STATUSES) {
             statuses.removeFirst();
         }
+    }
+
+    /**
+     * The video's last told, at or after the time (in the clock's time), is that the poToken's attestation is pending: past its
+     * grace period, the server sends no more media (see SabrStream#onResponseEnd). One told before is of the stream before. For the
+     * error fixer.
+     */
+    public static synchronized boolean isAttestationPending(@Nullable String videoId, long sinceMs) {
+        ArrayDeque<Told> statuses = videoId != null ? sStatuses.get(videoId) : null;
+        Told last = statuses != null ? statuses.peekLast() : null;
+
+        return last != null && last.ms >= sinceMs
+                && (PoTokenStatus.PENDING.name().equals(last.status) || PoTokenStatus.PENDING_MISSING.name().equals(last.status));
     }
 
     /**
@@ -138,7 +152,7 @@ public final class ProtectionStatuses {
     }
 
     @VisibleForTesting
-    static synchronized void resetForTesting(@Nullable VideoStarts.Clock clock) {
+    public static synchronized void resetForTesting(@Nullable VideoStarts.Clock clock) {
         sStatuses.clear();
         sClock = clock != null ? clock : SystemClock::elapsedRealtime;
     }

@@ -43,6 +43,14 @@ public final class SabrExtractorInput implements ExtractorInput {
      * Of the response's last segment read, -1 for none yet
      */
     private long lastSequenceNumber = -1;
+    /**
+     * A media segment (not an init segment) came in the response
+     */
+    private boolean hasMedia;
+    /**
+     * The response was read to its end: told the stream once (see SabrStream#onResponseEnd), not at each read past it
+     */
+    private boolean isResponseEnded;
 
     public SabrExtractorInput(SabrStream sabrStream) {
         this(sabrStream, false);
@@ -74,6 +82,8 @@ public final class SabrExtractorInput implements ExtractorInput {
         lastSequenceNumber = -1;
         remaining = C.LENGTH_UNSET;
         isInitEnded = false;
+        hasMedia = false;
+        isResponseEnded = false;
     }
 
     public void dispose() {
@@ -91,6 +101,8 @@ public final class SabrExtractorInput implements ExtractorInput {
         position = C.POSITION_UNSET;
         lastSequenceNumber = -1;
         remaining = C.LENGTH_UNSET;
+        hasMedia = false;
+        isResponseEnded = false;
     }
 
     @Override
@@ -222,6 +234,7 @@ public final class SabrExtractorInput implements ExtractorInput {
 
             if (sabrPart == null) {
                 maybeThrowBackoffRequested();
+                maybeThrowAttestationPending();
                 break;
             }
 
@@ -242,6 +255,7 @@ public final class SabrExtractorInput implements ExtractorInput {
 
                 lastSequenceNumber = data.sequenceNumber;
                 startPosition = position;
+                hasMedia |= !data.isInitSegment;
                 break;
             }
 
@@ -419,6 +433,24 @@ public final class SabrExtractorInput implements ExtractorInput {
 
     private static void throwBackoffRequested(int backoffMs) {
         throw new SabrBackoffError(backoffMs);
+    }
+
+    /**
+     * The response ended. Past its grace period with the poToken's attestation pending, the server answers each request with no
+     * media, and the player stalled there for good (see SabrStream#onResponseEnd). The init chunk's response, cut at its init
+     * segment, isn't one: it's ended before it ends.
+     */
+    private void maybeThrowAttestationPending() {
+        if (isResponseEnded || sabrStream.isInitRequest()) {
+            return;
+        }
+
+        isResponseEnded = true;
+        PoTokenStatus status = sabrStream.onResponseEnd(hasMedia);
+
+        if (status != null) {
+            throw new PoTokenError(status);
+        }
     }
 
     private static void throwIfAttestationRequired(PoTokenStatusSabrPart sabrPart) {

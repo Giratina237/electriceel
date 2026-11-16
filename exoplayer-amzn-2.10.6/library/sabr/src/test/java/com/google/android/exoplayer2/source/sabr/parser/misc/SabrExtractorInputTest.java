@@ -51,7 +51,7 @@ public class SabrExtractorInputTest {
     }
 
     /**
-     * Pending and OK go on: the media still comes
+     * A response each, pending and OK go on: the media still comes
      */
     @Test
     public void otherStatusesDontFailTheLoad() throws Exception {
@@ -59,6 +59,112 @@ public class SabrExtractorInputTest {
         assertEquals(C.RESULT_END_OF_INPUT, read(null, Status.ATTESTATION_PENDING));
         assertEquals(C.RESULT_END_OF_INPUT, read(PO_TOKEN, Status.OK));
         assertEquals(C.RESULT_END_OF_INPUT, read(null, Status.OK));
+    }
+
+    /**
+     * Past its grace period with the poToken's attestation pending, the server answers each request at once with no media: the
+     * player stalled at 0:59, and the same client's reload froze there (51AQC7FS, BQ0MY38T). The load fails as the media
+     * stops coming, a poToken sent or not.
+     */
+    @Test
+    public void pendingResponsesWithoutMediaFailTheLoad() throws Exception {
+        SabrExtractorInput input = new SabrExtractorInput(newStream(PO_TOKEN));
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+
+        assertEquals(PoTokenStatus.PENDING, readFailure(input, statusResponse(Status.ATTESTATION_PENDING)).status);
+
+        SabrExtractorInput withoutPoToken = new SabrExtractorInput(newStream(null));
+        readResponse(withoutPoToken, statusResponse(Status.ATTESTATION_PENDING));
+        readResponse(withoutPoToken, statusResponse(Status.ATTESTATION_PENDING));
+
+        assertEquals(PoTokenStatus.PENDING_MISSING,
+                readFailure(withoutPoToken, statusResponse(Status.ATTESTATION_PENDING)).status);
+    }
+
+    /**
+     * Media in between: the responses without any were for another reason (e.g. a redirect), and the count starts over
+     */
+    @Test
+    public void mediaBetweenPendingResponsesKeepsTheLoadGoing() throws Exception {
+        SabrExtractorInput input = new SabrExtractorInput(newStream(PO_TOKEN));
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+
+        assertArrayEquals(INIT_AND_MEDIA_DATA, readResponse(input, mediaResponse(Status.ATTESTATION_PENDING)));
+
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+    }
+
+    /**
+     * An init segment isn't the media: the server sends it past the grace period too (51AQC7FS: both tracks' to the reload at 0:59)
+     */
+    @Test
+    public void anInitSegmentIsntTheMedia() throws Exception {
+        SabrExtractorInput input = new SabrExtractorInput(newStream(PO_TOKEN));
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+
+        assertEquals(PoTokenStatus.PENDING, readFailure(input, initSegmentResponse(Status.ATTESTATION_PENDING)).status);
+    }
+
+    /**
+     * Attested, the server sends the media: a response without any is for another reason
+     */
+    @Test
+    public void okResponsesWithoutMediaDontFailTheLoad() throws Exception {
+        SabrExtractorInput input = new SabrExtractorInput(newStream(PO_TOKEN));
+
+        for (int i = 0; i < 5; i++) {
+            readResponse(input, statusResponse(Status.OK));
+        }
+    }
+
+    /**
+     * A live stream's response has none while the segment asked for doesn't exist yet (see DefaultSabrChunkSource)
+     */
+    @Test
+    public void aLiveStreamsPendingResponsesWithoutMediaDontFailTheLoad() throws Exception {
+        SabrStream sabrStream = newStream(PO_TOKEN);
+        sabrStream.setLive(true);
+        SabrExtractorInput input = new SabrExtractorInput(sabrStream);
+
+        for (int i = 0; i < 5; i++) {
+            readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+        }
+    }
+
+    /**
+     * The init chunk's response isn't a media one: it's cut at its init segment (see theInitChunkReadsUpToItsInitSegment)
+     */
+    @Test
+    public void initResponsesDontCount() throws Exception {
+        SabrStream sabrStream = newStream(PO_TOKEN);
+        sabrStream.setInitRequest(true);
+        SabrExtractorInput input = new SabrExtractorInput(sabrStream);
+
+        for (int i = 0; i < 5; i++) {
+            readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+        }
+    }
+
+    /**
+     * Read again past its end (the extractor may), a response is still one
+     */
+    @Test
+    public void aResponseReadPastItsEndIsOne() throws Exception {
+        SabrExtractorInput input = new SabrExtractorInput(newStream(PO_TOKEN));
+        input.init(new FakeExtractorInput.Builder().setData(statusResponse(Status.ATTESTATION_PENDING)).build());
+
+        for (int i = 0; i < 5; i++) {
+            assertEquals(C.RESULT_END_OF_INPUT, input.read(new byte[1], 0, 1));
+        }
+
+        input.dispose();
+        readResponse(input, statusResponse(Status.ATTESTATION_PENDING));
+
+        assertEquals(PoTokenStatus.PENDING, readFailure(input, statusResponse(Status.ATTESTATION_PENDING)).status);
     }
 
     /**
@@ -125,11 +231,16 @@ public class SabrExtractorInputTest {
     private static final int ITAG = 315;
     private static final byte[] INIT_DATA = {1, 2, 3, 4};
     private static final byte[] MEDIA_DATA = {5, 6, 7, 8, 9, 10};
+    private static final byte[] INIT_AND_MEDIA_DATA = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
 
     private static SabrStream newStream() {
+        return newStream(null);
+    }
+
+    private static SabrStream newStream(String poToken) {
         SabrStream sabrStream = new SabrStream(
                 "https://rr1---sn-primary.googlevideo.com/videoplayback", "", ClientInfo.getDefaultInstance(),
-                -1, -1, -1, null, false, "test", 60_000);
+                -1, -1, -1, poToken, false, "test", 60_000);
         sabrStream.setFormatSelector(new VideoSelector("video", false, FormatId.newBuilder().setItag(ITAG).build()));
         return sabrStream;
     }
@@ -138,6 +249,13 @@ public class SabrExtractorInputTest {
      * As the server sends it: the format's metadata, its init segment (header 0), then its first media segment (header 1)
      */
     private static byte[] initResponse() throws Exception {
+        return formatResponse(true);
+    }
+
+    /**
+     * The format's metadata and its init segment (header 0), then with the media, its first media segment (header 1)
+     */
+    private static byte[] formatResponse(boolean withMedia) throws Exception {
         FormatId formatId = FormatId.newBuilder().setItag(ITAG).build();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         part(out, UMPPartId.FORMAT_INITIALIZATION_METADATA, FormatInitializationMetadata.newBuilder()
@@ -149,8 +267,41 @@ public class SabrExtractorInputTest {
                 .build().toByteArray());
         segment(out, MediaHeader.newBuilder().setHeaderId(0).setFormatId(formatId).setIsInitSeg(true)
                 .setContentLength(INIT_DATA.length).build(), 0, INIT_DATA);
-        segment(out, MediaHeader.newBuilder().setHeaderId(1).setFormatId(formatId).setSequenceNumber(1).setStartMs(0)
-                .setDurationMs(5_000).setContentLength(MEDIA_DATA.length).build(), 1, MEDIA_DATA);
+
+        if (withMedia) {
+            segment(out, MediaHeader.newBuilder().setHeaderId(1).setFormatId(formatId).setSequenceNumber(1).setStartMs(0)
+                    .setDurationMs(5_000).setContentLength(MEDIA_DATA.length).build(), 1, MEDIA_DATA);
+        }
+
+        return out.toByteArray();
+    }
+
+    /**
+     * A response that has only the StreamProtectionStatus, as the server answers past the grace period
+     */
+    private static byte[] statusResponse(Status status) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        part(out, UMPPartId.STREAM_PROTECTION_STATUS, StreamProtectionStatus.newBuilder().setStatus(status).build().toByteArray());
+        return out.toByteArray();
+    }
+
+    /**
+     * The StreamProtectionStatus, the format's metadata, its init segment and its first media segment
+     */
+    private static byte[] mediaResponse(Status status) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(statusResponse(status));
+        out.write(formatResponse(true));
+        return out.toByteArray();
+    }
+
+    /**
+     * The StreamProtectionStatus, the format's metadata and its init segment: no media
+     */
+    private static byte[] initSegmentResponse(Status status) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(statusResponse(status));
+        out.write(formatResponse(false));
         return out.toByteArray();
     }
 
@@ -184,6 +335,37 @@ public class SabrExtractorInputTest {
         }
 
         return result.toByteArray();
+    }
+
+    /**
+     * As the adapters read a media chunk's response (see SabrMatroskaAdapter): to its end, then the input disposed
+     */
+    private static byte[] readResponse(SabrExtractorInput input, byte[] response) throws Exception {
+        input.init(new FakeExtractorInput.Builder().setData(response).build());
+        ByteArrayOutputStream result = new ByteArrayOutputStream();
+        byte[] buffer = new byte[16];
+        int read;
+
+        try {
+            while ((read = input.read(buffer, 0, buffer.length)) != C.RESULT_END_OF_INPUT) {
+                result.write(buffer, 0, read);
+            }
+        } finally {
+            input.dispose();
+        }
+
+        return result.toByteArray();
+    }
+
+    private static PoTokenError readFailure(SabrExtractorInput input, byte[] response) throws Exception {
+        try {
+            readResponse(input, response);
+        } catch (PoTokenError e) {
+            return e;
+        }
+
+        fail("No PoTokenError");
+        return null;
     }
 
     private static PoTokenError readFailure(String poToken, Status status) throws Exception {

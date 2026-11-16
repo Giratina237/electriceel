@@ -54,6 +54,11 @@ import java.util.Set;
 
 public class SabrStream {
     private static final String TAG = SabrStream.class.getSimpleName();
+    /**
+     * Media responses in a row with no media while the poToken's attestation was pending: the server is withholding it (see
+     * #onResponseEnd). Fewer is a response with none for another reason, e.g. a redirect.
+     */
+    private static final int MAX_PENDING_RESPONSES_WITHOUT_MEDIA = 3;
     private final int[] KNOWN_PARTS = {
             UMPPartId.MEDIA_HEADER,
             UMPPartId.MEDIA,
@@ -103,9 +108,13 @@ public class SabrStream {
     @Nullable private static volatile RedirectListener redirectListener;
     @Nullable private final String videoId;
     /**
-     * The last one told for this stream (see ProtectionStatusListener)
+     * The server's last word on the poToken, which each response has (see ProtectionStatusListener), null before the first
      */
     @Nullable private volatile PoTokenStatus protectionStatus;
+    /**
+     * Media responses in a row that came with no media while the attestation was pending (see #onResponseEnd)
+     */
+    private int pendingResponsesWithoutMedia;
 
     /**
      * Told each wait the server asks for (see NextRequestPolicy#getBackoffTimeMs), e.g. for the app's timing of video starts: one
@@ -492,12 +501,40 @@ public class SabrStream {
         ProtectionStatusListener listener = protectionStatusListener;
 
         // Each response has it: told once, then when it changes
-        if (listener != null && sabrPart != null && sabrPart.status != protectionStatus) {
+        if (sabrPart != null && sabrPart.status != protectionStatus) {
             protectionStatus = sabrPart.status;
-            listener.onProtectionStatus(videoId, sabrPart.status);
+
+            if (listener != null) {
+                listener.onProtectionStatus(videoId, sabrPart.status);
+            }
         }
 
         return sabrPart;
+    }
+
+    /**
+     * A media request's response was read to its end (see SabrExtractorInput). With the poToken's attestation pending, the server
+     * sends a minute of the video (its grace period), then answers each request at once with no media: the player stalled at
+     * 0:59 and the same client's reload froze there (51AQC7FS, BQ0MY38T). A live stream's response has none while the
+     * segment asked for doesn't exist yet (see DefaultSabrChunkSource#maybeWaitForLiveSegment).
+     *
+     * @param hasMedia a media segment came in it
+     * @return the poToken's status when the server withholds the media for it: pending, with no media in the last
+     * MAX_PENDING_RESPONSES_WITHOUT_MEDIA responses. Null otherwise.
+     */
+    @Nullable
+    public PoTokenStatus onResponseEnd(boolean hasMedia) {
+        PoTokenStatus status = protectionStatus;
+        boolean isPending = status == PoTokenStatus.PENDING || status == PoTokenStatus.PENDING_MISSING;
+
+        if (hasMedia || !isPending || isLive()) {
+            pendingResponsesWithoutMedia = 0;
+            return null;
+        }
+
+        pendingResponsesWithoutMedia++;
+
+        return pendingResponsesWithoutMedia >= MAX_PENDING_RESPONSES_WITHOUT_MEDIA ? status : null;
     }
 
     private void processSabrRedirect(UMPPart part) {

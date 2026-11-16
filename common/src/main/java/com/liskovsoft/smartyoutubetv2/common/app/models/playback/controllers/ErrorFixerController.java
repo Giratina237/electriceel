@@ -34,6 +34,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.DecoderErrorFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
@@ -152,6 +153,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     private long mPlayStartPositionMs;
     /**
+     * When the player's source last opened (see onSourceChanged), before its streams' first request: a protection status told
+     * before is of a stream before (see isAttestationPending)
+     */
+    private long mSourceChangedMs;
+    /**
      * Still playing and its clock moved on: the audio's clock is the player's, so its sound is output (see FormatAttempts)
      */
     private final Runnable mCheckAudioPlayed = () -> {
@@ -206,6 +212,13 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         if (isStreamEnded() || isAtVideoEnd()) {
             failure.action("play_end");
             getMainController().onPlayEnd();
+        } else if (isOfflineVideo() && isAttestationPending()) {
+            // Past its grace period, the server withholds the media while the poToken's attestation is pending: stalled at 0:59,
+            // the same client's reload froze there (51AQC7FS). The SABR stream tells it as a PoTokenError (see
+            // applySabrPoTokenAction): this is a stall it didn't tell.
+            failure.action("switch_next_client_now").action("reload_video");
+            YouTubeServiceManager.instance().switchNextClientNow();
+            mVideoLoaderController.reloadVideo();
         } else if (isOfflineVideo() && isSubtitlesEnabled()) {
             // Long loading subtitles cause hangs
             failure.action("disable_subtitles").action("reload_video");
@@ -330,6 +343,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     @Override
     public void onSourceChanged(Video item) {
         mFetchRetries.reset();
+        mSourceChangedMs = SystemClock.elapsedRealtime();
     }
 
     @Override
@@ -548,9 +562,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
-     * SABR server requires attestation: it won't send media past its grace period (about a minute) with this poToken, at the same
-     * position after every reload. A TV token it rejects goes (e.g. the WebView's BotGuard makes bad ones): the client streams
-     * without one, like before it had any. Otherwise another client.
+     * SABR server requires attestation, or it's still pending: it won't send media past its grace period (about a minute) with this
+     * poToken, at the same position after every reload. A TV token it rejects goes (e.g. the WebView's BotGuard makes bad ones): the
+     * client streams without one, like before it had any. Otherwise another client: a pending TV token was a fresh one (51AQC7FS,
+     * 0KPV79TF: the app had run under a minute), and without one the server required one (5V8J002W #11).
      */
     private boolean applySabrPoTokenAction(Throwable error, PlayerFailure failure) {
         Throwable cause = error.getCause();
@@ -1194,6 +1209,18 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         long durationMs = getPlayer().getDurationMs();
 
         return durationMs > 0 && durationMs - getPlayer().getPositionMs() < VIDEO_END_THRESHOLD_MS;
+    }
+
+    /**
+     * The video streams over SABR, and the server's last word on its poToken, since the source opened, is that the attestation is
+     * pending (see ProtectionStatuses). Over another protocol, or told before, that word was of a stream before (e.g. the client
+     * switched to VISIONOS's DASH, or to another SABR client whose requests got no answer yet).
+     */
+    private boolean isAttestationPending() {
+        Video video = getVideo();
+
+        return video != null && PlayerFailure.PROTOCOL_SABR.equals(mVideoLoaderController.getFormatProtocol())
+                && ProtectionStatuses.isAttestationPending(video.videoId, mSourceChangedMs);
     }
 
     private boolean isOfflineVideo() {

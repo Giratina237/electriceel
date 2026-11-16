@@ -21,7 +21,9 @@ import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.Connections;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
@@ -103,6 +105,7 @@ public class ErrorFixerControllerTest {
         LoadErrors.resetForTesting();
         Connections.resetForTesting();
         Connections.onPrepare();
+        ProtectionStatuses.resetForTesting(null);
         ShadowToast.reset();
     }
 
@@ -118,6 +121,7 @@ public class ErrorFixerControllerTest {
         VideoStarts.onPrepare();
         LoadErrors.resetForTesting();
         Connections.resetForTesting();
+        ProtectionStatuses.resetForTesting(null);
     }
 
     /**
@@ -457,6 +461,70 @@ public class ErrorFixerControllerTest {
                 new UnexpectedLoaderException(new PoTokenError(PoTokenStatus.MISSING)));
 
         assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * SABR stopped sending media with the TV poToken's attestation pending (51AQC7FS: at 0:59): the next client, not the TV one
+     * without its poToken. A fresh one was pending too, and without one the server required one (5V8J002W #11).
+     */
+    @Test
+    public void aPendingPoTokenSwitchesTheClient() throws Exception {
+        TestController controller = new TestController(video("0IJSLGVTLWs"), "TV");
+        controller.onPlay();
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new PoTokenError(PoTokenStatus.PENDING)));
+
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(false, isTvPotRejected());
+    }
+
+    /**
+     * A stall with the poToken's attestation pending, which the SABR stream didn't tell as a PoTokenError: reloaded with the same
+     * client, it froze there (51AQC7FS: at 0:59). The next client.
+     */
+    @Test
+    public void aStallWithTheAttestationPendingSwitchesTheClient() throws Exception {
+        TestController controller = new TestController(video("0IJSLGVTLWs"), "TV", playerStub(atMs(59_910, 567_217)));
+        controller.mProtocol = PlayerFailure.PROTOCOL_SABR;
+        controller.onPlay();
+        ProtectionStatuses.onStatus("0IJSLGVTLWs", PoTokenStatus.PENDING);
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * Attested since (OK after pending), the stall is another's: reloaded, as before
+     */
+    @Test
+    public void aStallAfterTheAttestationCameIsReloaded() throws Exception {
+        TestController controller = new TestController(video("0IJSLGVTLWs"), "TV", playerStub(atMs(59_910, 567_217)));
+        controller.mProtocol = PlayerFailure.PROTOCOL_SABR;
+        controller.onPlay();
+        ProtectionStatuses.onStatus("0IJSLGVTLWs", PoTokenStatus.PENDING);
+        ProtectionStatuses.onStatus("0IJSLGVTLWs", PoTokenStatus.OK);
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * Pending was a SABR stream's before, and the video's DASH now (the client switched to VISIONOS): its stall is reloaded, as
+     * before
+     */
+    @Test
+    public void anAttestationPendingOfAStreamBeforeIsntThisStreams() throws Exception {
+        TestController controller = new TestController(video("0IJSLGVTLWs"), "VISIONOS", playerStub(atMs(59_910, 567_217)));
+        controller.mProtocol = PlayerFailure.PROTOCOL_DASH;
+        controller.onPlay();
+        ProtectionStatuses.onStatus("0IJSLGVTLWs", PoTokenStatus.PENDING);
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("reload_video"), getActions(mLog.readAll().get(0)));
     }
 
     /**
@@ -1147,6 +1215,12 @@ public class ErrorFixerControllerTest {
         field.setBoolean(null, rejected);
     }
 
+    private static boolean isTvPotRejected() throws Exception {
+        Field field = PoTokenGate.class.getDeclaredField("mTvPotRejected");
+        field.setAccessible(true);
+        return field.getBoolean(null);
+    }
+
     /**
      * As the IPv6 test found it (see Ipv6CheckDns): null not tested
      */
@@ -1234,6 +1308,10 @@ public class ErrorFixerControllerTest {
          */
         private final List<Integer> mReloads = new ArrayList<>();
         private final List<Integer> mRestarts = new ArrayList<>();
+        /**
+         * Of the video's formats (see PlayerFailure.PROTOCOL_ constants), null when it has none
+         */
+        private String mProtocol;
 
         private TestController(Video video) throws Exception {
             this(video, (String) null);
@@ -1262,6 +1340,11 @@ public class ErrorFixerControllerTest {
                 @Override
                 public String getFormatClient() {
                     return formatClient;
+                }
+
+                @Override
+                public String getFormatProtocol() {
+                    return mProtocol;
                 }
 
                 @Override

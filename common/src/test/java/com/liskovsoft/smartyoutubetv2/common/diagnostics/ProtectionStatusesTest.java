@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -91,6 +92,31 @@ public class ProtectionStatusesTest {
         // Not streamed by SABR
         assertNull(ProtectionStatuses.snapshot("other"));
         assertNull(ProtectionStatuses.snapshot(null));
+    }
+
+    /**
+     * The video's last told is what the error fixer goes by: pending, with or without a poToken, till another says otherwise
+     */
+    @Test
+    public void theAttestationIsPendingTillTheLastSaysOtherwise() {
+        assertFalse(ProtectionStatuses.isAttestationPending("video", 0));
+
+        tell(1_000, "video", PoTokenStatus.PENDING);
+        assertTrue(ProtectionStatuses.isAttestationPending("video", 0));
+
+        tell(2_000, "video", PoTokenStatus.OK);
+        assertFalse(ProtectionStatuses.isAttestationPending("video", 0));
+
+        tell(3_000, "video", PoTokenStatus.PENDING_MISSING);
+        assertTrue(ProtectionStatuses.isAttestationPending("video", 0));
+
+        tell(4_000, "video", PoTokenStatus.INVALID);
+        assertFalse(ProtectionStatuses.isAttestationPending("video", 0));
+
+        // Another video's isn't this one's
+        tell(5_000, "other", PoTokenStatus.PENDING);
+        assertFalse(ProtectionStatuses.isAttestationPending("video", 0));
+        assertFalse(ProtectionStatuses.isAttestationPending(null, 0));
     }
 
     @Test

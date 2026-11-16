@@ -42,9 +42,10 @@ public class SabrDefaultLoadErrorHandlingPolicy extends DashDefaultLoadErrorHand
             return C.TIME_UNSET; // fatal, no retry. Propagate to ErrorFixerController
         }
 
-        // The server won't send media past its grace period with this poToken. Retrying with the same one is pointless.
+        // The server won't send media past its grace period with this poToken (attestation required, or still pending). Retrying
+        // with the same one is pointless.
         if (cause instanceof PoTokenError) {
-            Log.e(TAG, "Attestation required: " + ((PoTokenError) cause).status + ", errorCount: " + errorCount);
+            Log.e(TAG, "No media past the grace period, poToken: " + ((PoTokenError) cause).status + ", errorCount: " + errorCount);
             return C.TIME_UNSET; // fatal, no retry. Propagate to ErrorFixerController
         }
 
