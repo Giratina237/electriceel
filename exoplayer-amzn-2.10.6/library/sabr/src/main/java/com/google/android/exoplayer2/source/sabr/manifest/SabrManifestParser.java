@@ -50,6 +50,81 @@ public class SabrManifestParser {
     private Map<String, Set<MediaFormat>> mWEBMAudios;
     private List<MediaSubtitle> mSubs;
 
+    /**
+     * The streams of the video the manifest plays, fetched again before they expire (see SabrManifest#refreshSession): put in use when
+     * they're of the same client and have each of its formats as it was. Its tracks and what they buffered stay.
+     *
+     * @return whether they were put in use
+     */
+    public static boolean refresh(SabrManifest manifest, MediaItemFormatInfo formatInfo) {
+        String url = formatInfo.getServerAbrStreamingUrl();
+        String config = formatInfo.getVideoPlaybackUstreamerConfig();
+
+        if (url == null || config == null || formatInfo.isLive() || manifest.isLive() || formatInfo.getClientInfo() == null
+                || !Helpers.equals(manifest.getVideoId(), formatInfo.getVideoId())
+                || !createClientInfo(formatInfo).equals(manifest.getClientInfo())
+                || !hasFormats(manifest, formatInfo.getAdaptiveFormats())) {
+            return false;
+        }
+
+        manifest.refreshSession(url, config, formatInfo.getPoToken());
+
+        return true;
+    }
+
+    /**
+     * Each audio and video format of the manifest is one of them: the same itag, last modified time and tags. The requests name the
+     * formats they're for by these.
+     */
+    private static boolean hasFormats(SabrManifest manifest, @Nullable List<MediaFormat> formats) {
+        if (formats == null) {
+            return false;
+        }
+
+        Set<String> keys = new HashSet<>();
+
+        for (MediaFormat format : formats) {
+            keys.add(getFormatKey(format.getITag(), Helpers.parseLong(format.getLmt()), format.getXtags()));
+        }
+
+        for (int i = 0; i < manifest.getPeriodCount(); i++) {
+            for (AdaptationSet adaptationSet : manifest.getPeriod(i).adaptationSets) {
+                if (adaptationSet.type != C.TRACK_TYPE_AUDIO && adaptationSet.type != C.TRACK_TYPE_VIDEO) {
+                    continue;
+                }
+
+                for (Representation representation : adaptationSet.representations) {
+                    Format format = representation.format;
+
+                    if (!keys.contains(getFormatKey(format.id, format.lastModified, getXtags(format)))) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static String getFormatKey(@Nullable String itag, long lastModified, @Nullable String xtags) {
+        return itag + "/" + lastModified + "/" + (xtags != null ? xtags : "");
+    }
+
+    @Nullable
+    private static String getXtags(Format format) {
+        if (format.metadata == null) {
+            return null;
+        }
+
+        for (int i = 0; i < format.metadata.length(); i++) {
+            if (format.metadata.get(i) instanceof SabrFormatMetadata) {
+                return ((SabrFormatMetadata) format.metadata.get(i)).xTags;
+            }
+        }
+
+        return null;
+    }
+
     public SabrManifest parse(@NonNull MediaItemFormatInfo formatInfo) {
         mFormatInfo = formatInfo;
         MediaFormatComparator comp = new MediaFormatComparator();

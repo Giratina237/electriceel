@@ -22,6 +22,9 @@ import com.google.android.exoplayer2.source.MediaSourceEventListener.MediaLoadDa
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.MergingMediaSource;
 import com.google.android.exoplayer2.source.TrackGroupArray;
+import com.google.android.exoplayer2.source.sabr.SabrMediaSource;
+import com.google.android.exoplayer2.source.sabr.manifest.SabrManifest;
+import com.google.android.exoplayer2.source.sabr.manifest.SabrManifestParser;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
@@ -94,6 +97,11 @@ public class ExoPlayerController implements Player.EventListener {
      * It played since the player was prepared with its source: playing again is a resume (see PlaybackHealth#onResumed), not the start
      */
     private boolean mHasPlayedSource;
+    /**
+     * Of the SABR source prepared, null for another source: its streams can be fetched again (see refreshSabr)
+     */
+    @Nullable
+    private SabrManifest mSabrManifest;
     /**
      * The video has a surface to be shown on. Without one (e.g. the sound plays on in the background) no frame is rendered.
      */
@@ -439,6 +447,18 @@ public class ExoPlayerController implements Player.EventListener {
         openMediaSource(mediaSource);
     }
 
+    /**
+     * The streams of the SABR video playing, fetched again before they expire: the source goes on with them (see
+     * SabrManifestParser#refresh), its buffer plays on
+     *
+     * @return whether they were put in use: not when another source plays, or they don't fit it (e.g. other formats)
+     */
+    public boolean refreshSabr(MediaItemFormatInfo formatInfo) {
+        SabrManifest manifest = mSabrManifest;
+
+        return mPlayer != null && manifest != null && SabrManifestParser.refresh(manifest, formatInfo);
+    }
+
     public void openDash(MediaItemFormatInfo formatInfo) {
         MediaSource mediaSource = buildSource(() -> mMediaSourceFactory.fromDashFormatInfo(formatInfo));
         openMediaSource(mediaSource);
@@ -501,6 +521,7 @@ public class ExoPlayerController implements Player.EventListener {
         LoadErrors.onPrepare();
         Connections.onPrepare();
         mHasPlayedSource = false;
+        mSabrManifest = mediaSource instanceof SabrMediaSource ? ((SabrMediaSource) mediaSource).getManifest() : null;
         mPlayer.prepare(mediaSource);
         // Its first seconds are looked at closely: the check may be 2 s away, past its first frame
         Utils.removeCallbacks(mHealthCheck);
@@ -1019,6 +1040,7 @@ public class ExoPlayerController implements Player.EventListener {
 
     private void releasePlayer() {
         Utils.removeCallbacks(mHealthCheck);
+        mSabrManifest = null;
         // Left before its start played: what it played of it
         onStartFrames(mHealth.endStart());
         LastState.onPlayer(mContext, false, false);

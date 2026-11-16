@@ -287,6 +287,13 @@ public class SabrStream {
         processor.setLive(isLive);
     }
 
+    /**
+     * Of the streams fetched again (see SabrManifest#refreshSession, #requestSessionRefresh): the requests from now on send it
+     */
+    public void setPoToken(@Nullable String poToken) {
+        processor.setPoToken(poToken);
+    }
+
     public boolean isLive() {
         return processor.isLive();
     }
@@ -706,13 +713,6 @@ public class SabrStream {
 
     public void setServerAbrStreamingUrl(String url) {
         setUrl(url);
-    }
-
-    /**
-     * Of a new session (see SabrManifest#requestSessionRefresh)
-     */
-    public void setPoToken(@Nullable String poToken) {
-        processor.setPoToken(poToken);
     }
 
     /**

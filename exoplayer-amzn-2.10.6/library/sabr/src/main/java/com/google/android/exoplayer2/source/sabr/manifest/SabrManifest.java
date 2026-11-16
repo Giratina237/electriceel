@@ -111,7 +111,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
     private final String videoId;
     /**
-     * The URL, the ustreamer config and the poToken are the session's: swapped for a new one's (see requestSessionRefresh)
+     * The streams' session: replaced when they're fetched again (see refreshSession, requestSessionRefresh)
      */
     private SabrCdnSelector cdnSelector;
     private volatile String videoPlaybackUstreamerConfig;
@@ -135,7 +135,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
     private long sessionRefreshStartMs = -1;
     /**
      * A new session was asked for and not had, or didn't help: the next ask for one fails the stream, which the app reloads with the
-     * video
+     * video. Not after another one was swapped in (see refreshSession).
      */
     private boolean isSessionRefreshFailed;
 
@@ -418,7 +418,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
      */
     private synchronized boolean onSessionRefreshed(int refreshedSessionId, @Nullable SabrSession session) {
         if (refreshedSessionId != sessionId || sessionRefreshStartMs == -1) {
-            Log.w(TAG, "A new session came after the ask for it timed out");
+            Log.w(TAG, "A new session came after the ask for it timed out, or after another one was swapped in");
             return false;
         }
 
@@ -431,20 +431,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
             return false;
         }
 
-        cdnSelector = new SabrCdnSelector(session.serverAbrStreamingUrl);
-        videoPlaybackUstreamerConfig = session.videoPlaybackUstreamerConfig;
-        poToken = session.poToken;
-        String url = cdnSelector.getCurrentUrl();
-
-        // The streams keep what they have of the playback (e.g. its cookie, the formats initialized): it goes on where it was
-        for (SabrStream sabrStream : sabrStreams.values()) {
-            sabrStream.setServerAbrStreamingUrl(url);
-            sabrStream.setPoToken(session.poToken);
-        }
-
-        sessionId++;
-        sessionStartMs = SystemClock.elapsedRealtime();
-        Log.d(TAG, "New session swapped in: %s", url);
+        refreshSession(session.serverAbrStreamingUrl, session.videoPlaybackUstreamerConfig, session.poToken);
 
         return true;
     }
@@ -471,6 +458,36 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         }
 
         return null;
+    }
+
+    /**
+     * The streams fetched again: before they expire (see SabrManifestParser#refresh), or as the server asked (see
+     * requestSessionRefresh). The next request of each track goes to their URL with their config and poToken, while the media buffered
+     * plays on. A request under way keeps the old ones, and one answered with an ask for a new session is made again with this one.
+     * What the server said of the streams so far (e.g. the playback cookie, the formats initialized) stays.
+     */
+    public synchronized void refreshSession(String serverAbrStreamingUrl, String videoPlaybackUstreamerConfig, @Nullable String poToken) {
+        cdnSelector = new SabrCdnSelector(serverAbrStreamingUrl);
+        this.videoPlaybackUstreamerConfig = videoPlaybackUstreamerConfig;
+        this.poToken = poToken;
+        String url = cdnSelector.getCurrentUrl();
+
+        for (SabrStream sabrStream : sabrStreams.values()) {
+            sabrStream.setServerAbrStreamingUrl(url);
+            sabrStream.setPoToken(poToken);
+        }
+
+        sessionId++;
+        sessionStartMs = SystemClock.elapsedRealtime();
+        // The requests waiting for a new session (see requestSessionRefresh) go on with this one: the one asked for is dropped when it
+        // comes (see onSessionRefreshed)
+        sessionRefreshStartMs = -1;
+        isSessionRefreshFailed = false;
+        Log.d(TAG, "New session swapped in: %s", url);
+    }
+
+    public ClientInfo getClientInfo() {
+        return clientInfo;
     }
 
     public int getSabrRequestNumber() {

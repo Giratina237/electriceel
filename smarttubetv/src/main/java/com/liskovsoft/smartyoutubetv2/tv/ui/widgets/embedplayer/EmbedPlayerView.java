@@ -273,6 +273,11 @@ public class EmbedPlayerView extends PlayerView implements PlaybackView {
     }
 
     @Override
+    public boolean refreshSabr(MediaItemFormatInfo formatInfo) {
+        return mExoPlayerController != null && mExoPlayerController.refreshSabr(formatInfo);
+    }
+
+    @Override
     public void openDash(MediaItemFormatInfo formatInfo) {
         mExoPlayerController.openDash(formatInfo);
     }

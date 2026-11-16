@@ -61,7 +61,7 @@ public class SabrProcessor {
     private final int liveSegmentTargetDurationSec;
     private long playerTimeMs;
     /**
-     * The session's (see SabrManifest#requestSessionRefresh): a new one comes with the player response fetched again
+     * Replaced when the streams are fetched again (see SabrManifest#refreshSession, #requestSessionRefresh). Read on the loader's thread.
      */
     private volatile String poToken;
     private final boolean postLive;
@@ -130,10 +130,6 @@ public class SabrProcessor {
 
     public void setPlayerTimeMs(long playerTimeMs) {
         this.playerTimeMs = playerTimeMs;
-    }
-
-    public void setPoToken(@Nullable String poToken) {
-        this.poToken = poToken;
     }
 
     private void initializeFormatSelector() {
@@ -664,6 +660,13 @@ public class SabrProcessor {
 
     public void setLive(boolean isLive) {
         this.isLive = isLive;
+    }
+
+    /**
+     * Of the streams fetched again (see SabrManifest#refreshSession, #requestSessionRefresh): the requests from now on send it
+     */
+    public void setPoToken(@Nullable String poToken) {
+        this.poToken = poToken;
     }
 
     public int getLiveSegmentTargetDurationToleranceMs() {

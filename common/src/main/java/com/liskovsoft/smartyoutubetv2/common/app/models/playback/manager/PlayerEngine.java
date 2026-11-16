@@ -9,6 +9,14 @@ import java.util.List;
 
 public interface PlayerEngine extends PlayerConstants {
     void openSabr(MediaItemFormatInfo formatInfo);
+    /**
+     * The streams of the SABR video playing, fetched again before they expire: played on with, without a new source
+     *
+     * @return whether they were put in use (see ExoPlayerController#refreshSabr)
+     */
+    default boolean refreshSabr(MediaItemFormatInfo formatInfo) {
+        return false;
+    }
     void openDash(MediaItemFormatInfo formatInfo);
     void openDash(InputStream dashManifest);
     void openDashUrl(String dashManifestUrl);
