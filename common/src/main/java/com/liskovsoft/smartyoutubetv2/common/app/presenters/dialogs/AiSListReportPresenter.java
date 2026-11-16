@@ -17,6 +17,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.BrowsePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
 import com.liskovsoft.smartyoutubetv2.common.misc.AiSListManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.BlockedChannelManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AiSListFilterData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.BlockedChannelData;
@@ -153,16 +154,15 @@ public class AiSListReportPresenter extends BasePresenter<Void> {
      * @return the channel wasn't blocked before
      */
     private boolean block(Video video) {
-        String channelName = video.getAuthor();
-        BlockedChannelData blockedChannelData = BlockedChannelData.instance(getContext());
+        BlockedChannelManager blockedChannelManager = BlockedChannelManager.instance(getContext());
 
-        if (channelName == null || blockedChannelData.containsChannel(video.channelId, channelName)) {
+        if (video.getAuthor() == null || blockedChannelManager.isBlocked(video)) {
             return false;
         }
 
-        blockedChannelData.addChannel(video.channelId, channelName);
+        blockedChannelManager.block(video);
 
-        if (blockedChannelData.getChannelCount() == 1) { // show on add first channel
+        if (BlockedChannelData.instance(getContext()).getChannelCount() == 1) { // show on add first channel
             BrowsePresenter.instance(getContext()).enableSection(MediaGroup.TYPE_BLOCKED_CHANNELS, true);
         }
 

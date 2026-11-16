@@ -36,6 +36,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.FilterExclu
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.KeywordFilterSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.ChannelUploadsView;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
+import com.liskovsoft.smartyoutubetv2.common.misc.BlockedChannelManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.KeywordFilter;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.NotInterestedManager;
@@ -620,15 +621,14 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
             return;
         }
 
-        String channelId = mVideo.channelId;
-        String channelName = mVideo.getAuthor();
-
-        if (channelName == null) {
+        if (mVideo.getAuthor() == null) {
             return;
         }
 
+        // A card that has the channel name alone (e.g. of Home) by the channel its video has
+        BlockedChannelManager blockedChannelManager = BlockedChannelManager.instance(getContext());
         BlockedChannelData blockedChannelData = BlockedChannelData.instance(getContext());
-        boolean isBlocked = blockedChannelData.containsChannel(channelId, channelName);
+        boolean isBlocked = blockedChannelManager.isBlocked(mVideo);
 
         String buttonText = isBlocked
                 ? getContext().getString(R.string.dialog_unblock_channel)
@@ -637,10 +637,10 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
         mDialogPresenter.appendSingleButton(
                 UiOptionItem.from(buttonText, optionItem -> {
                     if (isBlocked) {
-                        blockedChannelData.removeChannel(channelId, channelName);
+                        blockedChannelManager.unblock(mVideo);
                         MessageHelpers.showMessage(getContext(), R.string.channel_unblocked);
                     } else {
-                        blockedChannelData.addChannel(channelId, channelName);
+                        blockedChannelManager.block(mVideo);
                         MessageHelpers.showMessage(getContext(), R.string.channel_blocked);
                     }
 

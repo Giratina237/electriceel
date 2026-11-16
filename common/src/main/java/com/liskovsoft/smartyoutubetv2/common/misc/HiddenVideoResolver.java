@@ -9,6 +9,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.BrowseSection;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -23,7 +24,8 @@ import io.reactivex.Observable;
  * the collaborations and Watch later, in the sections they apply to. The groups are then built without those videos (see VideoGroup),
  * so a hidden video never appears first and vanishes after. The categories of Home are held the same way (see VideoCategoryManager).<br/>
  * The dates of shorts are held too (see ShortsDateManager): the card never gets its date after it's shown, and Hide old videos reads it.
- * So are the live streams that ended in History (see StreamedManager): its cards come without the date that tells them.<br/>
+ * So are the live streams that ended in History (see StreamedManager): its cards come without the date that tells them.
+ * So are the channels of the cards that have their name alone, everywhere, while a channel is blocked with its id (see BlockedChannelManager).<br/>
  * A failed lookup doesn't hold the group back: its videos are shown.
  */
 public class HiddenVideoResolver {
@@ -65,9 +67,13 @@ public class HiddenVideoResolver {
         CollaborationManager collaborationManager = CollaborationManager.instance(context);
         WatchLaterManager watchLaterManager = WatchLaterManager.instance(context);
         StreamedManager streamedManager = StreamedManager.instance(context);
+        BlockedChannelManager blockedChannelManager = BlockedChannelManager.instance(context);
+        // Blocked channels are hidden from every group
+        boolean isBlockedChannelLookedUp = blockedChannelManager.isEnabled();
         Map<String, String> videoIdByKey = new LinkedHashMap<>();
         Set<String> authors = new LinkedHashSet<>();
         Set<String> streamedIds = new LinkedHashSet<>();
+        List<Video> blockedCandidates = new ArrayList<>();
         boolean isAiSListUsed = false;
         boolean isWatchLaterEnabled = false;
 
@@ -84,7 +90,7 @@ public class HiddenVideoResolver {
             isWatchLaterEnabled |= filterSectionId != -1 && watchLaterManager.isEnabled(filterSectionId);
             boolean isStreamedLookedUp = filterSectionId != -1 && streamedManager.isLookedUp(filterSectionId);
 
-            if (!isAiSListEnabled && !isCollaborationEnabled && !isStreamedLookedUp) {
+            if (!isAiSListEnabled && !isCollaborationEnabled && !isStreamedLookedUp && !isBlockedChannelLookedUp) {
                 continue;
             }
 
@@ -99,7 +105,14 @@ public class HiddenVideoResolver {
                     continue;
                 }
 
-                if (isAiSListEnabled && video.channelHandle == null) {
+                // The name is looked up for the blocked channels too, AiSList left off: it neither marks nor hides then (see VideoGroup)
+                boolean isBlockedCandidate = isBlockedChannelLookedUp && BlockedChannelManager.isCandidate(video);
+
+                if (isBlockedCandidate) {
+                    blockedCandidates.add(video);
+                }
+
+                if ((isAiSListEnabled && video.channelHandle == null) || isBlockedCandidate) {
                     String key = AiSListManager.getLookupKey(video);
 
                     if (key != null && !videoIdByKey.containsKey(key)) {
@@ -122,14 +135,15 @@ public class HiddenVideoResolver {
         Observable<Boolean> shortsDates = ShortsDateManager.instance(context).resolve(mediaGroups);
         Observable<Boolean> streamed = streamedManager.resolve(streamedIds);
 
-        if (!isAiSListUsed && authors.isEmpty() && !isWatchLaterEnabled) {
+        if (!isAiSListUsed && authors.isEmpty() && !isWatchLaterEnabled && blockedCandidates.isEmpty()) {
             return Observable.zip(shortsDates, streamed, (dates, streams) -> true);
         }
 
         return Observable.zip(
                 // Known handles are checked against the lists too, e.g. at the first start
                 isAiSListUsed ? aiSListManager.awaitLists() : Observable.just(true),
-                aiSListManager.resolveHandles(videoIdByKey),
+                // The cards that might be of a blocked channel are told once the ids of their names are known
+                aiSListManager.resolveHandles(videoIdByKey).concatMap(handles -> blockedChannelManager.resolve(blockedCandidates)),
                 collaborationManager.resolve(authors),
                 isWatchLaterEnabled ? watchLaterManager.resolve() : Observable.just(true),
                 shortsDates,

@@ -9,6 +9,7 @@ import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.service.VideoStateService;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.service.VideoStateService.State;
 import com.liskovsoft.smartyoutubetv2.common.misc.AiSListManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.BlockedChannelManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.ChannelGroupFilter;
 import com.liskovsoft.smartyoutubetv2.common.misc.ChildModeManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.DuplicateFilter;
@@ -588,21 +589,17 @@ public class VideoGroup {
     }
 
     private boolean isChannelBlocked(Video video) {
-        if (video.isChapter) {
+        // No context before the app is initialized (GlobalPreferences)
+        if (video.isChapter || GlobalPreferences.context() == null) {
             return false;
         }
 
-        BlockedChannelData blockedChannelData = BlockedChannelData.instance(GlobalPreferences.context());
-
-        if (blockedChannelData.isEmpty()) {
+        if (BlockedChannelData.instance(GlobalPreferences.context()).isEmpty()) {
             return false;
         }
 
-        // Filter out videos from blacklisted channels
-        String channelId = video.channelId;
-        String channelName = video.getAuthor();
-
-        return blockedChannelData.containsChannel(channelId, channelName);
+        // A card that has the channel name alone (e.g. of Home) by the channel looked up before the group is created (see HiddenVideoResolver)
+        return BlockedChannelManager.instance(GlobalPreferences.context()).isBlocked(video);
     }
 
     /**

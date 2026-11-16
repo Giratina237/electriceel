@@ -42,7 +42,8 @@ import io.reactivex.subjects.BehaviorSubject;
  * Most TV Home cards carry only the channel name. The handle of such a channel is looked up once
  * (one watch-next request for one of its videos), before the card is shown (see HiddenVideoResolver),
  * and cached on disk by the channel name. A collaboration ("X and Y") gets the handle of each of its channels.
- * With the user's own Data API key, the channels of a row batch are looked up together instead (see {@link #startBatchLookup}).<br/>
+ * With the user's own Data API key, the channels of a row batch are looked up together instead (see {@link #startBatchLookup}).
+ * The names are looked up for the blocked channels too, with every list off (see BlockedChannelManager).<br/>
  * A channel card is never hidden, only marked (see {@link #getChannelMarkedList}).<br/>
  * The channels reported to AiSList from this device are kept on disk, so none is sent twice (see AiSListReportPresenter).
  */
@@ -411,6 +412,16 @@ public class AiSListManager implements OnDataChange {
         }
 
         return warnlisted != null ? warnlisted : uploader;
+    }
+
+    /**
+     * The channel id found earlier for the channel name, the uploader's for a collaboration (see BlockedChannelManager)
+     * @return null when none is known
+     */
+    public String getCachedChannelId(String author) {
+        Map<String, String> handles = author != null ? mHandlesByAuthor.get(author) : null;
+
+        return handles != null && !handles.isEmpty() ? handles.values().iterator().next() : null;
     }
 
     /**

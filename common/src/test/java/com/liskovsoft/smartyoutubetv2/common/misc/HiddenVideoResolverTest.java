@@ -10,6 +10,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.SimpleMediaItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AiSListFilterData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.BlockedChannelData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.CollaborationsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.WatchLaterData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
@@ -48,6 +49,8 @@ public class HiddenVideoResolverTest {
     private static final String HUMAN_CHANNEL = "Real Person";
     private static final String HUMAN_HANDLE = "@RealPerson";
     private static final String AI_COLLABORATION = HUMAN_CHANNEL + " and " + AI_CHANNEL; // the AI channel is the guest
+    private static final String NEWS = "News";
+    private static final String NEWS_ID = "UCnews";
     private static final Map<String, List<String>> SEARCH_RESULTS = new HashMap<>();
     private static final Map<String, Map<String, String>> HANDLES = new HashMap<>(); // video id -> its owners' handles -> their channel ids
 
@@ -63,6 +66,9 @@ public class HiddenVideoResolverTest {
         collaborators.put(HUMAN_HANDLE, "UChuman");
         collaborators.put(AI_HANDLE, "UCai");
         HANDLES.put("aicollab", collaborators);
+        HANDLES.put("news", Collections.singletonMap("@News", NEWS_ID));
+        HANDLES.put("renamed", Collections.singletonMap("@News", NEWS_ID)); // the channel is now "News Daily"
+        HANDLES.put("fake", Collections.singletonMap("@FakeNews", "UCfake")); // another channel named "News"
     }
 
     private final Context mContext = RuntimeEnvironment.getApplication();
@@ -97,6 +103,8 @@ public class HiddenVideoResolverTest {
         AiSListManager aiSListManager = AiSListManager.instance(mContext);
         aiSListManager.setListsForTesting(new HashSet<>(Collections.singletonList(AI_HANDLE.toLowerCase())), Collections.emptySet());
         aiSListManager.setHandleLookupForTesting(this::lookupHandle);
+        BlockedChannelData.instance(mContext).clear();
+        BlockedChannelManager.instance(mContext).resetForTesting(this::lookupHandle);
     }
 
     @After
@@ -104,6 +112,7 @@ public class HiddenVideoResolverTest {
         mCollaborationsData.setMode(CollaborationsData.MODE_SHOW);
         mWatchLaterData.setMode(WatchLaterData.MODE_SHOW);
         disableAiSList();
+        BlockedChannelData.instance(mContext).clear();
         Utils.sHandler.removeCallbacksAndMessages(null);
     }
 
@@ -489,6 +498,113 @@ public class HiddenVideoResolverTest {
         } finally {
             mAiSListData.setMarkMode(AiSListFilterData.LIST_BLOCKLIST, AiSListFilterData.MARK_MODE_OFF);
         }
+    }
+
+    /**
+     * A Home card has the channel name alone: its id is found as AiSList finds the handle, the lists left off
+     */
+    @Test
+    public void renamedBlockedChannelNeverAppears() {
+        BlockedChannelData.instance(mContext).addChannel(NEWS_ID, NEWS);
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createVideo("renamed", "News Daily"),
+                createVideo("human", HUMAN_CHANNEL))), home).subscribe(shown::add);
+
+        VideoGroup group = VideoGroup.from(shown.get(0), home);
+        assertEquals(1, group.getSize());
+        assertEquals("human", group.get(0).videoId);
+    }
+
+    /**
+     * Each card of the blocked name is told by its video
+     */
+    @Test
+    public void otherChannelOfBlockedNameAppears() {
+        BlockedChannelData.instance(mContext).addChannel(NEWS_ID, NEWS);
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createVideo("fake", NEWS), createVideo("news", NEWS))), home)
+                .subscribe(shown::add);
+
+        VideoGroup group = VideoGroup.from(shown.get(0), home);
+        assertEquals(1, group.getSize());
+        assertEquals("fake", group.get(0).videoId);
+    }
+
+    @Test
+    public void cardOfBlockedNameIsHeldWhileItsVideoIsLookedUp() {
+        PublishSubject<Map<String, String>> fakeLookup = PublishSubject.create();
+        BlockedChannelManager.instance(mContext).resetForTesting(videoId -> "fake".equals(videoId) ? fakeLookup : lookupHandle(videoId));
+        BlockedChannelData.instance(mContext).addChannel(NEWS_ID, NEWS);
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createVideo("fake", NEWS))), home).subscribe(shown::add);
+
+        assertTrue(shown.isEmpty());
+
+        fakeLookup.onNext(HANDLES.get("fake"));
+        fakeLookup.onComplete();
+
+        assertEquals(1, shown.size());
+        assertEquals(1, VideoGroup.from(shown.get(0), home).getSize());
+    }
+
+    /**
+     * As before the ids
+     */
+    @Test
+    public void blockedNameIsHiddenWhenTheLookupFails() {
+        BlockedChannelData.instance(mContext).addChannel(NEWS_ID, NEWS);
+        mIsNetworkDown = true;
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createVideo("fake", NEWS), createVideo("human", HUMAN_CHANNEL))), home)
+                .subscribe(shown::add);
+
+        VideoGroup group = VideoGroup.from(shown.get(0), home);
+        assertEquals(1, group.getSize());
+        assertEquals("human", group.get(0).videoId);
+    }
+
+    /**
+     * The names are looked up for a blocked channel: AiSList, being off, neither marks nor hides the listed channel
+     */
+    @Test
+    public void aiSListOffNeitherMarksNorHides() {
+        BlockedChannelData.instance(mContext).addChannel(NEWS_ID, NEWS);
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createVideo("ai", AI_CHANNEL), createVideo("human", HUMAN_CHANNEL))), home)
+                .subscribe(shown::add);
+
+        assertEquals(Arrays.asList("ai", "human"), mHandleLookups);
+        VideoGroup group = VideoGroup.from(shown.get(0), home);
+        assertEquals(2, group.getSize());
+        assertEquals(-1, group.get(0).aiMarkList);
+    }
+
+    /**
+     * Matched by the name whatever the id
+     */
+    @Test
+    public void nothingIsLookedUpForChannelsBlockedByName() {
+        BlockedChannelData.instance(mContext).addChannel(null, NEWS);
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createVideo("fake", NEWS), createVideo("human", HUMAN_CHANNEL))), home)
+                .subscribe(shown::add);
+
+        assertTrue(mHandleLookups.isEmpty());
+        VideoGroup group = VideoGroup.from(shown.get(0), home);
+        assertEquals(1, group.getSize());
+        assertEquals("human", group.get(0).videoId);
     }
 
     private Observable<List<String>> search(String query) {
