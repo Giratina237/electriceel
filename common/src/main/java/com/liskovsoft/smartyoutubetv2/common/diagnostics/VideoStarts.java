@@ -99,6 +99,11 @@ public final class VideoStarts {
      */
     static final String STAGE_SERVER_BACKOFF = "server backoff";
     /**
+     * More waits of SABR's server than rows are shown for, as one: from the first told to the end of the last, its detail how many,
+     * and the first and last asked (see ServerBackoffs)
+     */
+    static final String STAGE_SERVER_HOLD = "server hold";
+    /**
      * What SABR's server made of the poToken when it said so, a moment: the first, then each change (see ProtectionStatuses)
      */
     static final String STAGE_PROTECTION = "protection";
@@ -121,6 +126,14 @@ public final class VideoStarts {
      */
     private static final String[] CHUNK_STAGES = {STAGE_VIDEO_INIT_CHUNK, STAGE_AUDIO_INIT_CHUNK, STAGE_FIRST_VIDEO_CHUNK,
             STAGE_FIRST_AUDIO_CHUNK};
+    static final String STAGE_VIDEO_INIT_AGAIN = "video init chunk again";
+    static final String STAGE_AUDIO_INIT_AGAIN = "audio init chunk again";
+    /**
+     * The init segments' loads after the first one, by track (as CHUNK_STAGES' first two), as one row: from the first of them to the
+     * end of the last, its detail how many and their bytes, e.g. "57 more, 9 KB". SABR asks again when an init request's answer had
+     * no init segment (e.g. the server held the stream, KKSJMSQX: 0 KB, then seconds with no row), or the format changed.
+     */
+    private static final String[] INIT_AGAIN_STAGES = {STAGE_VIDEO_INIT_AGAIN, STAGE_AUDIO_INIT_AGAIN};
     static final String STAGE_VIDEO_DECODER = "video decoder";
     /**
      * The frames decoded only to reach where the video starts (e.g. a resume's position), from the keyframe before it, till its first
@@ -407,6 +420,14 @@ public final class VideoStarts {
          */
         final boolean[] isChunkLoaded = new boolean[CHUNK_STAGES.length];
         final long[] chunkLoadMs = new long[CHUNK_STAGES.length];
+        /**
+         * Of the init segments' loads after the first one, by track (see INIT_AGAIN_STAGES): how many, their bytes, and from the start
+         * of the first to the end of the last
+         */
+        final int[] initAgainLoads = new int[INIT_AGAIN_STAGES.length];
+        final long[] initAgainBytes = new long[INIT_AGAIN_STAGES.length];
+        final long[] initAgainStartMs = new long[INIT_AGAIN_STAGES.length];
+        final long[] initAgainEndMs = new long[INIT_AGAIN_STAGES.length];
         boolean hasVideoDecoder;
         int seeks;
         boolean isCached;
@@ -851,6 +872,8 @@ public final class VideoStarts {
         timer.videoBitrateKbps = -1;
         Arrays.fill(timer.isChunkLoaded, false);
         Arrays.fill(timer.chunkLoadMs, -1);
+        Arrays.fill(timer.initAgainLoads, 0);
+        Arrays.fill(timer.initAgainBytes, 0);
         timer.hasVideoDecoder = false;
     }
 
@@ -889,12 +912,37 @@ public final class VideoStarts {
             sIsChunkDone[chunk] = true;
         }
 
-        if (timer == null || chunk < 0 || timer.prepareMs < 0 || startMs < timer.prepareMs || timer.isChunkLoaded[chunk]) {
+        if (timer == null || chunk < 0 || timer.prepareMs < 0 || startMs < timer.prepareMs) {
+            return;
+        }
+
+        if (timer.isChunkLoaded[chunk]) {
+            if (isInit) {
+                addInitAgain(timer, chunk, startMs, endMs, bytes);
+            }
+
             return;
         }
 
         timer.isChunkLoaded[chunk] = true;
         addToBuffering(timer, CHUNK_STAGES[chunk], formatBytes(bytes), startMs, endMs);
+    }
+
+    /**
+     * An init segment's load after the first one of its track (see INIT_AGAIN_STAGES)
+     *
+     * @param chunk of the init segment, in CHUNK_STAGES
+     */
+    private static void addInitAgain(Timer timer, int chunk, long startMs, long endMs, long bytes) {
+        if (timer.initAgainLoads[chunk]++ == 0) {
+            timer.initAgainStartMs[chunk] = startMs;
+            timer.initAgainEndMs[chunk] = endMs;
+        } else {
+            timer.initAgainStartMs[chunk] = Math.min(timer.initAgainStartMs[chunk], startMs);
+            timer.initAgainEndMs[chunk] = Math.max(timer.initAgainEndMs[chunk], endMs);
+        }
+
+        timer.initAgainBytes[chunk] += Math.max(bytes, 0);
     }
 
     /**
@@ -1335,6 +1383,16 @@ public final class VideoStarts {
             // Still loading: it played from what had come, or it's what doesn't come
             if (!timer.isChunkLoaded[chunk] && timer.chunkLoadMs[chunk] >= 0) {
                 result.add(new VideoStart.Stage(CHUNK_STAGES[chunk], DETAIL_LOADING, 1, timer.chunkLoadMs[chunk], endMs));
+            }
+        }
+
+        for (int chunk = 0; chunk < INIT_AGAIN_STAGES.length; chunk++) {
+            // Asked again: the first one's answer had no init segment, or the format changed
+            if (timer.initAgainLoads[chunk] > 0) {
+                String detail = String.format(Locale.US, "%d more, %s", timer.initAgainLoads[chunk],
+                        formatBytes(timer.initAgainBytes[chunk]));
+                result.add(new VideoStart.Stage(INIT_AGAIN_STAGES[chunk], detail, 1, timer.initAgainStartMs[chunk],
+                        Math.min(timer.initAgainEndMs[chunk], endMs)));
             }
         }
 

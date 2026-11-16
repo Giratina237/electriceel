@@ -290,6 +290,7 @@
   <string name="remote_session_closed">Отдалечената сесия е затворена</string>
   <string name="msg_mode_switch_error">Не може да превключи режима на показване на \"%s\"</string>
   <string name="msg_player_error">Възникна грешка в плеъра %s. Рестартиране на възпроизвеждането…</string>
+  <string name="msg_device_refuses_audio">Устройството отказва да възпроизвежда звук. Рестартирайте устройството, за да го поправите.</string>
   <string name="video_preset_disabled">Без предварително зададени</string>
   <string name="video_preset_enabled">Форматът на следващия видеоклип ще бъде зададен според предварително зададената настройка</string>
   <string name="player_sleep_timer">Таймер за заспиване</string>

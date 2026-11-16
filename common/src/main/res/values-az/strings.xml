@@ -306,6 +306,7 @@
     <string name="remote_session_closed">Uzaqdan idarəetmə sessiyası bağlandı</string>
     <string name="msg_mode_switch_error">Göstərmə rejimi \"%s\" rejiminə dəyişdirilə bilmir</string>
     <string name="msg_player_error">Oynadıcı xətası baş verdi %s. Oynatma yenidən başladılır…</string>
+    <string name="msg_device_refuses_audio">Cihaz səsi oxutmaqdan imtina edir. Düzəltmək üçün cihazı yenidən başladın.</string>
     <string name="video_preset_disabled">Şablonsuz</string>
     <string name="video_preset_enabled">Növbəti videonun formatı şablona uyğun təyin ediləcək</string>
     <string name="player_sleep_timer">Yuxu taymeri</string>

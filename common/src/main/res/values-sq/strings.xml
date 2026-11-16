@@ -300,6 +300,7 @@
   <string name="remote_session_closed">Sesioni në largësi është mbyllur</string>
   <string name="msg_mode_switch_error">Nuk mund të kalojë në mënyrën e pamjes \"%s\"</string>
   <string name="msg_player_error">Ndodhi një gabim i luajtësit %s. Po niset përsëri luajtja…</string>
+  <string name="msg_device_refuses_audio">Pajisja refuzon të luajë zë. Rinisni pajisjen për ta rregulluar.</string>
   <string name="video_preset_disabled">Pa paracaktim</string>
   <string name="video_preset_enabled">Formati i videos së ardhshme do të vendoset sipas paracaktimit</string>
   <string name="player_sleep_timer">Kohëmatës për gjumë</string>

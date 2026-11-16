@@ -1,6 +1,7 @@
 package com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers;
 
 import android.os.Build.VERSION;
+import android.os.SystemClock;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
@@ -169,7 +170,13 @@ public class VideoLoaderController extends BasePlayerController {
      * In a row, at most: each one skipped asks for its formats first
      */
     private static final int MAX_MEMBERS_SKIPS = 5;
+    /**
+     * When the reload and the engine restart asked for run (elapsed realtime), -1 for none asked for (see isFixPending)
+     */
+    private long mReloadDueMs = -1;
+    private long mRestartDueMs = -1;
     private final Runnable mReloadVideo = () -> {
+        mReloadDueMs = -1;
         Video video = getVideo();
 
         if (video != null) {
@@ -186,6 +193,8 @@ public class VideoLoaderController extends BasePlayerController {
         }
     };
     private final Runnable mRestartEngine = () -> {
+        mRestartDueMs = -1;
+
         if (getPlayer() != null) {
             Video video = getVideo();
 
@@ -533,6 +542,7 @@ public class VideoLoaderController extends BasePlayerController {
     @Override
     public boolean onKeyDown(int keyCode) {
         Utils.removeCallbacks(mRestartEngine);
+        mRestartDueMs = -1;
 
         return false;
     }
@@ -1015,6 +1025,10 @@ public class VideoLoaderController extends BasePlayerController {
         if (getPlayer().isEngineInitialized()) {
             Log.d(TAG, "Reloading the video...");
             Utils.postDelayed(mReloadVideo, delayMs);
+
+            if (delayMs >= 0) { // posted (see Utils#postDelayed)
+                mReloadDueMs = SystemClock.elapsedRealtime() + delayMs;
+            }
         }
     }
 
@@ -1036,7 +1050,21 @@ public class VideoLoaderController extends BasePlayerController {
         if (getPlayer() != null) {
             Log.d(TAG, "Restarting the engine...");
             Utils.postDelayed(mRestartEngine, delayMs);
+
+            if (delayMs >= 0) { // posted (see Utils#postDelayed)
+                mRestartDueMs = SystemClock.elapsedRealtime() + delayMs;
+            }
         }
+    }
+
+    /**
+     * A reload of the video or a restart of the engine was asked for and hasn't run yet: the player it replaces may still fail on its
+     * way out (see ErrorFixerController#runEngineErrorAction)
+     */
+    boolean isFixPending() {
+        long nowMs = SystemClock.elapsedRealtime();
+
+        return mReloadDueMs >= 0 && nowMs < mReloadDueMs || mRestartDueMs >= 0 && nowMs < mRestartDueMs;
     }
 
     /**
@@ -1127,6 +1155,8 @@ public class VideoLoaderController extends BasePlayerController {
         MediaServiceManager.instance().disposeActions();
         RxHelper.disposeActions(mFormatInfoAction, mMusicAutoplayAction, mRefreshStreamsAction);
         Utils.removeCallbacks(mReloadVideo, mLoadNext, mRestartEngine, mMetadataSync, mPrefetchNext, mRefreshStreams);
+        mReloadDueMs = -1;
+        mRestartDueMs = -1;
     }
 
     public void restartEngine() {

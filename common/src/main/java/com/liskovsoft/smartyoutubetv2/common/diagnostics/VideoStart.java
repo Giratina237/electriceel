@@ -507,6 +507,7 @@ public final class VideoStart {
             case VideoStarts.STAGE_QUEUE:
             case VideoStarts.STAGE_LOADING_HELD:
             case VideoStarts.STAGE_SERVER_BACKOFF:
+            case VideoStarts.STAGE_SERVER_HOLD:
             case "lock wait":
                 return Category.WAIT;
             case VideoStarts.STAGE_FORMATS:
@@ -527,6 +528,8 @@ public final class VideoStart {
             case VideoStarts.STAGE_FIRST_AUDIO_CHUNK:
             case VideoStarts.STAGE_VIDEO_INIT_CHUNK:
             case VideoStarts.STAGE_AUDIO_INIT_CHUNK:
+            case VideoStarts.STAGE_VIDEO_INIT_AGAIN:
+            case VideoStarts.STAGE_AUDIO_INIT_AGAIN:
                 return Category.BUFFER;
             case VideoStarts.STAGE_VIDEO_DECODER:
             case VideoStarts.STAGE_TO_POSITION:

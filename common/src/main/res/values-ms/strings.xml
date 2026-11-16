@@ -304,6 +304,7 @@
     <string name="remote_session_closed">Sesi jauh telah ditutup</string>
     <string name="msg_mode_switch_error">Tidak dapat menukar mod paparan kepada \"%s\"</string>
     <string name="msg_player_error">Ralat pemain berlaku %s. Memulakan semula main balik…</string>
+    <string name="msg_device_refuses_audio">Peranti enggan memainkan bunyi. Mulakan semula peranti untuk membetulkannya.</string>
     <string name="video_preset_disabled">Tanpa pratetap</string>
     <string name="video_preset_enabled">Format video seterusnya akan ditetapkan mengikut pratetap</string>
     <string name="player_sleep_timer">Pemasa tidur</string>

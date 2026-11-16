@@ -305,6 +305,7 @@
     <string name="remote_session_closed">Հեռակա սեանսը փակվել է</string>
     <string name="msg_mode_switch_error">Չհաջողվեց փոխել էկրանի ռեժիմը «%s»-ի</string>
     <string name="msg_player_error">Տեղի ունեցավ նվագարկիչի սխալ %s: Նվագարկումը վերսկսվում է…</string>
+    <string name="msg_device_refuses_audio">Սարքը հրաժարվում է ձայն նվագարկել։ Ուղղելու համար վերագործարկեք սարքը։</string>
     <string name="video_preset_disabled">Առանց նախադրվածքի</string>
     <string name="video_preset_enabled">Հաջորդ տեսանյութի ձևաչափը կսահմանվի ըստ նախադրվածքի</string>
     <string name="player_sleep_timer">Քնի ժամաչափ</string>

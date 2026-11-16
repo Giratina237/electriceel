@@ -290,6 +290,7 @@
   <string name="remote_session_closed">Η απομακρυσμένη συνεδρία έχει κλείσει</string>
   <string name="msg_mode_switch_error">Δεν είναι δυνατή η εναλλαγή λειτουργίας οθόνης σε \"%s\"</string>
   <string name="msg_player_error">Προκλήθηκε σφάλμα αναπαραγωγής %s. Επανεκκίνηση αναπαραγωγής…</string>
+  <string name="msg_device_refuses_audio">Η συσκευή αρνείται να αναπαράγει ήχο. Επανεκκινήστε τη συσκευή για να το διορθώσετε.</string>
   <string name="video_preset_disabled">Χωρίς προ-ρύθμιση</string>
   <string name="video_preset_enabled">Η μορφή του βίντεο θα καθοριστεί από την προ-ρύθμιση</string>
   <string name="player_sleep_timer">Χρονοδιακόπτης ύπνου</string>

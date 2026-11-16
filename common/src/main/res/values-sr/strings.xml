@@ -305,6 +305,7 @@
     <string name="remote_session_closed">Удаљена сесија је затворена</string>
     <string name="msg_mode_switch_error">Не могу да пребацим режим приказа на „%s“</string>
     <string name="msg_player_error">Дошло је до грешке %s. Поново покрећем …</string>
+    <string name="msg_device_refuses_audio">Уређај одбија да репродукује звук. Поново покрените уређај да бисте то поправили.</string>
     <string name="video_preset_disabled">Без преподешења</string>
     <string name="video_preset_enabled">Формат следећег видеа биће подешен у складу са преподешењем</string>
     <string name="player_sleep_timer">Тајмер спавања</string>

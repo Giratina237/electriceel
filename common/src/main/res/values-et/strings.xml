@@ -290,6 +290,7 @@
   <string name="remote_session_closed">Kaugühendus on katkestatud</string>
   <string name="msg_mode_switch_error">Kuvarežiimi \"%s\" rakendamine ei õnnestunud</string>
   <string name="msg_player_error">Viga %s. Uuesti laadimine…</string>
+  <string name="msg_device_refuses_audio">Seade keeldub heli esitamast. Parandamiseks taaskäivitage seade.</string>
   <string name="video_preset_disabled">Eelistus puudub</string>
   <string name="video_preset_enabled">Järgmise video vorming määratakse vastavalt profiilile</string>
   <string name="player_sleep_timer">Unetaimer</string>

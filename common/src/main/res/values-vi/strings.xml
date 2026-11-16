@@ -288,6 +288,7 @@
   <string name="remote_session_closed">Phiên từ xa đã bị đóng</string>
   <string name="msg_mode_switch_error">Không thể chuyển chế độ hiển thị sang \"%s\"</string>
   <string name="msg_player_error">Đã xảy ra lỗi trình phát %s. Bắt đầu phát lại…</string>
+  <string name="msg_device_refuses_audio">Thiết bị từ chối phát âm thanh. Khởi động lại thiết bị để khắc phục.</string>
   <string name="video_preset_disabled">Không có cài đặt trước</string>
   <string name="video_preset_enabled">Định dạng của video tiếp theo sẽ được thiết lập theo cài đặt trước</string>
   <string name="player_sleep_timer">Hẹn giờ ngủ</string>

@@ -307,6 +307,7 @@
     <string name="remote_session_closed">Attālinātā sesija ir aizvērta</string>
     <string name="msg_mode_switch_error">Nevar pārslēgt displeja režīmu uz \"%s\"</string>
     <string name="msg_player_error">Radās atskaņotāja kļūda %s. Atskaņošana tiek restartēta…</string>
+    <string name="msg_device_refuses_audio">Ierīce atsakās atskaņot skaņu. Lai to novērstu, restartējiet ierīci.</string>
     <string name="video_preset_disabled">Bez sagataves</string>
     <string name="video_preset_enabled">Nākamā video formāts tiks iestatīts atbilstoši sagatavei</string>
     <string name="player_sleep_timer">Miega taimeris</string>

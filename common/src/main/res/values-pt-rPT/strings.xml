@@ -306,6 +306,7 @@
     <string name="remote_session_closed">A sessão remota foi encerrada</string>
     <string name="msg_mode_switch_error">Não foi possível alterar para o modo \"%s\"</string>
     <string name="msg_player_error">Erro %s. A reiniciar reprodução…</string>
+    <string name="msg_device_refuses_audio">O dispositivo recusa-se a reproduzir som. Reinicie o dispositivo para corrigir.</string>
     <string name="video_preset_disabled">Sem pré-ajuste</string>
     <string name="video_preset_enabled">O formato do próximo vídeo estará de acordo com a pré-ajuste</string>
     <string name="player_sleep_timer">Temporizador</string>

@@ -298,6 +298,7 @@
   <string name="remote_session_closed">Se ha cerrado la sesión remota</string>
   <string name="msg_mode_switch_error">No se puede cambiar el modo de visualización a \"%s\"</string>
   <string name="msg_player_error">Error del reproductor %s. Reiniciando reproducción…</string>
+  <string name="msg_device_refuses_audio">El dispositivo se niega a reproducir sonido. Reinicia el dispositivo para solucionarlo.</string>
   <string name="video_preset_disabled">Sin preset</string>
   <string name="video_preset_enabled">El formato del siguiente vídeo se basará en el preset</string>
   <string name="player_sleep_timer">Temporizador de reposo</string>

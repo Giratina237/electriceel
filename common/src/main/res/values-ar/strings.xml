@@ -299,6 +299,7 @@
   <string name="remote_session_closed">تم إغلاق الجلسة عن بعد</string>
   <string name="msg_mode_switch_error">لا يمكن تبديل وضع العرض إلى\"%s</string>
   <string name="msg_player_error">حدث خطأ في المشغل %s. جارٍ إعادة التشغيل…</string>
+  <string name="msg_device_refuses_audio">الجهاز يرفض تشغيل الصوت. أعد تشغيل الجهاز لإصلاح ذلك.</string>
   <string name="video_preset_disabled">بدون إعداد مسبق</string>
   <string name="video_preset_enabled">سيتم ضبط تنسيق الفيديو التالي وفقًا للإعداد المسبق</string>
   <string name="player_sleep_timer">مؤقت النوم</string>

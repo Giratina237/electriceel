@@ -306,6 +306,7 @@
     <string name="remote_session_closed">Uzak oturum kapatıldı</string>
     <string name="msg_mode_switch_error">Görüntü modu değiştirilemiyor: \"%s\"</string>
     <string name="msg_player_error">Oynatıcı hatası oluştu %s. Oynatma yeniden başlatılıyor…</string>
+    <string name="msg_device_refuses_audio">Cihaz ses çalmayı reddediyor. Düzeltmek için cihazı yeniden başlatın.</string>
     <string name="video_preset_disabled">Ön ayar olmadan</string>
     <string name="video_preset_enabled">Bir sonraki videonun biçimi ön ayara göre ayarlanacaktır.</string>
     <string name="player_sleep_timer">Uyku zamanlayıcısı</string>

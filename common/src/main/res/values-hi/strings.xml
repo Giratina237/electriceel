@@ -288,6 +288,7 @@
   <string name="remote_session_closed">रिमोट सत्र बंद</string>
   <string name="msg_mode_switch_error">प्रदर्शन मोड को \"%s पर स्विच नहीं किया जा सकता</string>
   <string name="msg_player_error">प्लेयर त्रुटि %s हुई,पुनः आरम्भ हो रहा है… </string>
+  <string name="msg_device_refuses_audio">डिवाइस ध्वनि चलाने से इनकार कर रहा है। इसे ठीक करने के लिए डिवाइस को पुनः आरंभ करें।</string>
   <string name="video_preset_disabled">बिना प्रीसेट के</string>
   <string name="video_preset_enabled">अगले वीडियो का फॉर्मेट प्रीसेट के अनुसार सेट किया जाएगा</string>
   <string name="player_sleep_timer">स्लीप टाइमर</string>

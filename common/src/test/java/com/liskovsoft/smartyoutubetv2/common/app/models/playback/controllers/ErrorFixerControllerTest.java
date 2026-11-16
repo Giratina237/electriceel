@@ -801,7 +801,8 @@ public class ErrorFixerControllerTest {
 
     /**
      * The device refuses every AudioTrack, and the sound is AAC already: nothing left to fall back to (FARAJV5R #17–#35: 40 engine
-     * restarts a minute for 10 minutes). Past two restarts at once, each waits twice as long, up to 30 s, and the error is told once more.
+     * restarts a minute for 10 minutes). Refused again with no track of the app's open, it's the device's: each restart waits twice as
+     * long, from 2 s up to 30 s, and the user is told once to restart the device.
      */
     @Test
     public void aRefusedAudioTrackLoopWaitsLongerEachTime() throws Exception {
@@ -813,16 +814,17 @@ public class ErrorFixerControllerTest {
         }
 
         assertEquals(Collections.singletonList(1_000), controller.mReloads);
-        assertEquals(Arrays.asList(1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000), controller.mRestarts);
+        assertEquals(Arrays.asList(2_000, 4_000, 8_000, 16_000, 30_000, 30_000, 30_000), controller.mRestarts);
         List<JSONObject> events = mLog.readAll();
         assertEquals(Arrays.asList("audio_reload", "reload_video"), getActions(events.get(0)));
-        assertEquals(Arrays.asList("audio_fallback:none", "restart_engine_30s"), getActions(events.get(events.size() - 1)));
-        // The second's, and the first that waits
-        assertEquals(2, ShadowToast.shownToastCount());
+        assertEquals(Arrays.asList("audio_fallback:none", "device_audio_refused", "restart_engine_30s"),
+                getActions(events.get(events.size() - 1)));
+        // To restart the device, once
+        assertEquals(1, ShadowToast.shownToastCount());
     }
 
     /**
-     * Another video starts over: at once
+     * Each player's own: another's refusals don't add to its waits
      */
     @Test
     public void theAudioTrackWaitsAreOfTheVideo() throws Exception {
@@ -836,8 +838,8 @@ public class ErrorFixerControllerTest {
                     new AudioSink.InitializationException(0, 44_100, 12, 56_720));
         }
 
-        assertEquals(Arrays.asList(1_000, 2_000), first.mRestarts);
-        assertEquals(Arrays.asList(1_000, 2_000), controller.mRestarts);
+        assertEquals(Arrays.asList(2_000, 4_000), first.mRestarts);
+        assertEquals(Arrays.asList(2_000, 4_000), controller.mRestarts);
     }
 
     /**

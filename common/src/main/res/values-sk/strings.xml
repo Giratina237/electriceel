@@ -310,6 +310,7 @@
     <string name="remote_session_closed">Vzdialená relácia bola ukončená</string>
     <string name="msg_mode_switch_error">Nemožno prepnúť režim zobrazenia na \"%s\"</string>
     <string name="msg_player_error">Nastala chyba prehrávača %s. Reštartujem prehrávanie…</string>
+    <string name="msg_device_refuses_audio">Zariadenie odmieta prehrávať zvuk. Opravíte to reštartovaním zariadenia.</string>
     <string name="video_preset_disabled">Bez video predvoľby</string>
     <string name="video_preset_enabled">Formát ďalšieho videa bude nastavený podľa video predvoľby</string>
     <string name="player_sleep_timer">Časovač vypnutia</string>

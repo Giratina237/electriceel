@@ -290,6 +290,7 @@
   <string name="remote_session_closed">Etäyhteys on suljettu</string>
   <string name="msg_mode_switch_error">Ei voida vaihtaa kuvatilaa \"%s\"</string>
   <string name="msg_player_error">Soittimen virhe %s. Uudelleen käynnistetään toistoa…</string>
+  <string name="msg_device_refuses_audio">Laite kieltäytyy toistamasta ääntä. Korjaa tämä käynnistämällä laite uudelleen.</string>
   <string name="video_preset_disabled">Ei oletusasetusta</string>
   <string name="video_preset_enabled">Seuraavan videon formaatti asetetaan oletukseksi</string>
   <string name="player_sleep_timer">Uniajastin</string>

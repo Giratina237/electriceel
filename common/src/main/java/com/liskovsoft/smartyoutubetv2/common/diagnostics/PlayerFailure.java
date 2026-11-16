@@ -413,7 +413,7 @@ public final class PlayerFailure {
     }
 
     /**
-     * Built in the background, for the lines written only (see PlayerFailureLog)
+     * Built in the background as it's written, a repeat's too (see PlayerFailureLog)
      */
     @Nullable
     PlayerFailureLog.StateSource getStateSource() {

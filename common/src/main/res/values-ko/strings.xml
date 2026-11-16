@@ -298,6 +298,7 @@
   <string name="remote_session_closed">원격 세션이 종료되었습니다.</string>
   <string name="msg_mode_switch_error">표시 모드를 \"%s\"(으)로 전환할 수 없습니다.</string>
   <string name="msg_player_error">플레이어 오류 %s이(가) 발생했습니다. 다시 재생하는 중…</string>
+  <string name="msg_device_refuses_audio">기기가 소리 재생을 거부하고 있습니다. 기기를 다시 시작하면 해결됩니다.</string>
   <string name="video_preset_disabled">사전 설정 없음</string>
   <string name="video_preset_enabled">다음 동영상 포맷은 프리셋에 따라 설정됩니다.</string>
   <string name="player_sleep_timer">수면 타이머</string>

@@ -343,6 +343,7 @@
     <string name="remote_session_closed">Fjernøkten er avsluttet</string>
     <string name="msg_mode_switch_error">Kan ikke bytte visningsmodus til «%s»</string>
     <string name="msg_player_error">Avspillerfeil %s. Starter avspilling på nytt …</string>
+    <string name="msg_device_refuses_audio">Enheten nekter å spille av lyd. Start enheten på nytt for å fikse det.</string>
     <string name="video_preset_disabled">Uten forhåndsinnstilling</string>
     <string name="video_preset_enabled">Formatet på neste video vil bli satt i henhold til forhåndsinnstillingen</string>
     <string name="player_sleep_timer">Innsovningstimer</string>

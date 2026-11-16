@@ -296,6 +296,7 @@
   <string name="remote_session_closed">La sessió remota s\'ha tancat</string>
   <string name="msg_mode_switch_error">No es pot canviar el mode de visualització a \" %s</string>
   <string name="msg_player_error">S\'ha produït un error del jugador %s . S\'està reiniciant la reproducció…</string>
+  <string name="msg_device_refuses_audio">El dispositiu es nega a reproduir so. Reinicieu el dispositiu per solucionar-ho.</string>
   <string name="video_preset_disabled">Sense preajust</string>
   <string name="video_preset_enabled">El format del següent vídeo s\'establirà segons el valor predefinit</string>
   <string name="player_sleep_timer">Temporitzador de son</string>

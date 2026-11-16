@@ -298,6 +298,7 @@
   <string name="remote_session_closed">La session à distance a été fermée</string>
   <string name="msg_mode_switch_error">Impossible de basculer le mode d\'affichage sur \"%s\"</string>
   <string name="msg_player_error">Une erreur s\'est produite durant la lecture %s. Redémarrage du lecteur…</string>
+  <string name="msg_device_refuses_audio">L\'appareil refuse de lire le son. Redémarrez l\'appareil pour corriger cela.</string>
   <string name="video_preset_disabled">Aucune préférence</string>
   <string name="video_preset_enabled">Le format de la prochaine vidéo sera défini selon vos préférences</string>
   <string name="player_sleep_timer">Mise en veille automatique</string>
