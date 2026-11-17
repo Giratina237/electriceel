@@ -875,6 +875,7 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
         menuNames.put(MainUIData.MENU_ITEM_REPORT_AI_CHANNEL, R.string.report_ai_channel);
         menuNames.put(MainUIData.MENU_ITEM_HIDE_KEYWORDS, R.string.keyword_filter_hide_words);
         menuNames.put(MainUIData.MENU_ITEM_EXCLUDE_CHANNEL_FROM_HIDING, R.string.exclude_channel_from_hiding);
+        menuNames.put(MainUIData.MENU_ITEM_REFRESH_SECTION, R.string.refresh_section);
 
         for (ContextMenuProvider provider : new ContextMenuManager(getContext()).getProviders()) {
             menuNames.put(provider.getId(), provider.getTitleResId());

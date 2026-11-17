@@ -93,6 +93,7 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
     private boolean mIsOpenDescriptionButtonEnabled;
     private boolean mIsOpenCommentsButtonEnabled;
     private boolean mIsPlayVideoButtonEnabled;
+    private boolean mIsRefreshSectionButtonEnabled;
     private boolean mIsPlayVideoIncognitoButtonEnabled;
     private boolean mIsPlayFromStartButtonEnabled;
     private boolean mIsPlaylistOrderButtonEnabled;
@@ -931,6 +932,30 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
                 ));
     }
 
+    /**
+     * Refresh section, as in the menu of a section of the sidebar (see SectionMenuPresenter): the section shown is loaded again.
+     * Only for a card of that section, one of the browse view: search, a channel and the player have no section to refresh.
+     */
+    private void appendRefreshSectionButton() {
+        if (!mIsRefreshSectionButtonEnabled) {
+            return;
+        }
+
+        BrowsePresenter presenter = BrowsePresenter.instance(getContext());
+
+        if (!presenter.inForeground() || presenter.getCurrentSection() == null) {
+            return;
+        }
+
+        mDialogPresenter.appendSingleButton(
+                UiOptionItem.from(getContext().getString(R.string.refresh_section),
+                        optionItem -> {
+                            BrowsePresenter.instance(getContext()).refresh();
+                            mDialogPresenter.closeDialog();
+                        }
+                ));
+    }
+
     private void appendPlayVideoIncognitoButton() {
         if (!mIsPlayVideoIncognitoButtonEnabled || mVideo == null || mVideo.videoId == null) {
             return;
@@ -1281,6 +1306,7 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
         mIsHideButtonEnabled = mainUIData.isMenuItemEnabled(mMenu, MainUIData.MENU_ITEM_HIDE);
         mIsOpenDescriptionButtonEnabled = mainUIData.isMenuItemEnabled(mMenu, MainUIData.MENU_ITEM_OPEN_DESCRIPTION);
         mIsPlayVideoButtonEnabled = mainUIData.isMenuItemEnabled(mMenu, MainUIData.MENU_ITEM_PLAY_VIDEO);
+        mIsRefreshSectionButtonEnabled = mainUIData.isMenuItemEnabled(mMenu, MainUIData.MENU_ITEM_REFRESH_SECTION);
         mIsPlayVideoIncognitoButtonEnabled = mainUIData.isMenuItemEnabled(mMenu, MainUIData.MENU_ITEM_PLAY_VIDEO_INCOGNITO);
         mIsPlayFromStartButtonEnabled = mainUIData.isMenuItemEnabled(mMenu, MainUIData.MENU_ITEM_PLAY_FROM_START);
         mIsSubscribeButtonEnabled = mainUIData.isMenuItemEnabled(mMenu, MainUIData.MENU_ITEM_SUBSCRIBE);
@@ -1295,6 +1321,7 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
         mMenuMapping.clear();
 
         mMenuMapping.put(MainUIData.MENU_ITEM_PLAY_VIDEO, new MenuAction(this::appendPlayVideoButton, false));
+        mMenuMapping.put(MainUIData.MENU_ITEM_REFRESH_SECTION, new MenuAction(this::appendRefreshSectionButton, false));
         mMenuMapping.put(MainUIData.MENU_ITEM_PLAY_VIDEO_INCOGNITO, new MenuAction(this::appendPlayVideoIncognitoButton, false));
         mMenuMapping.put(MainUIData.MENU_ITEM_PLAY_FROM_START, new MenuAction(this::appendPlayFromStartButton, false));
         mMenuMapping.put(MainUIData.MENU_ITEM_REMOVE_FROM_HISTORY, new MenuAction(this::appendRemoveFromHistoryButton, false));

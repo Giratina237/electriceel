@@ -406,6 +406,69 @@ public class MainUIDataTest {
         assertFalse(getData().isMenuItemEnabled(MainUIData.MENU_VIDEOS, MainUIData.MENU_ITEM_EXCLUDE_CHANNEL_FROM_HIDING));
     }
 
+    /**
+     * In the menu of every card. Not an item of the sidebar one: its own is always there (see SectionMenuPresenter).
+     */
+    @Test
+    public void refreshSectionIsInEveryCardMenuByDefault() {
+        MainUIData data = getData();
+
+        for (int menu : CARD_MENUS) {
+            assertTrue("menu " + menu, data.isMenuItemEnabled(menu, MainUIData.MENU_ITEM_REFRESH_SECTION));
+        }
+
+        assertMenus(MainUIData.MENU_ITEM_REFRESH_SECTION, CARD_MENUS);
+    }
+
+    @Test
+    public void refreshSectionIsTheSecondItemOfEveryCardMenu() {
+        MainUIData data = getData();
+
+        for (int menu : CARD_MENUS) {
+            assertEquals("menu " + menu, 0, data.getMenuItemIndex(menu, MainUIData.MENU_ITEM_PLAY_VIDEO));
+            assertEquals("menu " + menu, 1, data.getMenuItemIndex(menu, MainUIData.MENU_ITEM_REFRESH_SECTION));
+        }
+    }
+
+    /**
+     * Saved before there was one: it's new to the card menus, on and second there, whatever their order
+     */
+    @Test
+    public void refreshSectionIsAddedToTheSavedCardMenusOnAndSecond() {
+        SavedMenus saved = SavedMenus.oldDefaults();
+
+        for (int menu : CARD_MENUS) {
+            saved.orders.get(menu).remove((Long) MainUIData.MENU_ITEM_REFRESH_SECTION);
+            saved.items[menu] &= ~MainUIData.MENU_ITEM_REFRESH_SECTION;
+        }
+
+        // In an order of its own
+        List<Long> videos = saved.orders.get(MainUIData.MENU_VIDEOS);
+        videos.remove((Long) MainUIData.MENU_ITEM_SHARE_LINK);
+        videos.add(0, MainUIData.MENU_ITEM_SHARE_LINK);
+        saved.save();
+
+        MainUIData data = getData();
+
+        for (int menu : CARD_MENUS) {
+            assertTrue("menu " + menu, data.isMenuItemEnabled(menu, MainUIData.MENU_ITEM_REFRESH_SECTION));
+            assertEquals("menu " + menu, 1, data.getMenuItemIndex(menu, MainUIData.MENU_ITEM_REFRESH_SECTION));
+        }
+
+        assertEquals(0, data.getMenuItemIndex(MainUIData.MENU_VIDEOS, MainUIData.MENU_ITEM_SHARE_LINK));
+        assertEquals(-1, data.getMenuItemIndex(MainUIData.MENU_SIDEBAR, MainUIData.MENU_ITEM_REFRESH_SECTION));
+    }
+
+    @Test
+    public void refreshSectionTurnedOffStaysOff() {
+        getData().setMenuItemDisabled(MainUIData.MENU_VIDEOS, MainUIData.MENU_ITEM_REFRESH_SECTION);
+        ShadowLooper.shadowMainLooper().idle();
+        MainUIData.resetInstanceForTesting();
+
+        assertFalse(getData().isMenuItemEnabled(MainUIData.MENU_VIDEOS, MainUIData.MENU_ITEM_REFRESH_SECTION));
+        assertTrue(getData().isMenuItemEnabled(MainUIData.MENU_SUBSCRIPTIONS, MainUIData.MENU_ITEM_REFRESH_SECTION));
+    }
+
     @Test
     public void subscriptionGroupIsTheItemOfItsProvider() {
         for (ContextMenuProvider provider : new ContextMenuManager(RuntimeEnvironment.getApplication()).getProviders()) {
