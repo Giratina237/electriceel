@@ -65,7 +65,7 @@ public class PlaybackActivity extends LeanbackActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (dispatchEndScreenKey(event)) {
+        if (dispatchCardKey(event)) {
             return true;
         }
 
@@ -77,12 +77,13 @@ public class PlaybackActivity extends LeanbackActivity {
     }
 
     /**
-     * The keys of the end screen cards, before the player's and the key translator's (see PlaybackFragment#dispatchEndScreenKey)
+     * The keys of the cards over the video (the end screen's, an info card's teaser), before the player's and the key translator's (see
+     * PlaybackFragment#dispatchCardKey)
      *
      * @return true if consumed
      */
-    protected boolean dispatchEndScreenKey(KeyEvent event) {
-        if (mPlaybackFragment == null || !mPlaybackFragment.dispatchEndScreenKey(event)) {
+    protected boolean dispatchCardKey(KeyEvent event) {
+        if (mPlaybackFragment == null || !mPlaybackFragment.dispatchCardKey(event)) {
             return false;
         }
 

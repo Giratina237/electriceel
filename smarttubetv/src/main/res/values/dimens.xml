@@ -177,6 +177,21 @@
     <dimen name="end_screen_badge_text_size">12sp</dimen>
     <dimen name="end_screen_badge_padding">3dp</dimen>
     <dimen name="end_screen_label_gap">4dp</dimen>
+    <!-- The teaser of an info card over the video (InfoCardView): as high as its image, 16:9 (round for a channel) -->
+    <dimen name="info_card_margin">24dp</dimen>
+    <dimen name="info_card_corner_radius">6dp</dimen>
+    <dimen name="info_card_focus_stroke">3dp</dimen>
+    <!-- Its white edge, inside its bounds: thinner than the focus ring drawn over it -->
+    <dimen name="info_card_border_width">1dp</dimen>
+    <dimen name="info_card_padding">6dp</dimen>
+    <dimen name="info_card_image_width">112dp</dimen>
+    <dimen name="info_card_image_height">63dp</dimen>
+    <dimen name="info_card_text_gap">10dp</dimen>
+    <dimen name="info_card_text_max_width">260dp</dimen>
+    <dimen name="info_card_teaser_text_size">14sp</dimen>
+    <dimen name="info_card_subtitle_text_size">12sp</dimen>
+    <dimen name="info_card_badge_text_size">11sp</dimen>
+    <dimen name="info_card_badge_padding">2dp</dimen>
     <!-- The changelog of the pinned Update section, in every skin (ModernStatePage, ErrorDialogFragment) -->
     <dimen name="update_changelog_text_size">12sp</dimen>
 </resources>

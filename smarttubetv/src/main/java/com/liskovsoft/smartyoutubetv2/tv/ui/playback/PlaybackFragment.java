@@ -48,6 +48,7 @@ import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.util.Util;
 import com.google.android.exoplayer2.video.VideoListener;
 import com.liskovsoft.mediaserviceinterfaces.data.EndScreenItem;
+import com.liskovsoft.mediaserviceinterfaces.data.InfoCardItem;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
@@ -96,6 +97,7 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.playback.other.VideoPlayerGlue.OnAct
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.previewtimebar.StoryboardSeekDataProvider;
 import com.liskovsoft.smartyoutubetv2.tv.ui.widgets.chat.LiveChatView;
 import com.liskovsoft.smartyoutubetv2.tv.ui.widgets.endscreen.EndScreenView;
+import com.liskovsoft.smartyoutubetv2.tv.ui.widgets.infocard.InfoCardView;
 import com.liskovsoft.smartyoutubetv2.tv.ui.widgets.startgraph.StartGraphView;
 import com.liskovsoft.smartyoutubetv2.tv.ui.widgets.time.DateTimeView;
 import com.liskovsoft.smartyoutubetv2.tv.ui.widgets.time.EndingTimeView;
@@ -145,8 +147,9 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     private String mSelectedVideoId;
     private EndScreenView mEndScreen;
     private boolean mHasEndScreen;
-    // Down handled by the end screen: their up is too
-    private final Set<Integer> mEndScreenKeys = new HashSet<>();
+    private InfoCardView mInfoCard;
+    // Down handled by the cards: their up is too
+    private final Set<Integer> mCardKeys = new HashSet<>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -197,6 +200,11 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         mEndScreen = root.findViewById(R.id.end_screen);
         mEndScreen.setFrameView(root.findViewById(R.id.surface_root));
         mEndScreen.setListener(item -> mPlaybackPresenter.onEndScreenItemClicked(item));
+
+        mInfoCard = root.findViewById(R.id.info_card);
+        mInfoCard.setFrameView(root.findViewById(R.id.surface_root));
+        mInfoCard.setCornerView(root.findViewById(R.id.player_overlay_wrapper));
+        mInfoCard.setListener(item -> mPlaybackPresenter.onInfoCardClicked(item));
 
         return root;
     }
@@ -332,21 +340,22 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             notifyPlaybackRowChanged();
         }
 
-        updateEndScreen(isControlsOverlayVisible());
+        updateCards(isControlsOverlayVisible());
     }
 
     /**
-     * Keys of the end screen, before the player's: up while its cards show and the controls don't moves the focus to them (unless up is
-     * set to change the speed or the volume, or to skip videos). Then they get the arrows, OK and back until they're left (see
-     * EndScreenView); other keys (e.g. play/pause) still go to the player.
+     * Keys of the cards over the video, before the player's: up while the end screen's cards or an info card's teaser show and the
+     * controls don't moves the focus to them, to the end screen's when both show (unless up is set to change the speed or the volume, or
+     * to skip videos). Then they get the arrows, OK and back until they're left (see EndScreenView, InfoCardView); other keys (e.g.
+     * play/pause) still go to the player.
      *
      * @return true if consumed
      */
-    public boolean dispatchEndScreenKey(KeyEvent event) {
+    public boolean dispatchCardKey(KeyEvent event) {
         int keyCode = event.getKeyCode();
 
         if (event.getAction() == KeyEvent.ACTION_UP) {
-            return mEndScreenKeys.remove(keyCode);
+            return mCardKeys.remove(keyCode);
         }
 
         if (event.getAction() != KeyEvent.ACTION_DOWN) {
@@ -355,23 +364,30 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
 
         // A press whose up went to another screen (e.g. OK opened a channel): this one's up is the player's
         if (event.getRepeatCount() == 0) {
-            mEndScreenKeys.remove(keyCode);
+            mCardKeys.remove(keyCode);
         }
 
-        if (mEndScreen == null || !mEndScreen.hasCards()) {
+        boolean hasEndScreen = mEndScreen != null && mEndScreen.hasCards();
+        boolean hasInfoCard = mInfoCard != null && mInfoCard.hasCard();
+
+        if (!hasEndScreen && !hasInfoCard) {
             return false;
         }
 
         boolean handled;
 
-        if (mEndScreen.isActive()) {
+        if (hasEndScreen && mEndScreen.isActive()) {
             handled = mEndScreen.onActiveKeyDown(event);
+        } else if (hasInfoCard && mInfoCard.isActive()) {
+            handled = mInfoCard.onActiveKeyDown(event);
         } else {
-            handled = keyCode == KeyEvent.KEYCODE_DPAD_UP && !isControlsOverlayVisible() && !isDpadUpRemapped() && mEndScreen.enter();
+            // The end screen's cards before a teaser: they're what's left of the video
+            handled = keyCode == KeyEvent.KEYCODE_DPAD_UP && !isControlsOverlayVisible() && !isDpadUpRemapped()
+                    && ((hasEndScreen && mEndScreen.enter()) || (hasInfoCard && mInfoCard.enter()));
         }
 
         if (handled) {
-            mEndScreenKeys.add(keyCode);
+            mCardKeys.add(keyCode);
         }
 
         return handled;
@@ -387,18 +403,39 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     /**
      * The cards show over the video, not over the controls or in PIP
      */
-    private void updateEndScreen(boolean isControlsVisible) {
-        if (mEndScreen == null) {
-            return;
+    private void updateCards(boolean isControlsVisible) {
+        showCards(!isControlsVisible && !isInPIPMode());
+    }
+
+    /**
+     * The end screen's cards (when it has some) and an info card's teaser (when there's one: its view is empty otherwise)
+     */
+    private void showCards(boolean show) {
+        if (mEndScreen != null) {
+            boolean showEndScreen = show && mHasEndScreen;
+
+            if (!showEndScreen) {
+                mEndScreen.exit();
+            }
+
+            mEndScreen.setVisibility(showEndScreen ? View.VISIBLE : View.INVISIBLE);
         }
 
-        boolean show = mHasEndScreen && !isControlsVisible && !isInPIPMode();
+        if (mInfoCard != null) {
+            if (!show) {
+                mInfoCard.exit();
+            }
 
-        if (!show) {
-            mEndScreen.exit();
+            // FIX83: temporary
+            if (mInfoCard.getVisibility() != (show ? View.VISIBLE : View.INVISIBLE)) {
+                StackTraceElement[] stack = new Throwable().getStackTrace();
+                Log.d(TAG, "FIX83 info card view %s (controls %s, pip %s), from %s < %s < %s", show ? "VISIBLE" : "INVISIBLE",
+                        isControlsOverlayVisible(), isInPIPMode(), stack[1].getMethodName(), stack.length > 2 ? stack[2].getMethodName() : "",
+                        stack.length > 3 ? stack[3].getMethodName() : "");
+            }
+
+            mInfoCard.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
         }
-
-        mEndScreen.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
     }
 
     @Override
@@ -1151,7 +1188,25 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
 
         mHasEndScreen = items != null && !items.isEmpty();
         mEndScreen.setItems(items);
-        updateEndScreen(isControlsOverlayVisible());
+        updateCards(isControlsOverlayVisible());
+    }
+
+    @Override
+    public void setInfoCard(@Nullable InfoCardItem item) {
+        if (mInfoCard == null) {
+            return;
+        }
+
+        // FIX83: temporary
+        Log.d(TAG, "FIX83 setInfoCard %s (controls %s, pip %s)", item != null ? item.getTeaser() : null, isControlsOverlayVisible(),
+                isInPIPMode());
+        mInfoCard.setItem(item);
+        updateCards(isControlsOverlayVisible());
+    }
+
+    @Override
+    public boolean isInfoCardShown() {
+        return mInfoCard != null && mInfoCard.hasCard() && mInfoCard.isShown();
     }
 
     @Override
@@ -1482,7 +1537,7 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     @Override
     public void showControlsOverlay(boolean runAnimation) {
         super.showControlsOverlay(mIsUIAnimationsEnabled);
-        updateEndScreen(true);
+        updateCards(true);
 
         // Do throttle. Called so many times. Rely on boxing because initial state is unknown.
         if (mIsControlsShownPreviously != null && mIsControlsShownPreviously) {
@@ -1505,7 +1560,7 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     @Override
     public void hideControlsOverlay(boolean runAnimation) {
         super.hideControlsOverlay(mIsUIAnimationsEnabled);
-        updateEndScreen(false);
+        updateCards(false);
 
         // Do throttle. Called so many times. Rely on boxing because initial state is unknown.
         if (mIsControlsShownPreviously != null && !mIsControlsShownPreviously) {
@@ -1872,6 +1927,11 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         setChatReceiver(null);
         setSeekBarSegments(null);
         setSeekPreviewTitle(null);
+
+        // A teaser kept while it's picked (see InfoCardView#setItem) isn't the next video's
+        if (mInfoCard != null) {
+            mInfoCard.exit();
+        }
     }
 
     @Override
@@ -1905,10 +1965,9 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         }
 
         if (show) {
-            updateEndScreen(isControlsOverlayVisible());
-        } else if (mEndScreen != null) {
-            mEndScreen.exit();
-            mEndScreen.setVisibility(View.INVISIBLE);
+            updateCards(isControlsOverlayVisible());
+        } else {
+            showCards(false);
         }
     }
 

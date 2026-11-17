@@ -11,6 +11,7 @@ import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.ui.AspectRatioFrameLayout;
 import com.google.android.exoplayer2.ui.PlayerView;
 import com.liskovsoft.mediaserviceinterfaces.data.EndScreenItem;
+import com.liskovsoft.mediaserviceinterfaces.data.InfoCardItem;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
@@ -211,6 +212,16 @@ public class EmbedPlayerView extends PlayerView implements PlaybackView {
     @Override
     public void setEndScreen(@Nullable List<EndScreenItem> items) {
         // A card's preview: no end screen
+    }
+
+    @Override
+    public void setInfoCard(@Nullable InfoCardItem item) {
+        // A card's preview: no info cards
+    }
+
+    @Override
+    public boolean isInfoCardShown() {
+        return false;
     }
 
     @Override

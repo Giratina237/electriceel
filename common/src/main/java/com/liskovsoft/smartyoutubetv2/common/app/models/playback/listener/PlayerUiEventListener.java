@@ -1,6 +1,7 @@
 package com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener;
 
 import com.liskovsoft.mediaserviceinterfaces.data.EndScreenItem;
+import com.liskovsoft.mediaserviceinterfaces.data.InfoCardItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 
 public interface PlayerUiEventListener {
@@ -9,6 +10,10 @@ public interface PlayerUiEventListener {
      * A card of the end screen the creator put over the video (see EndScreenController)
      */
     void onEndScreenItemClicked(EndScreenItem item);
+    /**
+     * A card the creator put partway through the video, its teaser picked (see InfoCardController)
+     */
+    void onInfoCardClicked(InfoCardItem item);
     void onSuggestionItemLongClicked(Video item);
     void onScrollEnd(Video item);
     /**

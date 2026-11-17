@@ -17,6 +17,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUti
 import com.liskovsoft.smartyoutubetv2.common.misc.VideoCategoryManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.EndScreenData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.InfoCardData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.MusicAutoplayData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
@@ -180,6 +181,12 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
                 getContext().getString(R.string.player_end_screen_desc),
                 option -> endScreenData.setShowEnabled(option.isSelected()),
                 endScreenData.isShowEnabled()));
+
+        InfoCardData infoCardData = InfoCardData.instance(getContext());
+        options.add(UiOptionItem.from(getContext().getString(R.string.player_info_cards),
+                getContext().getString(R.string.player_info_cards_desc),
+                option -> infoCardData.setShowEnabled(option.isSelected()),
+                infoCardData.isShowEnabled()));
 
         settingsPresenter.appendCheckedCategory(getContext().getString(R.string.settings_show_options), options);
 

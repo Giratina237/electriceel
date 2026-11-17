@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Context;
 
 import com.liskovsoft.mediaserviceinterfaces.data.EndScreenItem;
+import com.liskovsoft.mediaserviceinterfaces.data.InfoCardItem;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Playlist;
@@ -13,6 +14,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.BasePlayerContr
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.AutoFrameRateController;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.CensoredWordsController;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.EndScreenController;
+import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.InfoCardController;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.ChatController;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.CommentsController;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.ErrorFixerController;
@@ -71,6 +73,7 @@ public class PlaybackPresenter extends BasePresenter<PlaybackView> implements Pl
         mEventListeners.add(new SponsorBlockController());
         mEventListeners.add(new CensoredWordsController());
         mEventListeners.add(new EndScreenController());
+        mEventListeners.add(new InfoCardController());
         mEventListeners.add(new AutoFrameRateController());
         mEventListeners.add(new HQDialogController());
         mEventListeners.add(new ChatController());
@@ -420,6 +423,11 @@ public class PlaybackPresenter extends BasePresenter<PlaybackView> implements Pl
     @Override
     public void onEndScreenItemClicked(EndScreenItem item) {
         process(listener -> listener.onEndScreenItemClicked(item));
+    }
+
+    @Override
+    public void onInfoCardClicked(InfoCardItem item) {
+        process(listener -> listener.onInfoCardClicked(item));
     }
 
     @Override

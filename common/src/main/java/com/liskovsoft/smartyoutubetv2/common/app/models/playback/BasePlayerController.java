@@ -13,6 +13,7 @@ import com.liskovsoft.mediaserviceinterfaces.MediaItemService;
 import com.liskovsoft.mediaserviceinterfaces.NotificationsService;
 import com.liskovsoft.mediaserviceinterfaces.SignInService;
 import com.liskovsoft.mediaserviceinterfaces.data.EndScreenItem;
+import com.liskovsoft.mediaserviceinterfaces.data.InfoCardItem;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
 import com.liskovsoft.sharedutils.helpers.Helpers;
@@ -128,6 +129,11 @@ public abstract class BasePlayerController implements PlayerEventListener {
 
     @Override
     public void onEndScreenItemClicked(EndScreenItem item) {
+        // NOP
+    }
+
+    @Override
+    public void onInfoCardClicked(InfoCardItem item) {
         // NOP
     }
 

@@ -3,6 +3,7 @@ package com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager;
 import androidx.annotation.Nullable;
 
 import com.liskovsoft.mediaserviceinterfaces.data.EndScreenItem;
+import com.liskovsoft.mediaserviceinterfaces.data.InfoCardItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment;
@@ -49,6 +50,14 @@ public interface PlayerUI {
      * The cards of the end screen on the screen now (see EndScreenController). Null hides them.
      */
     void setEndScreen(@Nullable List<EndScreenItem> items);
+    /**
+     * The card whose teaser is on the screen now (see InfoCardController). Null hides it.
+     */
+    void setInfoCard(@Nullable InfoCardItem item);
+    /**
+     * Whether the teaser set (see setInfoCard) can be seen now: not while the controls hide it, or in PIP
+     */
+    boolean isInfoCardShown();
     void updateEndingTime();
     void setChatReceiver(ChatReceiver chatReceiver);
 }

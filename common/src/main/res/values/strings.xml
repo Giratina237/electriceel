@@ -1100,6 +1100,8 @@
     <string name="mute_censored_words_desc">Mutes the words YouTube\'s automatic captions show as [ __ ], with subtitles on or off. Only on videos with automatic captions.</string>
     <string name="player_end_screen">Show end screen cards</string>
     <string name="player_end_screen_desc">The videos, playlists, channels and links a creator puts over the end of a video. Press up to pick one.</string>
+    <string name="player_info_cards">Show mid-video cards</string>
+    <string name="player_info_cards_desc">The videos, playlists, channels and links a creator puts partway through a video, shown for a few seconds in the top corner. Press up to pick one.</string>
     <plurals name="seconds">
         <item quantity="one">%s second</item>
         <item quantity="other">%s seconds</item>

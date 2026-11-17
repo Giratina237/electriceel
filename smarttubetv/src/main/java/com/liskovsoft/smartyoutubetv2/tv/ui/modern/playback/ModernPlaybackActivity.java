@@ -18,8 +18,8 @@ public class ModernPlaybackActivity extends PlaybackActivity {
     public boolean dispatchKeyEvent(KeyEvent event) {
         Fragment fragment = getSupportFragmentManager().findFragmentById(R.id.playback_controls_fragment);
 
-        // Up selects the end screen cards rather than showing the controls
-        if (dispatchEndScreenKey(event)) {
+        // Up selects the end screen cards or an info card's teaser rather than showing the controls
+        if (dispatchCardKey(event)) {
             return true;
         }
 
