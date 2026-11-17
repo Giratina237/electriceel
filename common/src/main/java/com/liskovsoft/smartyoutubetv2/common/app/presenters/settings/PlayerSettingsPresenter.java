@@ -23,6 +23,7 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SearchData;
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil;
+import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.service.internal.MediaServiceData;
 
 import java.util.ArrayList;
@@ -245,7 +246,11 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
                 mPlayerTweaksData.isSnappingToVsyncDisabled()));
 
         options.add(UiOptionItem.from(getContext().getString(R.string.disable_channels_service),
-                option -> GlobalPreferences.instance(getContext()).setChannelsServiceEnabled(!option.isSelected()),
+                option -> {
+                    GlobalPreferences.instance(getContext()).setChannelsServiceEnabled(!option.isSelected());
+                    // Cancels the channels update work when disabled, starts it now when enabled
+                    Utils.updateChannels(getContext());
+                },
                 !GlobalPreferences.instance(getContext()).isChannelsServiceEnabled()));
 
         showCheckedList(R.string.settings_disable_options, options);

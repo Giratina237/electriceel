@@ -40,6 +40,9 @@ public class UpdateChannelsWorker extends Worker {
         mTask = new UpdateChannelsTask(context);
     }
 
+    /**
+     * Enqueues the work, or cancels it when the channels service is disabled: the work enqueued before would keep running
+     */
     public static void schedule(Context context) {
         if (VERSION.SDK_INT >= 23 && GlobalPreferences.instance(context).isChannelsServiceEnabled()) {
             sIsWorkScheduled = true;
@@ -55,11 +58,13 @@ public class UpdateChannelsWorker extends Worker {
                     ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE, // called immediately!
                     new PeriodicWorkRequest.Builder(UpdateChannelsWorker.class, REPEAT_INTERVAL_MINUTES, TimeUnit.MINUTES).addTag(WORK_NAME).build()
             );
+        } else {
+            cancel(context);
         }
     }
 
     public static void cancel(Context context) {
-        if (VERSION.SDK_INT >= 23 && GlobalPreferences.instance(context).isChannelsServiceEnabled()) {
+        if (VERSION.SDK_INT >= 23) {
             Log.d(TAG, "Unregistering Channels update job...");
 
             SafeWorkManager workManager = SafeWorkManager.getInstance(context);
@@ -71,6 +76,12 @@ public class UpdateChannelsWorker extends Worker {
     @Override
     public Result doWork() {
         Log.d(TAG, "Starting worker %s...", this);
+
+        // Enqueued before the channels service was disabled: removes itself, even when the app isn't started again
+        if (!GlobalPreferences.instance(getApplicationContext()).isChannelsServiceEnabled()) {
+            cancel(getApplicationContext());
+            return Result.success();
+        }
 
         // Foreground ⇒ possible playback; skip sync to avoid CPU contention during video decode (#6234)
         if (!Helpers.isAppInForeground() || sIsWorkScheduled) {
