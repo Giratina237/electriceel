@@ -1,13 +1,23 @@
 {
   "package": {
     "downloadUrlList_arm64-v8a": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.70.5/ElectricEel_stable_32.70.5_arm64-v8a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.71.1/ElectricEel_stable_32.71.1_arm64-v8a.apk"
     ],
     "downloadUrlList_armeabi-v7a": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.70.5/ElectricEel_stable_32.70.5_armeabi-v7a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.71.1/ElectricEel_stable_32.71.1_armeabi-v7a.apk"
     ],
     "downloadUrlList": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.70.5/ElectricEel_stable_32.70.5_armeabi-v7a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.71.1/ElectricEel_stable_32.71.1_armeabi-v7a.apk"
+    ]
+  },
+  "32.71.1": {
+    "versionCode": 2458,
+    "changelog": [
+      "Fixed the 0:59 issue by replacing questionable or avoiding PENDING poTokens",
+      "Fixed Hybrid style: OK button brings up control bar instead of pausing after hiding it with Up/Down #78",
+      "Implemented Option to hide the \"None\" account from the top-left account switcher #80",
+      "Added a Member videos filter that hides or marks members-only and members-first videos",
+      "Fixed the font size of the changelog"
     ]
   },
   "32.70.5": {
