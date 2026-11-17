@@ -122,6 +122,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
      */
     private static final long MIN_LIVE_WAIT_MS = 250;
     private static final long MAX_LIVE_WAIT_MS = 10_000;
+    /**
+     * The longest wait the server asks for before an init request is sent again (see maybeWaitForInit): a longer one fails the load
+     * (see SabrExtractorInput#MIN_SWALLOW_BACKOFF_MS)
+     */
+    private static final long MAX_INIT_WAIT_MS = 15_000;
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final int[] adaptationSetIndices;
     private final int trackType;
@@ -149,6 +154,14 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
      * Of a live stream: the next media chunk's request isn't sent before (elapsed realtime), see maybeWaitForLiveSegment
      */
     private long nextLiveLoadTimeMs = C.TIME_UNSET;
+    /**
+     * Of a stream that isn't live: the next init chunk's request isn't sent before (elapsed realtime), see maybeWaitForInit
+     */
+    private long nextInitLoadTimeMs = C.TIME_UNSET;
+    /**
+     * The stream's NextRequestPolicy count when the last init chunk's request was made (see SabrStream#getNextRequestPolicyCount)
+     */
+    private int initRequestPolicyCount;
     /**
      * Of the last media chunk's request: its format's itag and the sequence number of the segment received last before it
      */
@@ -546,6 +559,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             //                                representationHolder.representation.presentationTimeOffsetUs));
             //    }
             //}
+            maybeWaitForInit(representationHolder);
         }
         if (playerTrackEmsgHandler != null) {
             playerTrackEmsgHandler.onChunkLoadCompleted(chunk);
@@ -632,6 +646,31 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             resetSampleDeduplicator(); // the chunk is discarded with its samples
         }
         return blacklisted;
+    }
+
+    /**
+     * The init chunk's request was answered with no init segment, and the server asked to wait: it holds the stream till a moment it
+     * names (each start of a WEB stream on a DuneHD, KKSJMSQX: 0 KB, 3.6 to 4.6 s with no row, then the last 8 waits kept, asked about
+     * 60 ms apart, counting down to the moment the media came). The chunk source asks for the init segment again as soon as the answer
+     * ends (see getNextChunk), and each time gets the same: the next request waits what was asked for. A wait over MAX_INIT_WAIT_MS
+     * fails the load instead (see SabrExtractorInput). A live stream's has its own wait (see maybeWaitForLiveSegment).
+     */
+    private void maybeWaitForInit(RepresentationHolder representationHolder) {
+        if (sabrStream == null || manifest.isLive() || representationHolder.extractorWrapper == null
+                || representationHolder.extractorWrapper.getSampleFormats() != null) {
+            return; // the init segment came
+        }
+
+        // The wait is the last one asked for: one asked before this request was made isn't its answer's
+        int backoffMs = sabrStream.getBackoffTimeMs();
+
+        if (sabrStream.getNextRequestPolicyCount() == initRequestPolicyCount || backoffMs <= 0) {
+            return;
+        }
+
+        long waitMs = Math.min(backoffMs, MAX_INIT_WAIT_MS);
+        nextInitLoadTimeMs = SystemClock.elapsedRealtime() + waitMs;
+        Log.d(TAG, "No init segment: the next init request waits " + waitMs + " ms");
     }
 
     /**
@@ -852,9 +891,17 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
         if (sabrStream != null) {
             sabrStream.setInitRequest(true); // read up to the init segment only (see SabrExtractorInput)
+            initRequestPolicyCount = sabrStream.getNextRequestPolicyCount();
         }
 
-        return new InitializationChunk(dataSource, dataSpec, trackFormat,
+        // The server asked to wait before it's asked again (see maybeWaitForInit). The chunk is loaded now, its request waits.
+        DataSource chunkDataSource = dataSource;
+        if (nextInitLoadTimeMs != C.TIME_UNSET) {
+            chunkDataSource = new DelayedOpenDataSource(dataSource, nextInitLoadTimeMs);
+            nextInitLoadTimeMs = C.TIME_UNSET;
+        }
+
+        return new InitializationChunk(chunkDataSource, dataSpec, trackFormat,
                 trackSelectionReason, trackSelectionData, representationHolder.extractorWrapper);
     }
 
@@ -1181,7 +1228,8 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
     /**
      * Opens no earlier than a time (elapsed realtime): a live stream's request for a segment that doesn't exist yet (see
-     * maybeWaitForLiveSegment). The wait ends early when the load is canceled (the loader interrupts its thread).
+     * maybeWaitForLiveSegment), or an init request the server asked to wait for (see maybeWaitForInit). The wait ends early when the
+     * load is canceled (the loader interrupts its thread).
      */
     /* package */ static final class DelayedOpenDataSource implements DataSource {
         private final DataSource upstream;
@@ -1206,7 +1254,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                     Thread.sleep(waitMs);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw new InterruptedIOException("Canceled while waiting for the next live segment");
+                    throw new InterruptedIOException("Canceled while waiting to send the request");
                 }
             }
 

@@ -61,8 +61,11 @@ public class ServerBackoffsTest {
         assertTrue(ServerBackoffs.take(10_000, 13_000).isEmpty());
     }
 
+    /**
+     * More than the rows shown: one, the server's hold, from the first told to the end of the last (KKSJMSQX: only the last 8 were kept)
+     */
     @Test
-    public void keepsTheLastOnes() {
+    public void moreThanTheRowsAreOneHold() {
         for (int i = 0; i < ServerBackoffs.MAX_BACKOFFS + 2; i++) {
             mNow.set(20_000 + i * 100);
             ServerBackoffs.onBackoff(50);
@@ -70,7 +73,10 @@ public class ServerBackoffsTest {
 
         List<VideoStart.Stage> stages = ServerBackoffs.take(0, 30_000);
 
-        assertEquals(ServerBackoffs.MAX_BACKOFFS, stages.size());
-        assertEquals(20_200, stages.get(0).startMs);
+        assertEquals(1, stages.size());
+        assertEquals(VideoStarts.STAGE_SERVER_HOLD, stages.get(0).name);
+        assertEquals("10 waits, first 50 ms asked, last 50 ms asked", stages.get(0).detail);
+        assertEquals(20_000, stages.get(0).startMs);
+        assertEquals(20_950, stages.get(0).endMs);
     }
 }

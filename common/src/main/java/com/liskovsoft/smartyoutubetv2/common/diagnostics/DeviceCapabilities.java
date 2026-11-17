@@ -168,7 +168,7 @@ public final class DeviceCapabilities {
                 result.put("mediaOutput", nullable(getMediaOutput(audioManager)));
             }
 
-            // A refused AudioTrack: the ones the app holds, or the device's (FARAJV5R: refused for 20 minutes, a new process played)
+            // A refused AudioTrack: the ones the app holds, or the device's (FARAJV5R, 9M6NBWN7: refused till the device restarted)
             result.put("audioTracks", buildAudioTracks());
         } catch (JSONException | RuntimeException e) {
             putError(result, e);

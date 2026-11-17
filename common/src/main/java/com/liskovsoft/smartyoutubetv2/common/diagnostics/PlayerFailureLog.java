@@ -98,7 +98,11 @@ public final class PlayerFailureLog {
         long writtenTs;
         int count;
         JSONObject last;
-        StateSource lastState;
+        /**
+         * Of the last one, built when it happened (see #write)
+         */
+        @Nullable
+        JSONObject lastState;
 
         Repeat(long writtenTs) {
             this.writtenTs = writtenTs;
@@ -139,7 +143,8 @@ public final class PlayerFailureLog {
     }
 
     /**
-     * Where the device was at (see DeviceCapabilities#buildState): built in the background, for the lines written only
+     * Where the device was at (see DeviceCapabilities#buildState): built in the background as each failure is written, a repeat's
+     * too, whose last is written when its minute is over
      */
     interface StateSource {
         JSONObject build();
@@ -380,7 +385,9 @@ public final class PlayerFailureLog {
         if (repeat != null) {
             repeat.count++;
             repeat.last = json;
-            repeat.lastState = state;
+            // Now, where the device is at when it happened: built when its minute is written, it was minutes late (KKSJMSQX #2: a
+            // stall's state from 312 s after it, with the display mode and the heap of then)
+            repeat.lastState = buildState(state);
             return;
         }
 
@@ -390,13 +397,33 @@ public final class PlayerFailureLog {
     }
 
     private static void addState(JSONObject json, @Nullable StateSource state) {
+        putState(json, buildState(state));
+    }
+
+    /**
+     * Null when there's none, or it can't be built: written without it
+     */
+    @Nullable
+    private static JSONObject buildState(@Nullable StateSource state) {
+        if (state == null) {
+            return null;
+        }
+
+        try {
+            return state.build();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static void putState(JSONObject json, @Nullable JSONObject state) {
         if (state == null) {
             return;
         }
 
         try {
-            json.put("state", state.build());
-        } catch (JSONException | RuntimeException e) {
+            json.put("state", state);
+        } catch (JSONException e) {
             // Written without it
         }
     }
@@ -423,7 +450,7 @@ public final class PlayerFailureLog {
                     throw new IllegalStateException(e);
                 }
 
-                addState(repeat.last, repeat.lastState);
+                putState(repeat.last, repeat.lastState);
                 append(repeat.last);
             }
 

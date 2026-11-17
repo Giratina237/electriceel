@@ -304,6 +304,7 @@
   <string name="remote_session_closed">Sesja zdalna została zamknięta</string>
   <string name="msg_mode_switch_error">Nie można przełączyć trybu wyświetlania na \"%s\"</string>
   <string name="msg_player_error">Wystąpił błąd odtwarzacza %s. Wznawiam odtwarzanie…</string>
+  <string name="msg_device_refuses_audio">Urządzenie odmawia odtwarzania dźwięku. Uruchom ponownie urządzenie, aby to naprawić.</string>
   <string name="video_preset_disabled">Bez ustawień wstępnych</string>
   <string name="video_preset_enabled">Format następnego wideo zostanie ustawiony zgodnie z ustawieniami wstępnymi</string>
   <string name="player_sleep_timer">Wyłącznik czasowy</string>

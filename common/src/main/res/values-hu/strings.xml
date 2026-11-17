@@ -291,6 +291,7 @@
   <string name="remote_session_closed">A távoli munkamenet lezárult</string>
   <string name="msg_mode_switch_error">Nem lehet átállítani a megjelenítési módot \"%s\"</string>
   <string name="msg_player_error">Lejátszási hiba történt %s. A lejátszás újraindítása..</string>
+  <string name="msg_device_refuses_audio">Az eszköz nem hajlandó hangot lejátszani. A javításhoz indítsa újra az eszközt.</string>
   <string name="open_playlist">Videólista megnyitása</string>
   <string name="playback_queue_category_title">Videólista</string>
   <string name="video_buffer_size_none">Nincs megadva</string>

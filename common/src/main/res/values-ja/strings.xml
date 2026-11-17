@@ -304,6 +304,7 @@
     <string name="remote_session_closed">キャストのセッションが終了しました</string>
     <string name="msg_mode_switch_error">表示モードを「%s」に切り替えられません</string>
     <string name="msg_player_error">プレーヤーエラー %s が発生しました。再生を再開します…</string>
+    <string name="msg_device_refuses_audio">デバイスが音声の再生を拒否しています。デバイスを再起動すると直ります。</string>
     <string name="video_preset_disabled">プリセットなし</string>
     <string name="video_preset_enabled">次の動画の形式は、プリセットに従って設定されます</string>
     <string name="player_sleep_timer">スリープタイマー</string>

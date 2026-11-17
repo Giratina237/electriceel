@@ -265,6 +265,7 @@
   <string name="video_preset_enabled">Formatet for den næste video indstilles ifølge forudindstillingen</string>
   <string name="video_preset_disabled">Uden forudindstilling</string>
   <string name="msg_player_error">Afpillerfejl opstod %s. Genstarter afspilning…</string>
+  <string name="msg_device_refuses_audio">Enheden nægter at afspille lyd. Genstart enheden for at løse det.</string>
   <string name="msg_mode_switch_error">Kan ikke skifte visningstilstand til \"%s</string>
   <string name="remote_session_closed">Fjernsession blev lukket</string>
   <string name="player_low_video_quality">Lav videokvalitet</string>

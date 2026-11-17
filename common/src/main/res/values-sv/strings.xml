@@ -306,6 +306,7 @@
   <string name="remote_session_closed">Fjärrsessionen har stängts</string>
   <string name="msg_mode_switch_error">Det går inte att byta visningsläge till \"%s\"</string>
   <string name="msg_player_error">Det uppstod ett fel med spelaren %s. Uppspelningen startas om …</string>
+  <string name="msg_device_refuses_audio">Enheten vägrar spela upp ljud. Starta om enheten för att åtgärda det.</string>
   <string name="video_preset_disabled">Utan förinställning</string>
   <string name="video_preset_enabled">Formatet för nästa video ställs in enligt förinställningen</string>
   <string name="player_sleep_timer">Sovtimer</string>

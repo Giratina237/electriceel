@@ -292,6 +292,7 @@
     <string name="remote_session_closed">เซสชันระยะไกลถูกปิดแล้ว</string>
     <string name="msg_mode_switch_error">ไม่สามารถเปลี่ยนโหมดการแสดงผลเป็น \"%s\"</string>
     <string name="msg_player_error">เกิดข้อผิดพลาดของเครื่องเล่น %s กำลังเริ่มเล่นใหม่…</string>
+    <string name="msg_device_refuses_audio">อุปกรณ์ปฏิเสธการเล่นเสียง รีสตาร์ทอุปกรณ์เพื่อแก้ไข</string>
     <string name="video_preset_disabled">ไม่ได้ตั้งค่า</string>
     <string name="video_preset_enabled">รูปแบบของวิดีโอจะถูกตั้งค่าตามที่ตั้งไว้</string>
     <string name="player_sleep_timer">เวลานอน</string>

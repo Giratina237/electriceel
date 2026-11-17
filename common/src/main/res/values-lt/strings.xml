@@ -298,6 +298,7 @@
     <string name="remote_session_closed">Nuotolinė sesija uždaryta</string>
     <string name="msg_mode_switch_error">Nepavyko pakeisti vaizdo režimo į \„%s\“"</string>
     <string name="msg_player_error">Įvyko grotuvo klaida \„%s\“. Atkūrimas paleidžiamas iš naujo…</string>
+    <string name="msg_device_refuses_audio">Įrenginys atsisako leisti garsą. Norėdami tai ištaisyti, paleiskite įrenginį iš naujo.</string>
     <string name="video_preset_disabled">Be išankstinio nustatymo</string>
     <string name="video_preset_enabled">Sekančio vaizdo įrašo formatas bus nustatytas pagal išankstinį nustatymą</string>
     <string name="player_sleep_timer">Užmigimo laikmatis</string>

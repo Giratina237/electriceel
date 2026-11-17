@@ -443,6 +443,7 @@
   <string name="remote_session_closed">Seja na daljavo je bila zaprta</string>
   <string name="msg_mode_switch_error">Načina prikaza ni mogoče preklopiti na \"%s\"</string>
   <string name="msg_player_error">Prišlo je do napake predvajalnika %s. Ponovni zagon predvajanja…</string>
+  <string name="msg_device_refuses_audio">Naprava zavrača predvajanje zvoka. Za odpravo težave znova zaženite napravo.</string>
   <string name="video_preset_disabled">Brez prednastavitve</string>
   <string name="video_preset_enabled">Oblika naslednjega videa bo nastavljena glede na prednastavitev</string>
   <string name="msg_player_error_video_renderer">Izbrana oblika VIDEA ni podprta.\nPoskusite izbrati drugo s pritiskom na gumb HQ v predvajalniku.\nČe to ne pomaga, poskusite znova zagnati napravo.</string>

@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.audio.AudioSink;
+import com.google.android.exoplayer2.audio.AudioTrackCounts;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderErrorException;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderInitializationException;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
@@ -28,6 +29,7 @@ import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.BasePlayerController;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.AudioOutputProbe;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.Connections;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
@@ -87,6 +89,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     private static final int MAX_AUDIO_INIT_RESTARTS = 2;
     /**
+     * Of mDeviceAudioRetries: the device's, whatever the video
+     */
+    private static final String DEVICE_AUDIO_RETRY_KEY = "device";
+    /**
      * A load failed on its connection this recently: the connection is what fails a start that hangs (see LoadErrors)
      */
     private static final long CONNECTION_ERROR_WINDOW_MS = 30_000;
@@ -108,6 +114,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * minutes (FARAJV5R #16–#41), restarted 40 times a minute
      */
     private final RetryBackoff mAudioInitRetries = new RetryBackoff(2 * RETRY_MS, MAX_RETRY_MS);
+    /**
+     * The device refuses every AudioTrack, not the app's (see applyDeviceAudioRefusal), till a video's sound plays: whatever video
+     */
+    private boolean mIsAudioRefusedByDevice;
+    /**
+     * The engine restarts while the device refuses every AudioTrack: one wait growing across the videos, not each video's own
+     */
+    private final RetryBackoff mDeviceAudioRetries = new RetryBackoff(2 * RETRY_MS, MAX_RETRY_MS);
     /**
      * Of the video, the fetches of its formats that failed, till its formats come (see onSourceChanged): 55 fetches a minute for 15
      * minutes while the network was down (FARAJV5R #47–#99)
@@ -166,6 +180,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             // A track refused after this is another time's
             mAudioInitErrorCount = 0;
             mAudioInitRetries.reset();
+            mIsAudioRefusedByDevice = false;
+            mDeviceAudioRetries.reset();
         }
     };
 
@@ -270,10 +286,27 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 failure.action(delayed("reload_video", delayMs));
                 mVideoLoaderController.reloadVideo((int) delayMs);
             }
-        } else if (isOfflineVideo() && isRepeatedStall() && lowerVideoQuality()) {
-            // A reload didn't help: the connection can't keep up with this format right now. For this video only.
-            failure.action("lower_quality").action("restart_engine");
-            mVideoLoaderController.restartEngine();
+        } else if (isOfflineVideo() && isRepeatedStall()) {
+            // A reload didn't help. Its loads failed on their connection (they didn't connect, or no answer came), or they came faster
+            // than the format plays: the connection stops answering, it isn't too slow for the format, and a lower one stalls the same
+            // way (KKSJMSQX #2: neither track loaded for 20 s at 30.7 Mbps of a 20.3 Mbps format; 1440p was lowered for the video, and
+            // the read timed out again at 1080p, #4). Tried again later each time instead.
+            boolean hasConnectionError = LoadErrors.hasConnectionErrorWithin(CONNECTION_ERROR_WINDOW_MS);
+            failure.detail("loadConnectionError", hasConnectionError);
+
+            if (hasConnectionError || FormatAttempts.isFastEnough()) {
+                failure.action("network_wait");
+                long delayMs = mStallRetries.next(getVideo() != null ? getVideo().videoId : null);
+                failure.action(delayed("reload_video", delayMs));
+                mVideoLoaderController.reloadVideo((int) delayMs);
+            } else if (lowerVideoQuality()) {
+                // The connection can't keep up with this format right now. For this video only.
+                failure.action("lower_quality").action("restart_engine");
+                mVideoLoaderController.restartEngine();
+            } else {
+                failure.action("reload_video");
+                mVideoLoaderController.reloadVideo();
+            }
         } else {
             // SABR may hang if the server issues a high backoffTime
             failure.action("reload_video");
@@ -481,6 +514,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
 
         if (applySabrProtocolErrorAction(error, failure)) {
+            return;
+        }
+
+        if (mVideoLoaderController.isFixPending()) {
+            // The player a reload or a restart replaces failed on its way out, e.g. its load that hung timed out (KKSJMSQX #3: 565 ms
+            // after a stall's restart was asked for). The fix asked for covers it: another one put the restart off and showed the
+            // error.
+            failure.action("fix_pending");
             return;
         }
 
@@ -782,10 +823,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 restartEngine = false;
             }
         } else if (type == PlayerEventListener.ERROR_TYPE_RENDERER && error instanceof AudioSink.InitializationException) {
-            // The device refused a new AudioTrack even after DefaultAudioSink retried, e.g. the app's AudioFlinger memory is full
-            // (a seek briefly holds two tracks). The format plays fine, so don't save another one. A reload frees the old track;
-            // if this video keeps failing, restart the engine to free everything the player holds.
-            if (++mAudioInitErrorCount == 1) {
+            // Whose refusal it is, and whether the device would take another config (see AudioOutputProbe)
+            failure.detail("audioOutput", AudioOutputProbe.probe(getContext()));
+
+            // The device refused a new AudioTrack even after DefaultAudioSink retried (see AudioTrackInitRetry). Once, it can be the
+            // app's own: a seek briefly holds two tracks. The format plays fine, so don't save another one. A reload frees the old
+            // track; if this video keeps failing, restart the engine to free everything the player holds. Refused by the device
+            // already (see applyDeviceAudioRefusal), a reload is no use.
+            if (++mAudioInitErrorCount == 1 && !mIsAudioRefusedByDevice) {
                 failure.action("audio_reload");
                 restartEngine = false;
                 showMessage = false;
@@ -795,7 +840,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 FormatItem fallback = applyAudioFallback(audioFormat != null && audioFormat.getTrack() != null ? audioFormat.getTrack().format : null);
                 failure.action("audio_fallback:" + getFallbackName(fallback));
 
-                if (fallback == null && mAudioInitErrorCount > MAX_AUDIO_INIT_RESTARTS && getVideo() != null) {
+                if (fallback == null && AudioTrackCounts.getOpen() == 0) {
+                    restartDelayMs = applyDeviceAudioRefusal(failure);
+                    showMessage = false;
+                } else if (fallback == null && mAudioInitErrorCount > MAX_AUDIO_INIT_RESTARTS && getVideo() != null) {
                     // Nothing left to change, and refused again: each restart waits longer for the device to have room for a track
                     // (FARAJV5R #17–#35: 40 restarts a minute for 10 minutes). Told once.
                     restartDelayMs = mAudioInitRetries.next(getVideo().videoId);
@@ -1274,6 +1322,31 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
 
         return fallback;
+    }
+
+    /**
+     * Refused again with no AudioTrack of the app's open, and no other audio format to try: it's the device's, not the app's memory.
+     * A Shield refused every 44.1 kHz track for 20 minutes and more, a new process's first one too, and played again only once the
+     * device was restarted (FARAJV5R #40–#41: a process 110 s old, the device booted at 07:53:57; #104: booted 23 s after it;
+     * 9M6NBWN7: a process 18.7 s old). No restart of the player helps: the user is told once to restart the device, and it's tried
+     * again with a wait growing across the videos, till a video's sound plays.
+     *
+     * @return the wait before the engine is restarted
+     */
+    private long applyDeviceAudioRefusal(PlayerFailure failure) {
+        failure.action("device_audio_refused");
+
+        if (!mIsAudioRefusedByDevice) {
+            mIsAudioRefusedByDevice = true;
+            MessageHelpers.showLongMessage(getContext(), R.string.msg_device_refuses_audio);
+        }
+
+        if (getPlayer() != null && getContext() != null) {
+            // In place of the error's title: what the user can do about it
+            getPlayer().setTitle(getContext().getString(R.string.msg_device_refuses_audio));
+        }
+
+        return mDeviceAudioRetries.next(DEVICE_AUDIO_RETRY_KEY);
     }
 
     /**

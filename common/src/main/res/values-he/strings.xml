@@ -312,6 +312,7 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="remote_session_closed">הפעלה מרוחקת נסגרה</string>
     <string name="msg_mode_switch_error">לא ניתן להחליף למצב התצוגה \"%s\"</string>
     <string name="msg_player_error">אירעה שגיאת נגן %s. מתבצעת התחלה מחדש של ההפעלה…</string>
+    <string name="msg_device_refuses_audio">המכשיר מסרב להשמיע צליל. הפעילו מחדש את המכשיר כדי לתקן זאת.</string>
     <string name="video_preset_disabled">ללא קביעה מוגדרת מראש</string>
     <string name="video_preset_enabled">פורמט הסרטון הבא יוגדר בהתאם לקביעה מוגדרת מראש</string>
     <string name="player_sleep_timer">קוצב זמן לשינה</string>

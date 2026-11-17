@@ -300,6 +300,7 @@
   <string name="remote_session_closed">Pechouse a sesión remota</string>
   <string name="msg_mode_switch_error">Non se pode trocar o modo de visualización a \"%s</string>
   <string name="msg_player_error">Produciuse un erro do reprodutor %s. Reiniciando a reprodución…</string>
+  <string name="msg_device_refuses_audio">O dispositivo négase a reproducir son. Reinicia o dispositivo para solucionalo.</string>
   <string name="video_preset_disabled">Sen predefinido</string>
   <string name="video_preset_enabled">O formato do seguinte vídeo establecerase segundo o preestablecido</string>
   <string name="player_sleep_timer">Temporizador de durmir</string>

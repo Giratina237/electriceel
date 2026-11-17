@@ -300,6 +300,7 @@
   <string name="remote_session_closed">Sesi jarak jauh telah ditutup</string>
   <string name="msg_mode_switch_error">Tidak dapat mengganti mode tampilan ke \"%s\"</string>
   <string name="msg_player_error">Terjadi eror pemutar %s. Memulai ulang pemutaran…</string>
+  <string name="msg_device_refuses_audio">Perangkat menolak memutar suara. Mulai ulang perangkat untuk memperbaikinya.</string>
   <string name="video_preset_disabled">Tanpa preset</string>
   <string name="video_preset_enabled">Format video selanjutnya akan diatur sesuai preset</string>
   <string name="player_sleep_timer">Pengatur waktu tidur</string>

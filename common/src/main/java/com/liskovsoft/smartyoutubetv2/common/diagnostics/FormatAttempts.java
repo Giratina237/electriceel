@@ -433,22 +433,47 @@ public final class FormatAttempts {
         }
 
         long now = sClock.now();
+        long throughputKbps = getRecentThroughputKbps(last, now);
+
+        failure.detail("videoBufferedMs", last.videoLoadedToMs >= 0 ? last.videoLoadedToMs - positionMs : null)
+                .detail("audioBufferedMs", last.audioLoadedToMs >= 0 ? last.audioLoadedToMs - positionMs : null)
+                .detail("videoLoadAgoMs", last.videoLoadedAt >= 0 ? now - last.videoLoadedAt : null)
+                .detail("audioLoadAgoMs", last.audioLoadedAt >= 0 ? now - last.audioLoadedAt : null)
+                .detail("recentThroughputKbps", throughputKbps >= 0 ? throughputKbps : null)
+                .detail("videoBitrateKbps", last.videoBitrateKbps > 0 ? last.videoBitrateKbps : null);
+    }
+
+    /**
+     * The segments of the format tried came faster than it plays, as far as the last 30 s tell: a stall then is the connection that
+     * stops answering, not one too slow for the format (see ErrorFixerController#runLongBufferingAction). False when unknown.
+     */
+    public static boolean isFastEnough() {
+        Attempt last = getLast();
+
+        if (last == null || last.videoBitrateKbps <= 0) {
+            return false;
+        }
+
+        long throughputKbps = getRecentThroughputKbps(last, sClock.now());
+
+        return throughputKbps >= last.videoBitrateKbps;
+    }
+
+    /**
+     * Of the segments that finished loading in the last RECENT_LOADS_MS, while they loaded: -1 for none
+     */
+    private static long getRecentThroughputKbps(Attempt attempt, long now) {
         long bytes = 0;
         long loadMs = 0;
 
-        for (long[] load : last.recentLoads) {
+        for (long[] load : attempt.recentLoads) {
             if (now - load[0] <= RECENT_LOADS_MS) {
                 bytes += load[1];
                 loadMs += load[2];
             }
         }
 
-        failure.detail("videoBufferedMs", last.videoLoadedToMs >= 0 ? last.videoLoadedToMs - positionMs : null)
-                .detail("audioBufferedMs", last.audioLoadedToMs >= 0 ? last.audioLoadedToMs - positionMs : null)
-                .detail("videoLoadAgoMs", last.videoLoadedAt >= 0 ? now - last.videoLoadedAt : null)
-                .detail("audioLoadAgoMs", last.audioLoadedAt >= 0 ? now - last.audioLoadedAt : null)
-                .detail("recentThroughputKbps", loadMs > 0 ? bytes * 8 / loadMs : null)
-                .detail("videoBitrateKbps", last.videoBitrateKbps > 0 ? last.videoBitrateKbps : null);
+        return loadMs > 0 ? bytes * 8 / loadMs : -1;
     }
 
     /**

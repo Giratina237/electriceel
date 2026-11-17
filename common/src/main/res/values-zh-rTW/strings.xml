@@ -294,6 +294,7 @@
   <string name="remote_session_closed">遠端已經關閉</string>
   <string name="msg_mode_switch_error">無法切換顯示模式到「%s」</string>
   <string name="msg_player_error">播放器發生錯誤 %s。正在重新啟動播放…</string>
+  <string name="msg_device_refuses_audio">裝置拒絕播放聲音。重新啟動裝置即可修正。</string>
   <string name="video_preset_disabled">不使用預設規則</string>
   <string name="video_preset_enabled">下一段影片的格式將根據預設規則播放</string>
   <string name="player_sleep_timer">睡眠計時器</string>

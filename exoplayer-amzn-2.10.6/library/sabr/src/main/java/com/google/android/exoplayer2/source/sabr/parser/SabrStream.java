@@ -115,10 +115,16 @@ public class SabrStream {
      * Media responses in a row that came with no media while the attestation was pending (see #onResponseEnd)
      */
     private int pendingResponsesWithoutMedia;
+    /**
+     * The NextRequestPolicy parts read so far: one read since a request was made came in its answer (see #getBackoffTimeMs, which is
+     * the last one's)
+     */
+    private volatile int nextRequestPolicyCount;
 
     /**
      * Told each wait the server asks for (see NextRequestPolicy#getBackoffTimeMs), e.g. for the app's timing of video starts: one
-     * under SabrExtractorInput's MIN_SWALLOW_BACKOFF_MS isn't waited. On the loader's thread.
+     * under SabrExtractorInput's MIN_SWALLOW_BACKOFF_MS isn't waited, unless an init request's answer had no init segment (see
+     * DefaultSabrChunkSource#maybeWaitForInit). On the loader's thread.
      */
     public interface BackoffListener {
         void onBackoff(int backoffMs);
@@ -363,6 +369,13 @@ public class SabrStream {
         return processor.getBackoffTimeMs();
     }
 
+    /**
+     * The NextRequestPolicy parts read so far: compared with the count when a request was made, one came in its answer
+     */
+    public int getNextRequestPolicyCount() {
+        return nextRequestPolicyCount;
+    }
+
     public MediaHeader getInitializedFormat(int iTag) {
         return processor.getInitializedFormats().get(iTag);
     }
@@ -600,6 +613,7 @@ public class SabrStream {
 
         Log.d(TAG, "Process NextRequestPolicy: %s", nextRequestPolicy);
         processor.processNextRequestPolicy(nextRequestPolicy);
+        nextRequestPolicyCount++;
         BackoffListener listener = backoffListener;
 
         if (listener != null && nextRequestPolicy.getBackoffTimeMs() > 0) {

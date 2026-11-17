@@ -291,6 +291,7 @@
   <string name="remote_session_closed">جلسه راه‌دور بسته شد</string>
   <string name="msg_mode_switch_error">امکان تغییر حالت نمایش به \"%s\" وجود ندارد</string>
   <string name="msg_player_error">خطایی در پخش کننده%s رخ داده است. در حال راه‌اندازی مجدد…</string>
+  <string name="msg_device_refuses_audio">دستگاه از پخش صدا خودداری می‌کند. برای رفع آن، دستگاه را مجددا راه‌اندازی کنید.</string>
   <string name="video_preset_disabled">بدون پیش‌تنظیم</string>
   <string name="video_preset_enabled">فرمت ویدیوی بعدی مطابق با پیش‌تنظیم تنظیم خواهد شد</string>
   <string name="player_sleep_timer">تایمر خواب</string>

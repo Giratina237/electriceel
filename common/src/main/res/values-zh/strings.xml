@@ -298,6 +298,7 @@
   <string name="remote_session_closed">遥控配对已断开</string>
   <string name="msg_mode_switch_error">无法切换显示模式至 \"%s</string>
   <string name="msg_player_error">播放器发生错误 %s。正在重新播放……</string>
+  <string name="msg_device_refuses_audio">设备拒绝播放声音。重启设备即可修复。</string>
   <string name="video_preset_disabled">无预设</string>
   <string name="video_preset_enabled">下一个视频的格式将根据预设值设置</string>
   <string name="player_sleep_timer">睡眠定时</string>

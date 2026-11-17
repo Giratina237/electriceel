@@ -302,6 +302,7 @@
   <string name="remote_session_closed">De sessie op afstand is beëindigd</string>
   <string name="msg_mode_switch_error">De verhouding kan niet worden aangepast naar \‘%s\’</string>
   <string name="msg_player_error">\‘%s\’ kan niet worden afgespeeld - er wordt opnieuw gestart</string>
+  <string name="msg_device_refuses_audio">Het apparaat weigert geluid af te spelen. Start het apparaat opnieuw op om dit op te lossen.</string>
   <string name="video_preset_disabled">Geen voorinstelling</string>
   <string name="video_preset_enabled">De kwaliteit van de volgende video wordt ingesteld volgens je voorinstelling</string>
   <string name="player_sleep_timer">Slaapklok</string>

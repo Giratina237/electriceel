@@ -5,8 +5,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * SmartTube fix: the {@link android.media.AudioTrack}s the players of the app's process built and released, for a refused one to be
  * told apart: tracks the app still holds (its share of AudioFlinger's memory, 10 MB per app on an Nvidia Shield, is full of them), or
- * a device that refuses whatever the app holds. A Shield refused every track for 20 minutes in a process that had run for 28 hours,
- * and only a new process played again.
+ * a device that refuses whatever the app holds. A Shield refused every track for 20 minutes and more, a new process's first one too,
+ * and played again only once the device was restarted (FARAJV5R #40–#41, 9M6NBWN7): refused with none open, it's the device's (see
+ * ErrorFixerController#applyDeviceAudioRefusal).
  */
 public final class AudioTrackCounts {
 

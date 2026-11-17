@@ -302,6 +302,7 @@
   <string name="remote_session_closed">Sesiunea la distanță a fost închisă</string>
   <string name="msg_mode_switch_error">Nu se poate comuta modul de afișare la \"%s</string>
   <string name="msg_player_error">A apărut eroarea %s la player. Se repornește redării..</string>
+  <string name="msg_device_refuses_audio">Dispozitivul refuză să redea sunetul. Reporniți dispozitivul pentru a remedia problema.</string>
   <string name="video_preset_disabled">Fără presetare</string>
   <string name="video_preset_enabled">Formatul următorului videoclip va fi setat conform presetării</string>
   <string name="player_sleep_timer">Temporizator de oprire</string>

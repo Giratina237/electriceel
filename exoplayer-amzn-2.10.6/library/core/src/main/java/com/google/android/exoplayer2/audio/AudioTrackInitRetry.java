@@ -12,6 +12,10 @@ import com.google.android.exoplayer2.C;
  * nearly full (10 MB per app on an Nvidia Shield), the new track is refused ("AudioTrack init
  * failed: 0") although the same request succeeds as soon as the old track is gone. Newer ExoPlayer
  * versions retry AudioTrack creation the same way.
+ *
+ * <p>A device can also refuse every track for good, whatever the app holds: a Shield refused a new
+ * process's first one, till the device was restarted (FARAJV5R, 9M6NBWN7). No retry helps that
+ * (see AudioTrackCounts).
  */
 /* package */ final class AudioTrackInitRetry {
 

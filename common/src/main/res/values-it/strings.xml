@@ -306,6 +306,7 @@
     <string name="remote_session_closed">La sessione remota è stata chiusa</string>
     <string name="msg_mode_switch_error">Impossibile passare dalla modalità di visualizzazione a \"%s\"</string>
     <string name="msg_player_error">Si è verificato un errore del lettore %s. Riavvio della riproduzione…</string>
+    <string name="msg_device_refuses_audio">Il dispositivo si rifiuta di riprodurre l\'audio. Riavvia il dispositivo per risolvere.</string>
     <string name="video_preset_disabled">Senza preset</string>
     <string name="video_preset_enabled">Il formato del video successivo verrà impostato in base al preset</string>
     <string name="player_sleep_timer">Timer spegnimento</string>

@@ -298,6 +298,7 @@
     <string name="remote_session_closed">Udaljena sesija je zatvorena</string>
     <string name="msg_mode_switch_error">Nemoguće prebacivanje načina prikaza na \"%s\"</string>
     <string name="msg_player_error">Greška reproduktora %s. Ponovno pokretanje reprodukcije…</string>
+    <string name="msg_device_refuses_audio">Uređaj odbija reproducirati zvuk. Ponovno pokrenite uređaj da biste to popravili.</string>
     <string name="video_preset_disabled">Bez predloška</string>
     <string name="video_preset_enabled">Format sljedećeg videa biti će postavljen po predlošku</string>
     <string name="player_sleep_timer">Tajmer spavanja</string>

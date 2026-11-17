@@ -306,6 +306,7 @@
   <string name="remote_session_closed">დისტანციური სესია დახურულია</string>
   <string name="msg_mode_switch_error">ეკრანის რეჟიმში \"%s\" გადართვა ვერ მოხერხდა</string>
   <string name="msg_player_error">ფლეიერში წარმოიშვა შეცდომა %s. ვაჩერებ და ვრთავ ხელახლა…</string>
+  <string name="msg_device_refuses_audio">მოწყობილობა უარს ამბობს ხმის დაკვრაზე. გამოსასწორებლად გადატვირთეთ მოწყობილობა.</string>
   <string name="video_preset_disabled">წინასწარ დაყენებული რეჟიმის გარეშე</string>
   <string name="video_preset_enabled">შემდეგი ვიდეოს ფორმატი დაყენდება პროფილის შესაბამისად</string>
   <string name="player_sleep_timer">ძილის ტაიმერი</string>

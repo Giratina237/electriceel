@@ -310,6 +310,7 @@
     <string name="remote_session_closed">Удалённая сессия закрыта</string>
     <string name="msg_mode_switch_error">Не получилось переключить дисплей в режим \"%s\"</string>
     <string name="msg_player_error">В плеере возникла ошибка %s. Перезапускаю воспроизведение…</string>
+    <string name="msg_device_refuses_audio">Устройство отказывается воспроизводить звук. Перезагрузите устройство, чтобы это исправить.</string>
     <string name="video_preset_disabled">Без профиля</string>
     <string name="video_preset_enabled">Формат следующего видео будет установлен в соответствии с профилем</string>
     <string name="player_sleep_timer">Таймер сна</string>
