@@ -1000,6 +1000,7 @@
     <string name="player_quick_shorts_skip_alt">Preskoči Shorts tipkama gore/dolje</string>
     <string name="player_quick_skip_videos">Preskoči obične videe tipkama lijevo/desno</string>
     <string name="player_quick_skip_videos_alt">Preskoči obične videe tipkama gore/dolje</string>
+    <string name="player_quick_skip_chapters">Sljedeće poglavlje tipkom gore</string>
     <string name="channels_filter">Prikaži polje za filtriranje kanala unutar odjeljka Kanali</string>
     <string name="channel_search_bar">Traka za pretraživanje na stranici kanala</string>
     <string name="header_sports">Sport</string>

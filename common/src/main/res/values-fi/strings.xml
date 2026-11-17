@@ -1016,6 +1016,7 @@
   <string name="local_backup_not_supported">Automaattista varmuuskopiointia ei tueta Android TV 11:ssä tai sitä uudemmissa versioissa järjestelmärajoitusten vuoksi. Käytä sen sijaan GDrivea.</string>
   <string name="rounded_card_corners">Pyöristä videokorttien kulmat</string>
   <string name="player_quick_skip_videos_alt">Ohita tavallisia videoita ylös/alas-painikkeilla</string>
+  <string name="player_quick_skip_chapters">Seuraava videon osa ylös-painikkeella</string>
   <string name="player_quick_shorts_skip_alt">Ohita shorts-videoita ylös/alas-napeilla</string>
   <string name="create_playlist_note">Huom: Tämä ei näy YouTube-sovelluksessa</string>
   <string name="player_unexpected_error">Odottamaton toistovirhe</string>

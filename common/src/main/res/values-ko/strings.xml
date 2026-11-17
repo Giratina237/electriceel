@@ -1010,6 +1010,7 @@
   <string name="color_scheme_electric_blue">일렉트릭 블루</string>
   <string name="player_quick_shorts_skip_alt">위/아래 버튼으로 쇼츠 건너뛰기</string>
   <string name="player_quick_skip_videos_alt">위/아래 버튼으로 일반 동영상 건너뛰기</string>
+  <string name="player_quick_skip_chapters">위 버튼으로 다음 챕터</string>
   <string name="prefer_google_dns">Google DNS 우선 사용</string>
   <string name="typing_corrections">텍스트 입력 중 자동 수정 비활성화</string>
   <string name="suggestions_horizontally_scrolled">추천 항목 가로 스크롤</string>

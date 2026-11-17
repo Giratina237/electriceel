@@ -936,6 +936,7 @@
   <string name="player_quick_shorts_skip_alt">Pular os shorts (vídeos curtos) com os botões ▲/▼</string>
   <string name="player_quick_skip_videos">Pular os vídeos com botões ◀/▶</string>
   <string name="player_quick_skip_videos_alt">Pular os vídeos com botões ▲/▼</string>
+  <string name="player_quick_skip_chapters">Próximo capítulo com o botão ▲</string>
   <string name="channels_filter">Filtrar lista de canais dentro da seção \"Canais\"</string>
   <string name="channel_search_bar">Barra de pesquisa dentro da seção \"Canais\"</string>
   <string name="header_sports">Esportes</string>

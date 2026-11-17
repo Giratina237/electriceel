@@ -936,6 +936,7 @@
     <string name="player_quick_shorts_skip_alt">Saltar Shorts com os botões cima/baixo</string>
     <string name="player_quick_skip_videos">Ignorar vídeos com os botões esquerda/direita</string>
     <string name="player_quick_skip_videos_alt">Saltar vídeos regulares com os botões cima/baixo</string>
+    <string name="player_quick_skip_chapters">Capítulo seguinte com o botão cima</string>
     <string name="channels_filter">Mostrar campo Filtro na secção Canais</string>
     <string name="channel_search_bar">Mostrar barra de pesquisa na secção Canais</string>
     <string name="header_sports">Desporto</string>

@@ -1019,6 +1019,7 @@
   <string name="prefer_google_dns">Google DNS-t előnyben részesítése</string>
   <string name="player_quick_shorts_skip_alt">Rövid klip lapozás fel/le gomb</string>
   <string name="player_quick_skip_videos_alt">A normál videók kihagyása a fel/le gombokkal</string>
+  <string name="player_quick_skip_chapters">Következő fejezet a fel gombbal</string>
   <string name="color_scheme_dark_blue_oled">Sötétkék (OLED)</string>
   <string name="color_scheme_electric_blue">Elektromos kék</string>
   <string name="sidebar_notification">Értesítés megjelenítése az oldalsávon</string>

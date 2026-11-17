@@ -951,6 +951,7 @@
     <string name="player_quick_shorts_skip_alt">Săriți peste Shorts cu butoanele sus/jos</string>
     <string name="player_quick_skip_videos">Omiteți videoclipurile obișnuite cu butoanele stânga/dreapta</string>
     <string name="player_quick_skip_videos_alt">Săriți peste videoclipurile obișnuite cu butoanele sus/jos</string>
+    <string name="player_quick_skip_chapters">Capitolul următor cu butonul sus</string>
     <string name="channels_filter">Afișați câmpul Filtrare canale în secțiunea Canale</string>
     <string name="channel_search_bar">Bara de căutare în paginia Canalului</string>
     <string name="header_sports">Sporturi</string>

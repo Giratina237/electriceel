@@ -936,6 +936,7 @@
     <string name="player_quick_shorts_skip_alt">Shorts überspringen mit Oben/Unten-Tasten</string>
     <string name="player_quick_skip_videos">Normale Videos überspringen mit Links/Rechts-Tasten</string>
     <string name="player_quick_skip_videos_alt">Normale Videos überspringen mit Oben/Unten-Tasten</string>
+    <string name="player_quick_skip_chapters">Nächstes Kapitel mit der Oben-Taste</string>
     <string name="channels_filter">Feld zum Filtern von Kanälen innerhalb der Kanäle-Kategorie anzeigen</string>
     <string name="channel_search_bar">Suchleiste innerhalb der Kanalseite</string>
     <string name="header_sports">Sport</string>

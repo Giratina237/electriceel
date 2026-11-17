@@ -974,6 +974,7 @@
   <string name="color_scheme_electric_blue">Albastru electric</string>
   <string name="player_quick_shorts_skip_alt">Săriți peste Shorts cu butoanele sus/jos</string>
   <string name="player_quick_skip_videos_alt">Săriți peste videoclipurile obișnuite cu butoanele sus/jos</string>
+  <string name="player_quick_skip_chapters">Capitolul următor cu butonul sus</string>
   <string name="prefer_google_dns">Preferați Google DNS</string>
   <string name="calm_msg">Remediem problema. Verificați din când în când dacă există actualizări</string>
   <string name="without_picture">Fără imagine</string>

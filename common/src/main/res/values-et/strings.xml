@@ -944,6 +944,7 @@
   <string name="player_quick_shorts_skip_alt">Jäta Shortsid vahele üles/alla nupuga</string>
   <string name="player_quick_skip_videos">Jäta tavalised videod vahele vasak/parem nupuga</string>
   <string name="player_quick_skip_videos_alt">Jäta tavalised videod vahele üles/alla nupuga</string>
+  <string name="player_quick_skip_chapters">Järgmine peatükk üles nupuga</string>
   <string name="channels_filter">Näita kanalite filtri välja jaotises Kanalid</string>
   <string name="channel_search_bar">Otsinguriba kanali lehel</string>
   <string name="header_sports">Sport</string>

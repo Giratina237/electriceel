@@ -997,6 +997,7 @@
     <string name="player_quick_shorts_skip_alt">Praleisti Shorts aukštyn/žemyn mygtukais</string>
     <string name="player_quick_skip_videos">Praleisti įprastus vaizdo įrašus kairės/dešinės mygtukais</string>
     <string name="player_quick_skip_videos_alt">Praleisti įprastus vaizdo įrašus aukštyn/žemyn mygtukais</string>
+    <string name="player_quick_skip_chapters">Kitas skyrius aukštyn mygtuku</string>
     <string name="channels_filter">Rodyti kanalų filtro lauką skiltyje Kanalai</string>
     <string name="channel_search_bar">Paieškos juosta kanalo puslapyje</string>
     <string name="header_sports">Sportas</string>

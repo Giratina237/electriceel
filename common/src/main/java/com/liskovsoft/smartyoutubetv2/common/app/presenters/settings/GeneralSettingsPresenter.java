@@ -338,7 +338,17 @@ public class GeneralSettingsPresenter extends BasePresenter<Void> {
                     mGeneralData.setDpadUpDownAction(GeneralData.ACTION_UNDEFINED);
                 },
                 mPlayerTweaksData.isQuickSkipVideosAltEnabled()));
-        
+
+        options.add(UiOptionItem.from(getContext().getString(R.string.player_quick_skip_chapters),
+                option -> {
+                    mPlayerTweaksData.setQuickSkipChaptersEnabled(option.isSelected());
+                    // Unchecked: up/down may be set to volume or speed since (the list doesn't uncheck this one)
+                    if (option.isSelected()) {
+                        mGeneralData.setDpadUpDownAction(GeneralData.ACTION_UNDEFINED);
+                    }
+                },
+                mPlayerTweaksData.isQuickSkipChaptersEnabled()));
+
         options.add(UiOptionItem.from(getContext().getString(R.string.player_quick_skip_videos),
                 option -> {
                     mPlayerTweaksData.setQuickSkipVideosEnabled(option.isSelected());
@@ -360,14 +370,18 @@ public class GeneralSettingsPresenter extends BasePresenter<Void> {
         options.add(UiOptionItem.from("DPAD UP/DOWN -> Volume Up/Down",
                 option -> {
                     mGeneralData.setDpadUpDownAction(option.isSelected() ? GeneralData.ACTION_VOLUME_UP_DOWN : GeneralData.ACTION_UNDEFINED);
-                    mPlayerTweaksData.resetDpadUpDownSettings();
+                    if (option.isSelected()) {
+                        mPlayerTweaksData.resetDpadUpDownSettings();
+                    }
                 },
                 mGeneralData.getDpadUpDownAction() == GeneralData.ACTION_VOLUME_UP_DOWN));
 
         options.add(UiOptionItem.from("DPAD UP/DOWN -> Speed Up/Down",
                 option -> {
                     mGeneralData.setDpadUpDownAction(option.isSelected() ? GeneralData.ACTION_SPEED_UP_DOWN : GeneralData.ACTION_UNDEFINED);
-                    mPlayerTweaksData.resetDpadUpDownSettings();
+                    if (option.isSelected()) {
+                        mPlayerTweaksData.resetDpadUpDownSettings();
+                    }
                 },
                 mGeneralData.getDpadUpDownAction() == GeneralData.ACTION_SPEED_UP_DOWN));
 

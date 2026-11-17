@@ -397,7 +397,16 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         int action = GeneralData.instance(getContext()).getDpadUpDownAction();
 
         return action == GeneralData.ACTION_SPEED_UP_DOWN || action == GeneralData.ACTION_VOLUME_UP_DOWN
-                || getPlayerTweaksData().isQuickSkipVideosAltEnabled();
+                || getPlayerTweaksData().isQuickSkipVideosAltEnabled() || isDpadUpNextChapter();
+    }
+
+    /**
+     * Up skips to the next chapter: the player controller has it (see PlayerUIController#handleUpSkip)
+     */
+    protected boolean isDpadUpNextChapter() {
+        Video video = getVideo();
+
+        return getPlayerTweaksData().isQuickSkipChaptersEnabled() && video != null && !video.belongsToShortsGroup();
     }
 
     /**

@@ -3,9 +3,9 @@
   <string name="header_home">首頁</string>
   <string name="title_search">搜尋</string>
   <string name="header_subscriptions">訂閱內容</string>
-  <string name="header_history">觀看記錄</string>
-  <string name="history_videos">影片觀看記錄</string>
-  <string name="history_shorts">Shorts 觀看記錄</string>
+  <string name="header_history">觀看紀錄</string>
+  <string name="history_videos">影片觀看紀錄</string>
+  <string name="history_shorts">Shorts 觀看紀錄</string>
   <string name="header_music">音樂</string>
   <string name="header_news">新聞</string>
   <string name="header_gaming">遊戲</string>
@@ -843,7 +843,7 @@
   <string name="remember_position_subscriptions">於訂閱頻道中記住上次觀看位置</string>
   <string name="msg_player_unknown_error">未知錯誤</string>
   <string name="header_notifications">通知</string>
-  <string name="disable_search_history">停用搜尋記錄功能</string>
+  <string name="disable_search_history">停用搜尋紀錄功能</string>
   <string name="unlock_high_bitrate_formats">開放 1080p vp9 高位元率格式</string>
   <string name="unlock_high_bitrate_audio_formats">開放 mp4a 高位元率格式</string>
   <string name="color_scheme_blue">藍色</string>
@@ -885,7 +885,7 @@
   <string name="hide_watched_from_notifications">從通知隱藏已觀看的影片</string>
   <string name="hide_watched_from_subscription_groups">在訂閱群組中隱藏已觀看的影片</string>
   <string name="hide_opened_videos">隱藏你開啟過的影片</string>
-  <string name="hide_opened_videos_desc">動態、搜尋和頻道頁面中任何有觀看進度的影片，即使只有一點點。不包括觀看記錄、稍後觀看、播放清單和我的影片。</string>
+  <string name="hide_opened_videos_desc">動態、搜尋和頻道頁面中任何有觀看進度的影片，即使只有一點點。不包括觀看紀錄、稍後觀看、播放清單和我的影片。</string>
   <string name="about_sponsorblock">關於 SponsorBlock</string>
   <string name="about_dearrow">關於 DeArrow</string>
   <string name="pinned_channel_rows">將釘選頻道顯示為列</string>
@@ -980,7 +980,7 @@
   <string name="place_comments_left">把評論區放在左邊</string>
   <string name="unpin_group_from_sidebar">移除訂閱群組</string>
   <string name="hide_shorts_from_search">在搜尋結果中隱藏 Shorts</string>
-  <string name="hide_shorts_history">隱藏 Shorts 觀看記錄</string>
+  <string name="hide_shorts_history">隱藏 Shorts 觀看紀錄</string>
   <string name="hide_shorts_from_sports">在體育中隱藏 Shorts</string>
   <string name="hide_shorts_from_live">在直播中隱藏 Shorts</string>
   <string name="hide_shorts_from_my_videos">在我的影片中隱藏 Shorts</string>
@@ -997,6 +997,7 @@
   <string name="create_playlist_note">不會在 YouTube 應用程式裡出現</string>
   <string name="player_quick_shorts_skip_alt">使用向上 / 向下按鈕跳過 Shorts</string>
   <string name="player_quick_skip_videos_alt">使用向上 / 向下按鈕跳過一般影片</string>
+  <string name="player_quick_skip_chapters">使用向上按鈕跳到下一個章節</string>
   <string name="prefer_google_dns">偏好使用 Google DNS</string>
   <string name="auto_backup_category">自動備份</string>
   <string name="once_a_day">一天一次</string>
@@ -1026,7 +1027,7 @@
   <string name="player_unexpected_error">非預期的播放錯誤</string>
   <string name="app_backup_desc">注意：備份檔案將以 zip 格式建立。</string>
   <string name="app_restore_desc">注意：備份的 zip 壓縮檔需手動複製到此資料夾，或在檔案管理器中使用「開啟方式」選項。</string>
-  <string name="remove_from_search_history">從搜尋記錄中移除</string>
+  <string name="remove_from_search_history">從搜尋紀錄中移除</string>
   <string name="hide_local">隱藏（本機）</string>
   <string name="unhide">取消隱藏</string>
   <string name="unhide_channel_pages">頻道頁面</string>
@@ -1171,7 +1172,7 @@
     <string name="modern_off">關閉</string>
     <string name="modern_try_again">重試</string>
     <string name="card_desc_dearrow">將釣魚標題和縮圖替換成社群提交的版本</string>
-    <string name="card_desc_home_screen_channels">選擇哪些列（觀看記錄、你的播放清單…）要以頻道形式顯示在 Android TV 主畫面上</string>
+    <string name="card_desc_home_screen_channels">選擇哪些列（觀看紀錄、你的播放清單…）要以頻道形式顯示在 Android TV 主畫面上</string>
     <string name="card_desc_filtering">隱藏或標示合作影片、稍後觀看、節目、直播以及首頁的推薦列</string>
     <string name="card_desc_hide_content">隱藏 Shorts、合輯，以及已觀看、即將推出、重複、過舊或符合關鍵字的影片</string>
     <string name="card_desc_sponsorblock">略過社群標示的贊助、片頭、自我宣傳及影片的其他部分</string>

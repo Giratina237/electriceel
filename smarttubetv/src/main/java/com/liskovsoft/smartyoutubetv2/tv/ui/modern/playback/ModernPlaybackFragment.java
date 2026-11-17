@@ -290,7 +290,7 @@ public class ModernPlaybackFragment extends PlaybackFragment {
         }
 
         if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP && !isControlsOverlayVisible()
-                && !PlayerTweaksData.instance(getContext()).isQuickSkipVideosAltEnabled()) {
+                && !PlayerTweaksData.instance(getContext()).isQuickSkipVideosAltEnabled() && !isDpadUpNextChapter()) {
             notifyKey(event);
             showControlsOverlay(true);
             return true;

@@ -940,6 +940,7 @@
     <string name="player_quick_shorts_skip_alt">Preskočiť Shorts s tlačidlami hore/dolu</string>
     <string name="player_quick_skip_videos">Preskočiť videá s tlačidlami vľavo/vpravo</string>
     <string name="player_quick_skip_videos_alt">Preskočiť videá s tlačidlami hore/dolu</string>
+    <string name="player_quick_skip_chapters">Ďalšia kapitola tlačidlom hore</string>
     <string name="channels_filter">Zobraziť pole filtrovania kanálov v sekcii Kanály</string>
     <string name="channel_search_bar">Vyhľadávací panel v sekcii Kanály</string>
     <string name="header_sports">Šport</string>

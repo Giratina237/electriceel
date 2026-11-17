@@ -1004,6 +1004,7 @@
   <string name="create_playlist_note">cela ne sera pas visible dans l’application YouTube</string>
   <string name="player_quick_shorts_skip_alt">Naviguer entre les Shorts avec les boutons haut/bas</string>
   <string name="player_quick_skip_videos_alt">Naviguer entre les vidéos standards avec les boutons haut/bas</string>
+  <string name="player_quick_skip_chapters">Chapitre suivant avec le bouton haut</string>
   <string name="prefer_google_dns">Privilégier les DNS Google</string>
   <string name="dialog_block_channel">Mettre sur liste noire</string>
   <string name="dialog_unblock_channel">Retirer de la liste noire</string>

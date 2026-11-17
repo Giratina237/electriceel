@@ -997,6 +997,7 @@
     <string name="player_quick_shorts_skip_alt">పైకి/క్రిందికి బటన్‌లతో షార్ట్స్‌ను దాటవేయండి</string>
     <string name="player_quick_skip_videos">ఎడమ/కుడి బటన్‌లతో సాధారణ వీడియోలను దాటవేయండి</string>
     <string name="player_quick_skip_videos_alt">పైకి/క్రిందికి బటన్‌లతో సాధారణ వీడియోలను దాటవేయండి</string>
+    <string name="player_quick_skip_chapters">పైకి బటన్‌తో తదుపరి అధ్యాయం</string>
     <string name="channels_filter">ఛానెల్స్ విభాగంలో ఛానెల్‌ల ఫిల్టర్ ఫీల్డ్‌ను చూపండి</string>
     <string name="channel_search_bar">ఛానెల్ పేజీలో శోధన బార్</string>
     <string name="header_sports">క్రీడలు</string>

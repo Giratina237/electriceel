@@ -90,7 +90,8 @@ public class GDriveBackupWorker extends Worker {
     public static void cancel(Context context) {
         RxHelper.disposeActions(sAction);
 
-        if (VERSION.SDK_INT >= 23 && GeneralData.instance(context).getGDriveBackupFreqDays() > 0) {
+        // NOTE: no frequency check: "None" has already been saved by the time this is called
+        if (VERSION.SDK_INT >= 23) {
             Log.d(TAG, "Unregistering worker job...");
 
             SafeWorkManager workManager = SafeWorkManager.getInstance(context);
@@ -103,6 +104,12 @@ public class GDriveBackupWorker extends Worker {
     public Result doWork() {
         if (BackupSettingsPresenter.hasInstance()) {
             return Result.retry();
+        }
+
+        // A worker left scheduled after auto backup was turned off: "None" didn't cancel it before, nor does another device taking
+        // over the backup (see checkedRunBackup)
+        if (GeneralData.instance(getApplicationContext()).getGDriveBackupFreqDays() <= 0) {
+            return Result.success();
         }
 
         Log.d(TAG, "Starting worker %s...", this);

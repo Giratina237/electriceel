@@ -944,6 +944,7 @@
 	<string name="player_quick_shorts_skip_alt">Salta i video brevi con il tasto su/giù</string>
     <string name="player_quick_skip_videos">Salta i video normali con il tasto sinistro/destro</string>
     <string name="player_quick_skip_videos_alt">Salta i video normali con il tasto su/giù</string>
+    <string name="player_quick_skip_chapters">Capitolo successivo con il tasto su</string>
 	<string name="channels_filter">Mostra il campo Filtra canali nella sezione Canali</string>
     <string name="channel_search_bar">Barra di ricerca all\'interno della pagina del Canale</string>
     <string name="header_sports">Sport</string>

@@ -135,6 +135,7 @@ public class PlayerTweaksData implements ProfileChangeListener {
     private boolean mIsQuickSkipShortsAltEnabled;
     private boolean mIsQuickSkipVideosEnabled;
     private boolean mIsQuickSkipVideosAltEnabled;
+    private boolean mIsQuickSkipChaptersEnabled;
     private boolean mIsOculusQuestFixEnabled;
     private boolean mIsAudioFocusEnabled;
     private boolean mIsNetworkErrorFixingDisabled;
@@ -666,7 +667,29 @@ public class PlayerTweaksData implements ProfileChangeListener {
 
     public void setQuickSkipVideosAltEnabled(boolean enable) {
         resetQuickSkipVideosSettings();
+        if (enable) {
+            mIsQuickSkipChaptersEnabled = false; // up skips to the next chapter with it
+        }
         mIsQuickSkipVideosAltEnabled = enable;
+        persistData();
+    }
+
+    /**
+     * Up skips to the next chapter of a regular video, or to its end after the last one (see PlayerUIController#handleUpSkip)
+     */
+    public boolean isQuickSkipChaptersEnabled() {
+        return mIsQuickSkipChaptersEnabled;
+    }
+
+    /**
+     * Only turning it on turns off the other one: the settings list still shows that one checked, unchecking it (or this one)
+     * doesn't turn off the one turned on instead
+     */
+    public void setQuickSkipChaptersEnabled(boolean enable) {
+        if (enable) {
+            mIsQuickSkipVideosAltEnabled = false; // up skips to the previous video with it
+        }
+        mIsQuickSkipChaptersEnabled = enable;
         persistData();
     }
 
@@ -684,6 +707,7 @@ public class PlayerTweaksData implements ProfileChangeListener {
     public void resetDpadUpDownSettings() {
         mIsQuickSkipShortsAltEnabled = false;
         mIsQuickSkipVideosAltEnabled = false;
+        mIsQuickSkipChaptersEnabled = false;
         persistData();
     }
 
@@ -819,6 +843,8 @@ public class PlayerTweaksData implements ProfileChangeListener {
         mIsQuickSkipVideosAltEnabled = Helpers.parseBoolean(split, 58, false);
         mIsAudioTimeStretchingEnabled = Helpers.parseBoolean(split, 59, true);
         mIsQueueRespectsPlaybackMode = Helpers.parseBoolean(split, 60, false);
+        // 61 and 62 are SmartTube's (SABR live, Keep up with live): this one is where it keeps it too
+        mIsQuickSkipChaptersEnabled = Helpers.parseBoolean(split, 63, false);
 
         mPlayerButtons2 = Helpers.parseInt(Helpers.splitData(mPrefs.getProfileData(PLAYER_BUTTONS2_DATA)), 0,
                 (int) (PLAYER_BUTTON_DEFAULT >>> 32));
@@ -850,7 +876,8 @@ public class PlayerTweaksData implements ProfileChangeListener {
                 mIsUnsafeAudioFormatsEnabled, null, mIsLoopShortsEnabled, mIsQuickSkipShortsEnabled, mIsRememberPositionOfLiveVideosEnabled,
                 mIsOculusQuestFixEnabled, null, mIsExtraLongSpeedListEnabled, mIsQuickSkipVideosEnabled, mIsNetworkErrorFixingDisabled, mIsCommentsPlacedLeft,
                 null, mIsAudioFocusEnabled, mIsDontResizeVideoToFitDialogEnabled, mIsSuggestionsHorizontallyScrolled,
-                mIsQuickSkipShortsAltEnabled, mIsQuickSkipVideosAltEnabled, mIsAudioTimeStretchingEnabled, mIsQueueRespectsPlaybackMode
+                mIsQuickSkipShortsAltEnabled, mIsQuickSkipVideosAltEnabled, mIsAudioTimeStretchingEnabled, mIsQueueRespectsPlaybackMode, null,
+                null, mIsQuickSkipChaptersEnabled
                 ));
         mPrefs.setProfileData(PLAYER_BUTTONS2_DATA, Helpers.mergeData(mPlayerButtons2));
     }

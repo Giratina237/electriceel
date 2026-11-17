@@ -1007,6 +1007,7 @@
   <string name="color_scheme_electric_blue">Azul eléctrico</string>
   <string name="player_quick_shorts_skip_alt">Saltar curtos cos botóns arriba/abaixo</string>
   <string name="player_quick_skip_videos_alt">Saltar vídeos normais cos botóns arriba/abaixo</string>
+  <string name="player_quick_skip_chapters">Seguinte capítulo co botón arriba</string>
   <string name="prefer_google_dns">Preferir DNS de Google</string>
   <string name="stable_restore">Restaurar a versión estable (perderanse tódolos datos)</string>
   <string name="auto_backup_category">Copia de seguranza automática</string>

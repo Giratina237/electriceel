@@ -992,6 +992,7 @@
     <string name="player_quick_shorts_skip_alt">ข้าม Shorts ด้วยปุ่มขึ้น/ลง</string>
     <string name="player_quick_skip_videos">ข้ามวิดีโอปกติด้วยปุ่มซ้าย/ขวา</string>
     <string name="player_quick_skip_videos_alt">ข้ามวิดีโอปกติด้วยปุ่มขึ้น/ลง</string>
+    <string name="player_quick_skip_chapters">บทถัดไปด้วยปุ่มขึ้น</string>
     <string name="channels_filter">แสดงช่องกรองช่องภายในส่วนช่อง</string>
     <string name="channel_search_bar">แถบค้นหาภายในหน้าช่อง</string>
     <string name="header_sports">กีฬา</string>

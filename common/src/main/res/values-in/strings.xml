@@ -1001,6 +1001,7 @@
   <string name="color_scheme_electric_blue">Biru Listrik</string>
   <string name="player_quick_shorts_skip_alt">Lewati Shorts dengan tombol atas/bawah</string>
   <string name="player_quick_skip_videos_alt">Lewati video dengan tombol atas/bawah</string>
+  <string name="player_quick_skip_chapters">Chapter berikutnya dengan tombol atas</string>
   <string name="prefer_google_dns">Gunakan Google DNS</string>
   <string name="card_unlocalized_titles">Judul video yang belum dilokalisasi</string>
   <string name="dont_resize_video_to_fit_dialog">Jangan menyesuaikan video agar muat di dialoog</string>

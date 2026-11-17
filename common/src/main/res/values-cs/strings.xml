@@ -948,6 +948,7 @@
     <string name="player_quick_shorts_skip_alt">Přeskakovat Shorts tlačítky nahoru/dolů</string>
     <string name="player_quick_skip_videos">Přeskakovat běžná videa tlačítky doleva/doprava</string>
     <string name="player_quick_skip_videos_alt">Přeskakovat běžná videa tlačítky nahoru/dolů</string>
+    <string name="player_quick_skip_chapters">Další kapitola tlačítkem nahoru</string>
     <string name="channels_filter">Zobrazit pole Filtrovat kanály v sekci Kanály</string>
     <string name="channel_search_bar">Vyhledávací panel na stránce kanálu</string>
     <string name="header_sports">Sporty</string>

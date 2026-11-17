@@ -1006,6 +1006,7 @@
   <string name="color_scheme_electric_blue">Elektrisk blå</string>
   <string name="player_quick_shorts_skip_alt">Spring Shorts over med op/ned-knapper</string>
   <string name="player_quick_skip_videos_alt">Spring almindelige videoer over med op/ned-knapper</string>
+  <string name="player_quick_skip_chapters">Næste kapitel med op-knappen</string>
   <string name="prefer_google_dns">Foretræk Google DNS</string>
   <string name="suggestions_horizontally_scrolled">Vandret rullende forslag</string>
   <string name="stable_restore">Gendan den stabile version (alle data går tabt)</string>

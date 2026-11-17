@@ -944,6 +944,7 @@
     <string name="player_quick_shorts_skip_alt">Yuxarı/aşağı düymələri ilə Shortsları keç</string>
     <string name="player_quick_skip_videos">Sol/sağ düymələri ilə adi videoları keç</string>
     <string name="player_quick_skip_videos_alt">Yuxarı/aşağı düymələri ilə adi videoları keç</string>
+    <string name="player_quick_skip_chapters">Yuxarı düyməsi ilə növbəti fəsil</string>
     <string name="channels_filter">Kanallar bölməsində \"Kanalları filtrlə\" sahəsini göstər</string>
     <string name="channel_search_bar">Kanal səhifəsi daxilində axtarış çubuğu</string>
     <string name="header_sports">İdman</string>

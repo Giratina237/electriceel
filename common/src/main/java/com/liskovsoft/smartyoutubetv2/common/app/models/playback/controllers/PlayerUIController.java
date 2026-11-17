@@ -143,7 +143,8 @@ public class PlayerUIController extends BasePlayerController {
 
         boolean isHandled = handleBackKey(keyCode) || handleMenuKey(keyCode) ||
                 handleConfirmKey(keyCode) || handleStopKey(keyCode) || handleNumKeys(keyCode) ||
-                handlePlayPauseKey(keyCode) || handleNextFrameKey(keyCode) || handleLeftRightSkip(keyCode) || handleUpDownSkip(keyCode);
+                handlePlayPauseKey(keyCode) || handleNextFrameKey(keyCode) || handleLeftRightSkip(keyCode) || handleUpDownSkip(keyCode) ||
+                handleUpSkip(keyCode);
 
         if (isHandled) {
             return true; // don't show UI
@@ -966,6 +967,24 @@ public class PlayerUIController extends BasePlayerController {
 
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
             getMainController().onPreviousClicked();
+            return true; // hide ui
+        }
+
+        return false;
+    }
+
+    /**
+     * Up skips to the next chapter of a regular video (see PlayerTweaksData#isQuickSkipChaptersEnabled). The cards and the Modern
+     * player's controls leave it to this (see PlaybackFragment#isDpadUpNextChapter).
+     */
+    private boolean handleUpSkip(int keyCode) {
+        if (getPlayer() == null || getPlayer().isOverlayShown() || getVideo() == null ||
+                getVideo().belongsToShortsGroup() || !getPlayerTweaksData().isQuickSkipChaptersEnabled()) {
+            return false;
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            mSuggestionsController.onNextChapter();
             return true; // hide ui
         }
 

@@ -996,6 +996,7 @@
   <string name="color_scheme_electric_blue">آبی الکتریکی</string>
   <string name="player_quick_shorts_skip_alt">رد کردن کوته ویدیوها با دکمه‌های بالا/پایین</string>
   <string name="player_quick_skip_videos_alt">رد کردن ویدیوهای معمولی با دکمه‌های بالا/پایین</string>
+  <string name="player_quick_skip_chapters">فصل بعدی با دکمه بالا</string>
   <string name="prefer_google_dns">ترجیح DNS گوگل</string>
   <string name="you_liked">شما پسندیدید</string>
   <string name="premium_users_only">فقط برای کاربران پرمیوم. رفع مشکل ناقص بودن فهرست قالب‌های ویدیو</string>
