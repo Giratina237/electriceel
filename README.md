@@ -49,7 +49,7 @@ Electric Eel is a fork of [SmartTube](https://github.com/yuliskov/SmartTube), an
 - "My videos" includes a rows section with a Shorts row after the videos
 - View release notes with rendered markdown and images in app
 
-### SmartTub Features
+### SmartTube Features
 - Clean interface 
 - SponsorBlock integration  
 - Adjustable playback speed  
