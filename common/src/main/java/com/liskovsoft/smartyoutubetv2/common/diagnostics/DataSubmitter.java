@@ -117,12 +117,22 @@ public final class DataSubmitter {
     }
 
     /**
-     * Built and sent in the background. Emits the submission's ID.
+     * Built and sent in the background. Emits the submission's ID, or completes with none when nothing was recorded since the last
+     * submission (see #submitIfAnyRecorded).
      */
     public static Observable<String> submitObserve(Context context) {
         Context appContext = context.getApplicationContext();
 
-        return RxHelper.fromCallable(() -> submit(appContext, false));
+        // Not fromCallable: a null from it is an error ("fromNullable result is null"), and nothing to send isn't one
+        return RxHelper.create(emitter -> {
+            String id = submitIfAnyRecorded(appContext);
+
+            if (id != null) {
+                emitter.onNext(id);
+            }
+
+            emitter.onComplete();
+        });
     }
 
     /**
@@ -165,6 +175,26 @@ public final class DataSubmitter {
             return null;
         }
 
+        return send(context, unsent);
+    }
+
+    /**
+     * Nothing is sent, and null returned, when neither a failure nor a video start was recorded since the last submission: sent again,
+     * the same device data made a submission with nothing else in it (96SN9J99, 1 s after J9T6DZWN). The first one is always sent:
+     * the device and its settings are what it has to tell. With the clock set back since the last submission, they're all unsent.
+     */
+    @Nullable
+    static synchronized String submitIfAnyRecorded(Context context) throws IOException {
+        Unsent unsent = Unsent.read(context);
+
+        if (unsent.failures.isEmpty() && unsent.videoStarts.isEmpty() && DebuggingData.instance(context).getLastSubmissionId() != null) {
+            return null;
+        }
+
+        return send(context, unsent);
+    }
+
+    private static String send(Context context, Unsent unsent) throws IOException {
         String id = submit(context.getString(R.string.submit_data_url),
                 DiagnosticsReport.build(context, unsent.failures, unsent.videoStarts));
         DebuggingData.instance(context).setLastSubmission(id, unsent.newestFailureTs, unsent.newestStartTs, System.currentTimeMillis());

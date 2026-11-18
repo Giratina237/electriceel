@@ -59,8 +59,6 @@ public class InfoCardController extends BasePlayerController implements OnDataCh
 
     @Override
     public void onNewVideo(Video item) {
-        // FIX83: temporary
-        Log.d(TAG, "FIX83 onNewVideo %s", item != null ? item.videoId : null);
         // Till the new one is loaded: the player still tells the position of the video before
         stopPolling();
         // The card of the video before goes at once, e.g. after a click on it
@@ -69,9 +67,6 @@ public class InfoCardController extends BasePlayerController implements OnDataCh
 
     @Override
     public void onVideoLoaded(Video item) {
-        // FIX83: temporary
-        Log.d(TAG, "FIX83 onVideoLoaded %s (was %s)", item != null ? item.videoId : null, mVideoId);
-
         if (item != null && !Helpers.equals(mVideoId, item.videoId)) {
             reset(item.videoId);
         }
@@ -81,8 +76,6 @@ public class InfoCardController extends BasePlayerController implements OnDataCh
 
     @Override
     public void onEngineReleased() {
-        // FIX83: temporary
-        Log.d(TAG, "FIX83 onEngineReleased");
         stopPolling();
         show(null);
     }
@@ -140,9 +133,6 @@ public class InfoCardController extends BasePlayerController implements OnDataCh
         // Not outside the player (e.g. the setting changed with the account): the next video starts it
         if (getPlayer() == null || !getPlayer().isEngineInitialized() || !isEnabled() || mVideoId == null
                 || (mItems != null && mItems.isEmpty())) {
-            // FIX83: temporary
-            Log.d(TAG, "FIX83 startPolling: not polling (player %s, enabled %s, video %s, items %s)", getPlayer() != null,
-                    isEnabled(), mVideoId, mItems != null ? mItems.size() : null);
             show(null);
             return;
         }
@@ -175,18 +165,7 @@ public class InfoCardController extends BasePlayerController implements OnDataCh
 
         long positionMs = player.getPositionMs();
         InfoCardItem item = mTeaserTimer.update(mItems, positionMs, SystemClock.elapsedRealtime(), player.isInfoCardShown());
-
-        // FIX83: temporary, the position on every poll around a teaser
-        if (item != null || mShown != null) {
-            Log.d(TAG, "FIX83 poll position %s, speed %s, teaser %s", positionMs, player.getSpeed(), fix83Name(item));
-        }
-
         show(item);
-    }
-
-    // FIX83: temporary
-    static String fix83Name(@Nullable InfoCardItem item) {
-        return item != null ? "'" + item.getTeaser() + "' @" + item.getStartMs() : "none";
     }
 
     private void fetch() {
@@ -226,10 +205,6 @@ public class InfoCardController extends BasePlayerController implements OnDataCh
         if (item == mShown) {
             return;
         }
-
-        // FIX83: temporary
-        Log.d(TAG, "FIX83 show %s -> %s, position %s, from %s", fix83Name(mShown), fix83Name(item),
-                getPlayer() != null ? getPlayer().getPositionMs() : -2, new Throwable().getStackTrace()[1].getMethodName());
 
         mShown = item;
 
@@ -281,8 +256,6 @@ public class InfoCardController extends BasePlayerController implements OnDataCh
             }
 
             if (hasNew) {
-                // FIX83: temporary
-                Log.d(TAG, "FIX83 timer: new %s at position %s, now %s", fix83Name(latest), positionMs, nowMs);
                 mItem = latest;
                 mSeenMs = 0;
                 mCountedAtMs = nowMs;
@@ -294,9 +267,6 @@ public class InfoCardController extends BasePlayerController implements OnDataCh
                 mCountedAtMs = nowMs;
 
                 if (mSeenMs >= SHOW_MS || !isActive(mItem, positionMs)) {
-                    // FIX83: temporary
-                    Log.d(TAG, "FIX83 timer: hide %s at position %s, seen for %s ms, active %s", fix83Name(mItem), positionMs,
-                            mSeenMs, isActive(mItem, positionMs));
                     mItem = null;
                 }
             }

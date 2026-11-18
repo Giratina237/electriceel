@@ -203,6 +203,7 @@
     <string name="submit_data_include_video_ids_desc">వీడియో IDలు ఎల్లప్పుడూ పరికరంలో నమోదు అవుతాయి. ఇది అవి పంపబడాలా వద్దా అని మాత్రమే నిర్ణయిస్తుంది.</string>
     <string name="submit_data_sending">పంపుతోంది…</string>
     <string name="submit_data_done">సమర్పించబడింది. ID: %s. దీన్ని మీ GitHub issueలో చేర్చండి.</string>
+    <string name="submit_data_nothing_new">చివరి సమర్పణ తర్వాత కొత్తగా ఏమీ లేదు. ID: %s.</string>
     <string name="submit_data_failed">డేటాను సమర్పించలేకపోయింది: %s</string>
     <string name="submit_data_last">చివరిగా సమర్పించినది: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">IDతో GitHub issueను తెరవడానికి స్కాన్ చేయండి</string>

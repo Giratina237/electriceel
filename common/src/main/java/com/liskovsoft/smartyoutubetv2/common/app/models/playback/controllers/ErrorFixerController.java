@@ -9,6 +9,7 @@ import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.audio.AudioTrackCounts;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderErrorException;
@@ -36,9 +37,11 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.DecoderErrorFallback;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.SabrDefaultLoadErrorHandlingPolicy;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil;
@@ -215,12 +218,42 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
 
         PlayerFailure failure = newFailure(PlayerFailure.KIND_STALL);
-        FormatAttempts.addStallDetails(failure, getPlayer().getPositionMs());
+        long positionMs = getPlayer().getPositionMs();
+        long bufferedPositionMs = getPlayer().getBufferedPositionMs();
+        FormatAttempts.addStallDetails(failure, positionMs);
+        // What the player has past the position, the least of its tracks: where the last segments loaded end (see
+        // FormatAttempts#addStallDetails) isn't, a stall with "33 s" of video loaded ahead didn't tell why it waited (J9T6DZWN #2)
+        failure.detail("bufferedMs", bufferedPositionMs >= 0 ? bufferedPositionMs - positionMs : null);
 
         try {
             runLongBufferingAction(failure);
         } finally {
             failure.record();
+        }
+    }
+
+    /**
+     * The playback goes wrong without an error (see PlaybackHealth), before its failure is recorded: it stalls again and again on a
+     * connection slower than the format plays (J9T6DZWN #3, #4, #6: 4K60, 3 stalls in a minute each time, with no fix), or drops frames
+     * at a frame rate no decoder declares for its size (J7VJY9TH #1: 4K60 on a decoder that declares 2160p30, 215 frames dropped).
+     * A lower quality, for this video only, as a repeated long stall gets (see runLongBufferingAction). A connection that stops
+     * answering isn't one too slow (see FormatAttempts#isTooSlow): a lower quality stalls the same way.
+     */
+    @Override
+    public void onHealthFailure(String kind, PlayerFailure failure) {
+        // Not over a fix already asked for (e.g. a long stall's reload)
+        if (!isOfflineVideo() || mVideoLoaderController.isFixPending()) {
+            return;
+        }
+
+        FormatItem video = getPlayer().getVideoFormat();
+        Format format = video != null && video.getTrack() != null ? video.getTrack().format : null;
+        boolean isTooSlow = PlaybackHealth.KIND_STALLS.equals(kind) && FormatAttempts.isTooSlow();
+        boolean isBeyondDecoder = PlaybackHealth.KIND_FRAME_DROPS.equals(kind) && TrackSelectorUtil.isFrameRateBeyondDecoder(format);
+
+        if ((isTooSlow || isBeyondDecoder) && lowerVideoQuality()) {
+            failure.action("lower_quality").action("restart_engine");
+            mVideoLoaderController.restartEngine(failure.getKind());
         }
     }
 
@@ -234,17 +267,17 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             // applySabrPoTokenAction): this is a stall it didn't tell.
             failure.action("switch_next_client_now").action("reload_video");
             YouTubeServiceManager.instance().switchNextClientNow();
-            mVideoLoaderController.reloadVideo();
+            mVideoLoaderController.reloadVideo(failure.getKind());
         } else if (isOfflineVideo() && isSubtitlesEnabled()) {
             // Long loading subtitles cause hangs
             failure.action("disable_subtitles").action("reload_video");
             disableSubtitles();
-            mVideoLoaderController.reloadVideo();
+            mVideoLoaderController.reloadVideo(failure.getKind());
         } else if (isOfflineVideo() && !mBufferingDetector.isPlayable() && isFirstStuckLoad()) {
             // One track's first segment came and the other's request hangs: the name resolved and the client's formats load, so
             // neither the DNS nor the client is to blame. Reloaded once for the video, then the fixes below.
             failure.action("stuck_load_reload").action("reload_video");
-            mVideoLoaderController.reloadVideo();
+            mVideoLoaderController.reloadVideo(failure.getKind());
         } else if (isOfflineVideo() && !mBufferingDetector.isPlayable()) {
             int customDns = PlayerTweaksData.DNS_TYPE_GOOGLE;
             // What the player's new connections say of their lookup: only OkHttp's are told (the DNS setting is OkHttp's too), so
@@ -262,7 +295,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 mDnsFixFrom = getPlayerTweaksData().getPreferredDnsType();
                 failure.action("dns_google").action("restart_engine");
                 getPlayerTweaksData().setPreferredDnsType(customDns);
-                mVideoLoaderController.restartEngine();
+                mVideoLoaderController.restartEngine(failure.getKind());
             } else {
                 // The DNS fix of the last start that hung didn't help: the lookups fail the same way with Google's
                 if (lookup == Connections.Lookup.FAILING) {
@@ -284,7 +317,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 }
 
                 failure.action(delayed("reload_video", delayMs));
-                mVideoLoaderController.reloadVideo((int) delayMs);
+                mVideoLoaderController.reloadVideo((int) delayMs, failure.getKind());
             }
         } else if (isOfflineVideo() && isRepeatedStall()) {
             // A reload didn't help. Its loads failed on their connection (they didn't connect, or no answer came), or they came faster
@@ -298,19 +331,19 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 failure.action("network_wait");
                 long delayMs = mStallRetries.next(getVideo() != null ? getVideo().videoId : null);
                 failure.action(delayed("reload_video", delayMs));
-                mVideoLoaderController.reloadVideo((int) delayMs);
+                mVideoLoaderController.reloadVideo((int) delayMs, failure.getKind());
             } else if (lowerVideoQuality()) {
                 // The connection can't keep up with this format right now. For this video only.
                 failure.action("lower_quality").action("restart_engine");
-                mVideoLoaderController.restartEngine();
+                mVideoLoaderController.restartEngine(failure.getKind());
             } else {
                 failure.action("reload_video");
-                mVideoLoaderController.reloadVideo();
+                mVideoLoaderController.reloadVideo(failure.getKind());
             }
         } else {
             // SABR may hang if the server issues a high backoffTime
             failure.action("reload_video");
-            mVideoLoaderController.reloadVideo();
+            mVideoLoaderController.reloadVideo(failure.getKind());
         }
     }
 
@@ -513,6 +546,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return;
         }
 
+        if (applySabrRefusedAction(error, failure)) {
+            return;
+        }
+
         if (applySabrProtocolErrorAction(error, failure)) {
             return;
         }
@@ -563,7 +600,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         YouTubeServiceManager.instance().reloadPlayerResponse(video.videoId, reloadError.reloadPlaybackToken);
         // At once: the error came when the buffer ran out, the picture stands still till the video plays again. A second's wait was
         // more than the reload took (FARAJV5R #100: 674 ms to its first frame).
-        mVideoLoaderController.reloadVideo(0);
+        mVideoLoaderController.reloadVideo(0, failure.getKind());
 
         return true;
     }
@@ -599,7 +636,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
         failure.action("sabr_backoff " + mSabrErrorFixAttempts + "/" + MAX_SABR_ERROR_FIX_ATTEMPTS).action("reload_video");
         // SABR may hang if the server issues a high backoffTime
-        mVideoLoaderController.reloadVideo();
+        mVideoLoaderController.reloadVideo(failure.getKind());
 
         return true;
     }
@@ -626,7 +663,25 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             YouTubeServiceManager.instance().switchNextClientNow();
         }
 
-        mVideoLoaderController.reloadVideo();
+        mVideoLoaderController.reloadVideo(failure.getKind());
+
+        return true;
+    }
+
+    /**
+     * SABR's media server refused the request (HTTP 401 or 403, see SabrDefaultLoadErrorHandlingPolicy#isRefused) while the poToken's
+     * attestation was pending: past its grace period, the server refuses it at the same position after every retry and app restart
+     * (CX17FXZW #1-#4: 401s 7 times a minute, protection PENDING since 23 s before). The server holding back its media this way is a
+     * PoTokenError of its own (see applySabrPoTokenAction): another client. Refused otherwise, see applyEngineErrorAction.
+     */
+    private boolean applySabrRefusedAction(Throwable error, PlayerFailure failure) {
+        if (getVideo() == null || !SabrDefaultLoadErrorHandlingPolicy.isRefused(error) || !isAttestationPending()) {
+            return false;
+        }
+
+        failure.action("switch_next_client_now").action("reload_video");
+        YouTubeServiceManager.instance().switchNextClientNow();
+        mVideoLoaderController.reloadVideo(failure.getKind());
 
         return true;
     }
@@ -661,7 +716,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mSabrProtocolErrorVideoId = video.videoId;
         mSabrProtocolErrorTimeMs = nowMs;
         failure.action("reload_video");
-        mVideoLoaderController.reloadVideo();
+        mVideoLoaderController.reloadVideo(failure.getKind());
 
         return true;
     }
@@ -689,7 +744,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     private boolean applyNetworkErrorReload(Throwable error, PlayerFailure failure) {
         Video video = getVideo();
 
-        if (video == null || !(isConnectionError(error) || isBrokenSabrResponse(error))) {
+        if (video == null || !(isConnectionError(error) || isBrokenResponse(error))) {
             return false;
         }
 
@@ -708,12 +763,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
-     * The SABR response read had bytes no part starts with (see SabrStream#nextKnownUMPPart): broken on the way or read out of
-     * step, not the client's formats
+     * The response read had bytes its format doesn't start with, broken on the way or read out of step, not the client's formats: a
+     * SABR one no part starts with (see SabrStream#nextKnownUMPPart), or a segment the extractor can't parse once the video played
+     * (CX17FXZW #13: "Skipping atom with length > 2147483647" in a DASH segment, right after a 17.7 s stall at 706 kbps). One that
+     * fails the same way each time is the client's after MAX_NETWORK_ERROR_RELOADS.
      */
-    private static boolean isBrokenSabrResponse(Throwable error) {
+    private static boolean isBrokenResponse(Throwable error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
-            if (cause instanceof UnknownPartError) {
+            if (cause instanceof UnknownPartError || cause instanceof ParserException) {
                 return true;
             }
         }
@@ -803,7 +860,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 YouTubeServiceManager.instance().switchNextClientNow();
                 showMessage = true;
             } else if (!applyNetworkErrorReload(error, failure)) {
-                // A broken connection (e.g. a read timeout) or SABR response is only reloaded, with the same client
+                // A broken connection (e.g. a read timeout) or response (see isBrokenResponse) is only reloaded, with the same client
                 failure.action("switch_next_client");
                 YouTubeServiceManager.instance().switchNextClient(); // Response code: 403
             }
@@ -887,11 +944,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
         if (restartEngine) {
             failure.action(delayed("restart_engine", restartDelayMs));
-            mVideoLoaderController.restartEngine((int) restartDelayMs);
+            mVideoLoaderController.restartEngine((int) restartDelayMs, failure.getKind());
         } else {
             // Need at least to reload the video because the player becomes idle after error
             failure.action("reload_video");
-            mVideoLoaderController.reloadVideo();
+            mVideoLoaderController.reloadVideo(failure.getKind());
         }
     }
 
@@ -1074,7 +1131,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
 
         failure.action("reload_video_" + UNPLAYABLE_RELOAD_MS / 1_000 + "s");
-        mVideoLoaderController.reloadVideo(UNPLAYABLE_RELOAD_MS);
+        mVideoLoaderController.reloadVideo(UNPLAYABLE_RELOAD_MS, failure.getKind());
     }
 
     /**
@@ -1119,11 +1176,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 Helpers.equalsAny(className, "PoTokenException", "BadWebViewException")) {
             failure.action("switch_next_client").action("reload_video");
             YouTubeServiceManager.instance().switchNextClient();
-            mVideoLoaderController.reloadVideo();
+            mVideoLoaderController.reloadVideo(failure.getKind());
         } else if (Helpers.containsAny(message, "is not defined")) {
             failure.action("invalidate_cache").action("reload_video");
             YouTubeServiceManager.instance().invalidateCache();
-            mVideoLoaderController.reloadVideo();
+            mVideoLoaderController.reloadVideo(failure.getKind());
         } else {
             Log.e(TAG, "Probably no internet connection");
             reloadLater(failure, mFetchRetries.next(videoId));
@@ -1152,7 +1209,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     private void reloadLater(PlayerFailure failure, long delayMs) {
         failure.action(delayed("reload_video", delayMs));
-        mVideoLoaderController.reloadVideo((int) delayMs);
+        mVideoLoaderController.reloadVideo((int) delayMs, failure.getKind());
     }
 
     /**

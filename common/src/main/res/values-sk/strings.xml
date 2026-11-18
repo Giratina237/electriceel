@@ -220,6 +220,7 @@
     <string name="submit_data_include_video_ids_desc">ID videí sa v zariadení zaznamenávajú vždy. Tým sa len rozhoduje, či sa odošlú.</string>
     <string name="submit_data_sending">Odosiela sa…</string>
     <string name="submit_data_done">Odoslané. ID: %s. Uveďte ho vo svojom issue na GitHube.</string>
+    <string name="submit_data_nothing_new">Od posledného odoslania nie je nič nové. ID: %s.</string>
     <string name="submit_data_failed">Údaje sa nepodarilo odoslať: %s</string>
     <string name="submit_data_last">Naposledy odoslané: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Naskenujte na otvorenie issue na GitHube s týmto ID</string>

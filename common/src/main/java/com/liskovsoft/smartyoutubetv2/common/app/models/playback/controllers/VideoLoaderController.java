@@ -175,13 +175,29 @@ public class VideoLoaderController extends BasePlayerController {
      */
     private long mReloadDueMs = -1;
     private long mRestartDueMs = -1;
+    /**
+     * Why the reload and the engine restart asked for last are done, for their start (see VideoStart#reason): the kind of failure the
+     * error fixer acted on, or a VideoStart.REASON_ constant. Null when not told.
+     */
+    @Nullable
+    private String mReloadReason;
+    @Nullable
+    private String mRestartReason;
+    /**
+     * The reason told for the reload or restart being asked for (see #reloadVideo(int, String)), taken by the one asked for: one
+     * asked for without (see #reloadVideo(int)) has none
+     */
+    @Nullable
+    private String mNextReloadReason;
+    @Nullable
+    private String mNextRestartReason;
     private final Runnable mReloadVideo = () -> {
         mReloadDueMs = -1;
         Video video = getVideo();
 
         if (video != null) {
             video.fromReload = true;
-            VideoStarts.onReload(video.videoId);
+            VideoStarts.onReload(video.videoId, mReloadReason);
         }
 
         getMainController().onNewVideo(video);
@@ -199,7 +215,7 @@ public class VideoLoaderController extends BasePlayerController {
             Video video = getVideo();
 
             if (video != null) {
-                VideoStarts.onReload(video.videoId);
+                VideoStarts.onReload(video.videoId, mRestartReason);
             }
 
             getPlayer().restartEngine(); // properly save position of the current track
@@ -380,7 +396,7 @@ public class VideoLoaderController extends BasePlayerController {
 
         Log.d(TAG, "The streams expire: fetching them again before playing on");
         YouTubeServiceManager.instance().reloadPlayerResponse(video.videoId, null);
-        reloadVideo(0);
+        reloadVideo(0, VideoStart.REASON_STREAMS_EXPIRED);
     }
 
     /**
@@ -505,7 +521,7 @@ public class VideoLoaderController extends BasePlayerController {
         }
 
         if (reloadOnFailure) {
-            reloadVideo(0);
+            reloadVideo(0, VideoStart.REASON_STREAMS_REFRESH_FAILED);
         }
     }
 
@@ -761,7 +777,7 @@ public class VideoLoaderController extends BasePlayerController {
                 MessageHelpers.showLongMessage(getContext(), getContext().getString(R.string.msg_live_no_media,
                         mFormatClient != null ? mFormatClient : "YouTube"));
                 YouTubeServiceManager.instance().switchNextClientNow();
-                reloadVideo(0);
+                reloadVideo(0, failure.getKind());
                 isRefetched = true;
             } else {
                 // Not started yet: a reload when it does is all there is to do
@@ -775,7 +791,7 @@ public class VideoLoaderController extends BasePlayerController {
                 mSuggestionsController.loadSuggestions(getVideo());
                 bgImageUrl = getVideo().getBackgroundUrl();
                 player.showOverlay(true);
-                reloadVideo(getEmptyFormatsReloadMs(formatInfo, System.currentTimeMillis()));
+                reloadVideo(getEmptyFormatsReloadMs(formatInfo, System.currentTimeMillis()), failure.getKind());
             }
         }
 
@@ -789,6 +805,8 @@ public class VideoLoaderController extends BasePlayerController {
             mMembersSkips = 0; // one plays: the next run of members' videos is skipped again
         }
 
+        // Their average bitrates, before the player's tracks are known (see FormatAttempts#onTracks)
+        FormatAttempts.onFormats(mFormatProtocol != null ? formatInfo.getAdaptiveFormats() : null);
         FormatAttempts.onSource(mFormatClient, mFormatProtocol);
         player.showBackground(bgImageUrl); // remove bg (if video playing) or set another bg
     }
@@ -917,7 +935,7 @@ public class VideoLoaderController extends BasePlayerController {
         mPickedClientVideoId = video.videoId;
         mIsPickedClientFallbackShown = false;
         YouTubeServiceManager.instance().pickClient(video.videoId, client);
-        reloadVideo(0);
+        reloadVideo(0, VideoStart.REASON_PICK_CLIENT);
     }
 
     /**
@@ -1020,13 +1038,28 @@ public class VideoLoaderController extends BasePlayerController {
         return picked != null ? failure.detail("pickedClient", picked) : failure;
     }
 
+    /**
+     * @param reason why, for the start it makes (see VideoStart#reason): e.g. the kind of failure the error fixer acted on
+     */
+    public void reloadVideo(int delayMs, @Nullable String reason) {
+        mNextReloadReason = reason;
+        reloadVideo(delayMs);
+    }
+
+    /**
+     * With the reason told for it (see #reloadVideo(int, String)), none otherwise
+     */
     public void reloadVideo(int delayMs) {
+        String reason = mNextReloadReason;
+        mNextReloadReason = null;
+
         if (getPlayer() == null) {
             return;
         }
 
         if (getPlayer().isEngineInitialized()) {
             Log.d(TAG, "Reloading the video...");
+            mReloadReason = reason;
             Utils.postDelayed(mReloadVideo, delayMs);
 
             if (delayMs >= 0) { // posted (see Utils#postDelayed)
@@ -1048,10 +1081,23 @@ public class VideoLoaderController extends BasePlayerController {
 
     /**
      * @param delayMs e.g. longer each time a restart didn't help (see ErrorFixerController)
+     * @param reason why, for the start it makes (see VideoStart#reason): e.g. the kind of failure the error fixer acted on
+     */
+    void restartEngine(int delayMs, @Nullable String reason) {
+        mNextRestartReason = reason;
+        restartEngine(delayMs);
+    }
+
+    /**
+     * With the reason told for it (see #restartEngine(int, String)), none otherwise
      */
     void restartEngine(int delayMs) {
+        String reason = mNextRestartReason;
+        mNextRestartReason = null;
+
         if (getPlayer() != null) {
             Log.d(TAG, "Restarting the engine...");
+            mRestartReason = reason;
             Utils.postDelayed(mRestartEngine, delayMs);
 
             if (delayMs >= 0) { // posted (see Utils#postDelayed)
@@ -1163,11 +1209,19 @@ public class VideoLoaderController extends BasePlayerController {
     }
 
     public void restartEngine() {
-        restartEngine(1_000);
+        restartEngine((String) null);
+    }
+
+    public void restartEngine(@Nullable String reason) {
+        restartEngine(1_000, reason);
     }
 
     public void reloadVideo() {
-        reloadVideo(1_000);
+        reloadVideo((String) null);
+    }
+
+    public void reloadVideo(@Nullable String reason) {
+        reloadVideo(1_000, reason);
     }
 
     private void applyPlaybackMode(int playbackMode) {
@@ -1211,11 +1265,11 @@ public class VideoLoaderController extends BasePlayerController {
             case PlayerConstants.PLAYBACK_MODE_ONE:
                 if (VERSION.SDK_INT <= 19) {
                     // Fix frozen image on Android 4
-                    restartEngine();
+                    restartEngine(VideoStart.REASON_REPEAT);
                 } else if (!getPlayer().containsMedia()) {
                     // An error ended it (see ErrorFixerController): a seek doesn't play an idle player. Reloaded from its start.
                     getStateService().save(new State(video, 0, getPlayer().getDurationMs(), getPlayer().getSpeed()));
-                    reloadVideo();
+                    reloadVideo(VideoStart.REASON_REPEAT);
                 } else {
                     getPlayer().setPositionMs(0);
                 }

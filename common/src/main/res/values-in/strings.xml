@@ -217,6 +217,7 @@
   <string name="submit_data_include_video_ids_desc">ID video selalu dicatat di perangkat. Ini hanya menentukan apakah ID tersebut dikirim.</string>
   <string name="submit_data_sending">Mengirim…</string>
   <string name="submit_data_done">Terkirim. ID: %s. Sertakan di issue GitHub Anda.</string>
+  <string name="submit_data_nothing_new">Tidak ada yang baru sejak pengiriman terakhir. ID: %s.</string>
   <string name="submit_data_failed">Tidak dapat mengirim data: %s</string>
   <string name="submit_data_last">Terakhir dikirim: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Pindai untuk membuka issue GitHub dengan ID tersebut</string>

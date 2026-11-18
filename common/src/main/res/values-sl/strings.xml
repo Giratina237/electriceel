@@ -206,6 +206,7 @@
   <string name="submit_data_include_video_ids_desc">ID-ji videoposnetkov se v napravi vedno beležijo. To odloča le, ali se pošljejo.</string>
   <string name="submit_data_sending">Pošiljanje…</string>
   <string name="submit_data_done">Poslano. ID: %s. Navedi ga v svoji zadevi na GitHubu.</string>
+  <string name="submit_data_nothing_new">Od zadnjega pošiljanja ni nič novega. ID: %s.</string>
   <string name="submit_data_failed">Podatkov ni bilo mogoče poslati: %s</string>
   <string name="submit_data_last">Nazadnje poslano: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Skeniraj, da odpreš zadevo na GitHubu z ID-jem</string>

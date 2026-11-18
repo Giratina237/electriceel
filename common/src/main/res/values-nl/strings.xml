@@ -216,6 +216,7 @@
   <string name="submit_data_include_video_ids_desc">Video-ID\'s worden altijd op het apparaat vastgelegd. Dit bepaalt alleen of ze worden verstuurd.</string>
   <string name="submit_data_sending">Versturen…</string>
   <string name="submit_data_done">Verstuurd. ID: %s. Vermeld het in je GitHub-issue.</string>
+  <string name="submit_data_nothing_new">Niets nieuws sinds de laatste verzending. ID: %s.</string>
   <string name="submit_data_failed">Kan de gegevens niet versturen: %s</string>
   <string name="submit_data_last">Laatst verstuurd: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Scan om een GitHub-issue met de ID te openen</string>

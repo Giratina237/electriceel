@@ -207,6 +207,7 @@
   <string name="submit_data_include_video_ids_desc">تُسجَّل معرّفات الفيديو دائمًا على الجهاز. هذا يحدد فقط ما إذا كانت تُرسل.</string>
   <string name="submit_data_sending">جارٍ الإرسال…</string>
   <string name="submit_data_done">تم الإرسال. المعرّف: %s. أضفه إلى مشكلتك على GitHub.</string>
+  <string name="submit_data_nothing_new">لا جديد منذ آخر إرسال. المعرّف: %s.</string>
   <string name="submit_data_failed">تعذّر إرسال البيانات: %s</string>
   <string name="submit_data_last">آخر إرسال: %1$s، %2$s</string>
   <string name="submit_data_issue_qr">امسح الرمز لفتح مشكلة على GitHub بالمعرّف</string>

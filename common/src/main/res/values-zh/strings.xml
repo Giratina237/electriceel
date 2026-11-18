@@ -214,6 +214,7 @@
   <string name="submit_data_include_video_ids_desc">视频 ID 始终记录在设备上。此选项只决定是否发送它们。</string>
   <string name="submit_data_sending">正在发送…</string>
   <string name="submit_data_done">已提交。ID：%s。请在你的 GitHub 问题中附上它。</string>
+  <string name="submit_data_nothing_new">自上次提交以来没有新数据。ID：%s。</string>
   <string name="submit_data_failed">无法提交数据：%s</string>
   <string name="submit_data_last">上次提交：%1$s，%2$s</string>
   <string name="submit_data_issue_qr">扫码打开附带该 ID 的 GitHub 问题</string>

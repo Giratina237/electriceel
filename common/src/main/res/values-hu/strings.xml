@@ -206,6 +206,7 @@
   <string name="submit_data_include_video_ids_desc">A videóazonosítókat az eszköz mindig rögzíti. Ez csak azt dönti el, hogy elküldésre kerülnek-e.</string>
   <string name="submit_data_sending">Küldés…</string>
   <string name="submit_data_done">Elküldve. Azonosító: %s. Adja meg a GitHub-hibajegyében.</string>
+  <string name="submit_data_nothing_new">Az utolsó küldés óta nincs semmi új. Azonosító: %s.</string>
   <string name="submit_data_failed">Nem sikerült elküldeni az adatokat: %s</string>
   <string name="submit_data_last">Utolsó küldés: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Olvassa be, hogy GitHub-hibajegyet nyisson az azonosítóval</string>

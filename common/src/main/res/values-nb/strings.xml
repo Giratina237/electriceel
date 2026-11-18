@@ -154,6 +154,7 @@
     <string name="submit_data_include_video_ids_desc">Video-ID-er registreres alltid på enheten. Dette avgjør bare om de sendes.</string>
     <string name="submit_data_sending">Sender…</string>
     <string name="submit_data_done">Sendt. ID: %s. Oppgi den i GitHub-saken din.</string>
+    <string name="submit_data_nothing_new">Ingenting nytt siden forrige innsending. ID: %s.</string>
     <string name="submit_data_failed">Kunne ikke sende dataene: %s</string>
     <string name="submit_data_last">Sist sendt: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Skann for å åpne en GitHub-sak med ID-en</string>

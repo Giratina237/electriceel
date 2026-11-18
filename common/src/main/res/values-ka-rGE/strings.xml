@@ -220,6 +220,7 @@
   <string name="submit_data_include_video_ids_desc">ვიდეოს ID-ები ყოველთვის ინახება მოწყობილობაზე. ეს მხოლოდ იმას წყვეტს, გაიგზავნება თუ არა ისინი.</string>
   <string name="submit_data_sending">იგზავნება…</string>
   <string name="submit_data_done">გაიგზავნა. ID: %s. მიუთითეთ ის თქვენს GitHub-ის საკითხში.</string>
+  <string name="submit_data_nothing_new">ბოლო გაგზავნის შემდეგ ახალი არაფერია. ID: %s.</string>
   <string name="submit_data_failed">მონაცემების გაგზავნა ვერ მოხერხდა: %s</string>
   <string name="submit_data_last">ბოლო გაგზავნა: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">დაასკანერეთ ID-ით GitHub-ის საკითხის გასახსნელად</string>

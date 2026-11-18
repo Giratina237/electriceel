@@ -224,6 +224,7 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="submit_data_include_video_ids_desc">מזהי הסרטונים נרשמים תמיד במכשיר. האפשרות הזו קובעת רק אם הם נשלחים.</string>
     <string name="submit_data_sending">שולח…</string>
     <string name="submit_data_done">נשלח. מזהה: %s. יש לציין אותו בדיווח ב-GitHub.</string>
+    <string name="submit_data_nothing_new">אין שום דבר חדש מאז השליחה האחרונה. מזהה: %s.</string>
     <string name="submit_data_failed">לא ניתן היה לשלוח את הנתונים: %s</string>
     <string name="submit_data_last">שליחה אחרונה: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">סריקה לפתיחת דיווח ב-GitHub עם המזהה</string>

@@ -220,6 +220,7 @@
     <string name="submit_data_include_video_ids_desc">動画 ID は常にデバイスに記録されます。これは送信するかどうかだけを決めます。</string>
     <string name="submit_data_sending">送信中…</string>
     <string name="submit_data_done">送信しました。ID: %s。GitHub の Issue に記載してください。</string>
+    <string name="submit_data_nothing_new">前回の送信以降、新しいデータはありません。ID: %s。</string>
     <string name="submit_data_failed">データを送信できませんでした: %s</string>
     <string name="submit_data_last">前回の送信: %1$s、%2$s</string>
     <string name="submit_data_issue_qr">スキャンして ID 付きの GitHub Issue を開く</string>

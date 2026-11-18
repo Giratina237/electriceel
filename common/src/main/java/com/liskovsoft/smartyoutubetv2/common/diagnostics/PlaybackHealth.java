@@ -78,6 +78,12 @@ public final class PlaybackHealth {
     public static final long START_TICK_MS = 500;
     private static final long TICK_MS = 2_000;
     /**
+     * Ticks farther apart stopped meanwhile (e.g. the player was released, then the video opened again): the time between isn't
+     * playing time
+     */
+    @VisibleForTesting
+    static final long MAX_TICK_GAP_MS = 3 * TICK_MS;
+    /**
      * Pausing again and again doesn't add to the ticks of the start's playing time
      */
     private static final int MAX_START_TRAIL = 40;
@@ -387,7 +393,15 @@ public final class PlaybackHealth {
         List<String> result = new ArrayList<>();
         mIsPlaying = sample.isPlaying;
         long elapsedMs = mLastTickMs >= 0 ? Math.max(0, sample.nowMs - mLastTickMs) : 0;
-        boolean wasPlaying = mLastTickMs >= 0 && mLastPositionMs >= 0;
+        // Not across a gap in the ticks: the same video opened again 77 s after it was left was "frozen" for those 77 s, with its clock
+        // still (CX17FXZW #12). The formats were the same, so the attempt went on (see FormatAttempts#onTracks).
+        boolean isTickGap = elapsedMs > MAX_TICK_GAP_MS;
+        boolean wasPlaying = mLastTickMs >= 0 && mLastPositionMs >= 0 && !isTickGap;
+
+        if (isTickGap) {
+            mFrozenMs = 0;
+            mClockStillMs = 0;
+        }
 
         if (sample.stalls >= STALLS && sample.stallMs >= STALLS_MIN_MS) {
             report(result, KIND_STALLS);
@@ -569,6 +583,19 @@ public final class PlaybackHealth {
         if (RESUME_CAUSES.indexOf(cause) > RESUME_CAUSES.indexOf(mInterruption)) {
             mInterruption = cause;
         }
+    }
+
+    /**
+     * The player was prepared with a source (e.g. the video opened again, a reload): the next sample is its first. The time since the
+     * last one, of the player before, isn't this one's. Its frame counters start over too.
+     */
+    public void onPrepare() {
+        mLastTickMs = -1;
+        mLastPositionMs = -1;
+        mLastRendered = -1;
+        mNoFrameMs = 0;
+        mFrozenMs = 0;
+        mClockStillMs = 0;
     }
 
     /**

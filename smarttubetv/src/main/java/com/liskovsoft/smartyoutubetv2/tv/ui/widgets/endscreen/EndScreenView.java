@@ -442,7 +442,9 @@ public class EndScreenView extends FrameLayout {
             View child = ((ViewGroup) card.view).getChildAt(i);
 
             if (child instanceof ImageView) {
-                Glide.with(getContext()).clear(child);
+                // Not the activity's Glide: it throws once the activity is destroyed, and the player released in
+                // PlaybackFragment#onDestroy takes the cards away (J9T6DZWN, T33S5T0B). The application's finds the load wherever it is.
+                Glide.with(getContext().getApplicationContext()).clear(child);
             }
         }
 

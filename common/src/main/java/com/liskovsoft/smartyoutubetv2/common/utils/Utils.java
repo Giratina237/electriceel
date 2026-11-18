@@ -850,6 +850,12 @@ public class Utils {
             return false;
         }
 
+        // Its size plays, not at its frame rate: a preset above it gets the next one down, e.g. 1440p60 for a 4K60 preset, while a
+        // 30 fps video still plays at 2160p30
+        if (TrackSelectorUtil.isFrameRateBeyondDecoder(mediaTrack.format)) {
+            return false;
+        }
+
         // There's a bug. The player hangs at the black screen.
         // opus and others audio codecs require hardware acceleration
         //if (mediaTrack instanceof AudioTrack && !mediaTrack.isMP4ACodec() && !Helpers.isVP9Supported()) {

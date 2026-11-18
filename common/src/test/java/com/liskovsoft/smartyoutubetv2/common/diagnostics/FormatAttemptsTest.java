@@ -82,8 +82,8 @@ public class FormatAttemptsTest {
         failure.record();
 
         org.json.JSONObject details = mLog.readAll().get(0).getJSONObject("details");
-        assertEquals(1_000, details.getLong("videoBufferedMs"));
-        assertEquals(6_000, details.getLong("audioBufferedMs"));
+        assertEquals(1_000, details.getLong("videoLoadedAheadMs"));
+        assertEquals(6_000, details.getLong("audioLoadedAheadMs"));
         assertEquals(7_000, details.getLong("videoLoadAgoMs"));
         assertEquals(12_000, details.getLong("audioLoadAgoMs"));
         assertEquals(2_000, details.getLong("recentThroughputKbps"));
@@ -102,8 +102,8 @@ public class FormatAttemptsTest {
         failure.record();
 
         org.json.JSONObject details = mLog.readAll().get(0).getJSONObject("details");
-        assertTrue(details.isNull("videoBufferedMs"));
-        assertTrue(details.isNull("audioBufferedMs"));
+        assertTrue(details.isNull("videoLoadedAheadMs"));
+        assertTrue(details.isNull("audioLoadedAheadMs"));
         assertTrue(details.isNull("recentThroughputKbps"));
     }
 

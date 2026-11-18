@@ -205,6 +205,7 @@
   <string name="submit_data_include_video_ids_desc">ID video luôn được ghi lại trên thiết bị. Tùy chọn này chỉ quyết định có gửi chúng hay không.</string>
   <string name="submit_data_sending">Đang gửi…</string>
   <string name="submit_data_done">Đã gửi. ID: %s. Hãy ghi ID này vào issue GitHub của bạn.</string>
+  <string name="submit_data_nothing_new">Không có gì mới kể từ lần gửi gần nhất. ID: %s.</string>
   <string name="submit_data_failed">Không gửi được dữ liệu: %s</string>
   <string name="submit_data_last">Lần gửi gần nhất: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Quét để mở issue GitHub kèm ID</string>

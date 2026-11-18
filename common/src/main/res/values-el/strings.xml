@@ -204,6 +204,7 @@
   <string name="submit_data_include_video_ids_desc">Τα αναγνωριστικά βίντεο καταγράφονται πάντα στη συσκευή. Αυτό καθορίζει μόνο αν θα αποστέλλονται.</string>
   <string name="submit_data_sending">Αποστολή…</string>
   <string name="submit_data_done">Στάλθηκε. Αναγνωριστικό: %s. Συμπεριλάβετέ το στο ζήτημά σας στο GitHub.</string>
+  <string name="submit_data_nothing_new">Τίποτα νέο από την τελευταία αποστολή. Αναγνωριστικό: %s.</string>
   <string name="submit_data_failed">Δεν ήταν δυνατή η αποστολή των δεδομένων: %s</string>
   <string name="submit_data_last">Τελευταία αποστολή: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Σαρώστε για να ανοίξετε ζήτημα στο GitHub με το αναγνωριστικό</string>

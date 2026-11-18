@@ -205,6 +205,7 @@
   <string name="submit_data_include_video_ids_desc">ID на видеоклиповете винаги се записват на устройството. Това решава само дали да се изпращат.</string>
   <string name="submit_data_sending">Изпращане…</string>
   <string name="submit_data_done">Изпратено. ID: %s. Посочете го в своя проблем в GitHub.</string>
+  <string name="submit_data_nothing_new">Няма нищо ново след последното изпращане. ID: %s.</string>
   <string name="submit_data_failed">Данните не можаха да се изпратят: %s</string>
   <string name="submit_data_last">Последно изпращане: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Сканирайте, за да отворите проблем в GitHub с ID</string>

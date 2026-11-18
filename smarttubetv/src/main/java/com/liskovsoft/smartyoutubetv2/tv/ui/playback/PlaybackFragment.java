@@ -435,14 +435,6 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
                 mInfoCard.exit();
             }
 
-            // FIX83: temporary
-            if (mInfoCard.getVisibility() != (show ? View.VISIBLE : View.INVISIBLE)) {
-                StackTraceElement[] stack = new Throwable().getStackTrace();
-                Log.d(TAG, "FIX83 info card view %s (controls %s, pip %s), from %s < %s < %s", show ? "VISIBLE" : "INVISIBLE",
-                        isControlsOverlayVisible(), isInPIPMode(), stack[1].getMethodName(), stack.length > 2 ? stack[2].getMethodName() : "",
-                        stack.length > 3 ? stack[3].getMethodName() : "");
-            }
-
             mInfoCard.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
         }
     }
@@ -1207,9 +1199,6 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             return;
         }
 
-        // FIX83: temporary
-        Log.d(TAG, "FIX83 setInfoCard %s (controls %s, pip %s)", item != null ? item.getTeaser() : null, isControlsOverlayVisible(),
-                isInPIPMode());
         mInfoCard.setItem(item);
         updateCards(isControlsOverlayVisible());
     }

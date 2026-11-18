@@ -210,6 +210,7 @@
   <string name="submit_data_include_video_ids_desc">影片 ID 一律會記錄在裝置上。這只決定是否要傳送。</string>
   <string name="submit_data_sending">傳送中…</string>
   <string name="submit_data_done">已提交。ID：%s。請在你的 GitHub 問題回報中附上。</string>
+  <string name="submit_data_nothing_new">自上次提交後沒有新的資料。ID：%s。</string>
   <string name="submit_data_failed">無法提交資料：%s</string>
   <string name="submit_data_last">上次提交：%1$s，%2$s</string>
   <string name="submit_data_issue_qr">掃描以開啟附上此 ID 的 GitHub 問題回報</string>

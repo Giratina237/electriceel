@@ -220,6 +220,7 @@
     <string name="submit_data_include_video_ids_desc">Os ID dos vídeos ficam sempre registados no dispositivo. Isto só decide se são enviados.</string>
     <string name="submit_data_sending">A enviar…</string>
     <string name="submit_data_done">Enviado. ID: %s. Inclua-o no seu issue do GitHub.</string>
+    <string name="submit_data_nothing_new">Nada de novo desde o último envio. ID: %s.</string>
     <string name="submit_data_failed">Não foi possível enviar os dados: %s</string>
     <string name="submit_data_last">Último envio: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Leia para abrir um issue no GitHub com o ID</string>

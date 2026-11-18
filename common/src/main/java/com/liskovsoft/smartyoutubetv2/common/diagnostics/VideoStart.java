@@ -52,6 +52,24 @@ public final class VideoStart {
      * The app loaded the video that played again (see VideoStarts#onReload): the error fixer, its streams expired. Timed from the reload.
      */
     public static final String TRIGGER_RELOAD = "reload";
+    /**
+     * Of a reload (see #reason): the user picked a client for the video (see VideoLoaderController#pickClient). Otherwise its reason
+     * is the kind of failure the error fixer acted on (see PlayerFailure#KIND_STALL), or another of these.
+     */
+    public static final String REASON_PICK_CLIENT = "pick_client";
+    /**
+     * Of a reload: the streams expired and were fetched again before it played on
+     */
+    public static final String REASON_STREAMS_EXPIRED = "streams_expired";
+    /**
+     * Of a reload: the streams fetched again while it played didn't fit the ones in use
+     */
+    public static final String REASON_STREAMS_REFRESH_FAILED = "streams_refresh_failed";
+    /**
+     * Of a reload or an engine restart: the playback mode plays the video again from its start, and the player couldn't seek there
+     * (e.g. an error ended it)
+     */
+    public static final String REASON_REPEAT = "repeat";
 
     /**
      * It played: a frame was shown and the playback ran
@@ -310,6 +328,12 @@ public final class VideoStart {
      */
     @Nullable
     public final JSONObject state;
+    /**
+     * Of a reload (see TRIGGER_RELOAD): why the app loaded the video again, e.g. the kind of failure the error fixer acted on, or one
+     * of the REASON_ constants. Null when not told, and for the other triggers.
+     */
+    @Nullable
+    public final String reason;
 
     /**
      * One that played
@@ -342,6 +366,14 @@ public final class VideoStart {
                       @Nullable String protocol, @Nullable String engine, boolean isCached, String outcome, long totalMs,
                       List<Stage> stages, long positionMs, @Nullable String video, int videoBitrateKbps, @Nullable List<WarmUp> warmUps,
                       @Nullable JSONObject state) {
+        this(ts, videoId, trigger, isFirstOfRun, sinceProcessStartMs, client, protocol, engine, isCached, outcome, totalMs, stages,
+                positionMs, video, videoBitrateKbps, warmUps, state, null);
+    }
+
+    public VideoStart(long ts, String videoId, String trigger, boolean isFirstOfRun, long sinceProcessStartMs, @Nullable String client,
+                      @Nullable String protocol, @Nullable String engine, boolean isCached, String outcome, long totalMs,
+                      List<Stage> stages, long positionMs, @Nullable String video, int videoBitrateKbps, @Nullable List<WarmUp> warmUps,
+                      @Nullable JSONObject state, @Nullable String reason) {
         this.ts = ts;
         this.videoId = videoId;
         this.trigger = trigger;
@@ -359,6 +391,7 @@ public final class VideoStart {
         this.videoBitrateKbps = videoBitrateKbps;
         this.warmUps = warmUps != null ? Collections.unmodifiableList(new ArrayList<>(warmUps)) : null;
         this.state = state;
+        this.reason = reason;
     }
 
     public boolean isPlayed() {
@@ -373,10 +406,14 @@ public final class VideoStart {
     }
 
     /**
-     * E.g. "intent, first of run, TV sabr", "next, TV sabr, gave_up", "open, cached, TV sabr, from 0:41"
+     * E.g. "intent, first of run, TV sabr", "next, TV sabr, gave_up", "open, cached, TV sabr, from 0:41", "reload (stall), WEB sabr"
      */
     public String describe() {
         StringBuilder result = new StringBuilder(trigger);
+
+        if (reason != null) {
+            result.append(" (").append(reason).append(")");
+        }
 
         if (isFirstOfRun) {
             result.append(", first of run");
@@ -424,6 +461,10 @@ public final class VideoStart {
             result.put("time", formatUtc(ts));
             result.put("videoId", videoId);
             result.put("trigger", trigger);
+
+            if (reason != null) {
+                result.put("reason", reason);
+            }
             result.put("firstOfRun", isFirstOfRun);
 
             if (sinceProcessStartMs >= 0) {

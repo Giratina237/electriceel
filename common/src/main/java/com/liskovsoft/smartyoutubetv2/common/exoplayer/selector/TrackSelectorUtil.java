@@ -2,8 +2,14 @@ package com.liskovsoft.smartyoutubetv2.common.exoplayer.selector;
 
 import android.text.TextUtils;
 import android.util.Pair;
+
+import androidx.annotation.Nullable;
+
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
+import com.google.android.exoplayer2.mediacodec.MediaCodecUtil;
+import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.SubtitleTrack;
@@ -440,6 +446,35 @@ public class TrackSelectorUtil {
         }
 
         return originHeight;
+    }
+
+    /**
+     * A decoder of the video's type plays its size, and none declares its frame rate there: e.g. a VP9 decoder that declares 2160p30
+     * and not 2160p60 (J7VJY9TH, a HiSilicon Hi3798MV200: 4K60 dropped 215 frames and stalled 11.4 s, then 1080p60 played clean).
+     * Not when no decoder declares the size: the height checks cover that, and some TVs declare their screen's only (see
+     * DeviceHelpers#isVP9ResolutionSupported). The decoders' list is ExoPlayer's, read once (see MediaCodecUtil#getDecoderInfos).
+     */
+    public static boolean isFrameRateBeyondDecoder(@Nullable Format format) {
+        if (format == null || !MimeTypes.isVideo(format.sampleMimeType) || format.width <= 0 || format.height <= 0
+                || format.frameRate <= 0) {
+            return false;
+        }
+
+        try {
+            boolean isSizeSupported = false;
+
+            for (MediaCodecInfo decoder : MediaCodecUtil.getDecoderInfos(format.sampleMimeType, false, false)) {
+                if (decoder.isVideoSizeAndRateSupportedV21(format.width, format.height, format.frameRate)) {
+                    return false;
+                }
+
+                isSizeSupported |= decoder.isVideoSizeAndRateSupportedV21(format.width, format.height, Format.NO_VALUE);
+            }
+
+            return isSizeSupported;
+        } catch (DecoderQueryException e) {
+            return false;
+        }
     }
 
     /**

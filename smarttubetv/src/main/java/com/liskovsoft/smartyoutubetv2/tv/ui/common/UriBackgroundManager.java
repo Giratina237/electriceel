@@ -31,6 +31,10 @@ public class UriBackgroundManager {
     private final Activity mActivity;
     private final Handler mHandler;
     private int mBackgroundColor = -1;
+    /**
+     * The last background's load (see #showBackground), stopped when the activity goes (see #onDestroy)
+     */
+    private SimpleTarget<Bitmap> mBackgroundTarget;
 
     public UriBackgroundManager(Activity activity) {
         mActivity = activity;
@@ -81,6 +85,12 @@ public class UriBackgroundManager {
     public void onDestroy() {
         mHandler.removeCallbacks(mBackgroundTask);
         mBackgroundManager = null;
+
+        if (mBackgroundTarget != null) {
+            // Not the activity's Glide: it throws once the activity is destroyed. The application's finds the load wherever it is.
+            Glide.with(mActivity.getApplicationContext()).clear(mBackgroundTarget);
+            mBackgroundTarget = null;
+        }
     }
 
     public void removeBackground() {
@@ -110,6 +120,11 @@ public class UriBackgroundManager {
     }
 
     public void showBackground(String uri) {
+        // Destroyed (see #onDestroy): nothing to show it on, and the activity's Glide would throw
+        if (mBackgroundManager == null) {
+            return;
+        }
+
         View videoView = mActivity.findViewById(R.id.video_surface);
 
         if (videoView != null) {
@@ -128,7 +143,7 @@ public class UriBackgroundManager {
                 .centerCrop()
                 .error(mDefaultBackground);
 
-        Glide.with(mActivity)
+        mBackgroundTarget = Glide.with(mActivity)
                 .asBitmap()
                 .load(uri)
                 .apply(options)
@@ -137,7 +152,11 @@ public class UriBackgroundManager {
                     public void onResourceReady(
                             @NonNull Bitmap resource,
                             Transition<? super Bitmap> transition) {
-                        mBackgroundManager.setBitmap(resource);
+                        // The bitmap may come after the activity went: its callback was already on its way (CX17FXZW #20, 0.8 s after
+                        // a video that couldn't play closed the player)
+                        if (mBackgroundManager != null) {
+                            mBackgroundManager.setBitmap(resource);
+                        }
                     }
                 });
     }

@@ -219,6 +219,7 @@
     <string name="submit_data_include_video_ids_desc">Տեսանյութերի ID-ները միշտ գրանցվում են սարքում։ Սա որոշում է միայն՝ դրանք ուղարկվեն, թե ոչ։</string>
     <string name="submit_data_sending">Ուղարկվում է…</string>
     <string name="submit_data_done">Ուղարկված է։ ID՝ %s։ Նշեք այն ձեր GitHub խնդրում։</string>
+    <string name="submit_data_nothing_new">Վերջին ուղարկումից հետո նոր բան չկա։ ID՝ %s։</string>
     <string name="submit_data_failed">Չհաջողվեց ուղարկել տվյալները՝ %s</string>
     <string name="submit_data_last">Վերջին ուղարկումը՝ %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Սկանավորեք՝ այս ID-ով GitHub խնդիր բացելու համար</string>

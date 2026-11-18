@@ -207,6 +207,7 @@
   <string name="submit_data_include_video_ids_desc">شناسه‌های ویدیو همیشه روی دستگاه ثبت می‌شوند. این فقط تعیین می‌کند که ارسال شوند یا نه.</string>
   <string name="submit_data_sending">در حال ارسال…</string>
   <string name="submit_data_done">ارسال شد. شناسه: %s. آن را در issue خود در GitHub بیاورید.</string>
+  <string name="submit_data_nothing_new">از آخرین ارسال چیز جدیدی نیست. شناسه: %s.</string>
   <string name="submit_data_failed">ارسال داده‌ها ممکن نشد: %s</string>
   <string name="submit_data_last">آخرین ارسال: %1$s، %2$s</string>
   <string name="submit_data_issue_qr">برای باز کردن یک issue در GitHub با این شناسه اسکن کنید</string>

@@ -214,6 +214,7 @@
   <string name="submit_data_include_video_ids_desc">Identyfikatory filmów są zawsze zapisywane na urządzeniu. Ta opcja decyduje tylko, czy są wysyłane.</string>
   <string name="submit_data_sending">Wysyłanie…</string>
   <string name="submit_data_done">Wysłano. ID: %s. Podaj je w swoim zgłoszeniu na GitHubie.</string>
+  <string name="submit_data_nothing_new">Nic nowego od ostatniego wysłania. ID: %s.</string>
   <string name="submit_data_failed">Nie udało się wysłać danych: %s</string>
   <string name="submit_data_last">Ostatnio wysłano: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Zeskanuj, aby otworzyć zgłoszenie na GitHubie z tym ID</string>

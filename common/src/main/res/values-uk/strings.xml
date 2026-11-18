@@ -220,6 +220,7 @@
     <string name="submit_data_include_video_ids_desc">ID відео завжди записуються на пристрої. Цей параметр вирішує лише, чи надсилати їх.</string>
     <string name="submit_data_sending">Надсилання…</string>
     <string name="submit_data_done">Надіслано. ID: %s. Додайте його до свого issue на GitHub.</string>
+    <string name="submit_data_nothing_new">Нічого нового з останнього надсилання. ID: %s.</string>
     <string name="submit_data_failed">Не вдалося надіслати дані: %s</string>
     <string name="submit_data_last">Останнє надсилання: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Відскануйте, щоб відкрити issue на GitHub з цим ID</string>

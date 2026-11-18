@@ -31,6 +31,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.ViewEv
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStart;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
@@ -349,6 +350,11 @@ public class PlaybackPresenter extends BasePresenter<PlaybackView> implements Pl
     @Override
     public void onStreamsRefreshed(MediaItemFormatInfo formatInfo) {
         process(listener -> listener.onStreamsRefreshed(formatInfo));
+    }
+
+    @Override
+    public void onHealthFailure(String kind, PlayerFailure failure) {
+        process(listener -> listener.onHealthFailure(kind, failure));
     }
 
     @Override

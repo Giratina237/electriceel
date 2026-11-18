@@ -214,6 +214,7 @@
   <string name="submit_data_include_video_ids_desc">ID-të e videove regjistrohen gjithmonë në pajisje. Kjo vendos vetëm nëse dërgohen.</string>
   <string name="submit_data_sending">Po dërgohet…</string>
   <string name="submit_data_done">U dërgua. ID: %s. Përfshije në çështjen tënde në GitHub.</string>
+  <string name="submit_data_nothing_new">Asgjë e re që nga dërgimi i fundit. ID: %s.</string>
   <string name="submit_data_failed">Të dhënat nuk u dërguan: %s</string>
   <string name="submit_data_last">Dërgimi i fundit: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Skano për të hapur një çështje në GitHub me ID-në</string>

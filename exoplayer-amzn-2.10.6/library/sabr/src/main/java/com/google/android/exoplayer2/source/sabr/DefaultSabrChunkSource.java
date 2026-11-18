@@ -34,6 +34,7 @@ import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrBackoffError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
+import com.google.android.exoplayer2.source.sabr.parser.exceptions.UnknownPartError;
 import com.google.android.exoplayer2.source.sabr.parser.models.AudioSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.CaptionSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.FormatSelector;
@@ -576,9 +577,14 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
     @Override
     public boolean onChunkLoadError(Chunk chunk, boolean cancelable, Exception e, long blacklistDurationMs) {
-        Log.e(TAG, "Chunk load failed: " + e.getMessage());
-
         Throwable cause = e.getCause();
+
+        if (cause instanceof UnknownPartError) {
+            // What the response was, told with the error (T33S5T0B: a part id of 109 where the response began)
+            ((UnknownPartError) cause).setContentType(getContentType(chunk));
+        }
+
+        Log.e(TAG, "Chunk load failed: " + e.getMessage());
 
         // FIX: the server asks for the player response again, e.g. as the session expires about 6 h into a video. The chunk is
         // loaded again with a new session, swapped in while the player plays what it buffered (see SabrManifest#requestSessionRefresh).
@@ -794,6 +800,26 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         // FIX: a media network that stalls in the middle of a response (read timeout) is as
         // unusable as one that doesn't answer at all. Retrying the same network keeps stalling.
         return chunk.bytesLoaded() == 0 || hasCause(error, SocketTimeoutException.class);
+    }
+
+    /**
+     * Of the chunk's response, e.g. "application/vnd.yt-ump": null when it had none. Its name in any case (OkHttp tells it in lower case).
+     */
+    @Nullable
+    private static String getContentType(Chunk chunk) {
+        Map<String, List<String>> headers = chunk.getResponseHeaders();
+
+        if (headers == null) {
+            return null;
+        }
+
+        for (Map.Entry<String, List<String>> header : headers.entrySet()) {
+            if ("Content-Type".equalsIgnoreCase(header.getKey()) && header.getValue() != null && !header.getValue().isEmpty()) {
+                return header.getValue().get(0);
+            }
+        }
+
+        return null;
     }
 
     private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {

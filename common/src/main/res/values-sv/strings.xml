@@ -220,6 +220,7 @@
   <string name="submit_data_include_video_ids_desc">Video-ID:n sparas alltid på enheten. Detta avgör bara om de skickas.</string>
   <string name="submit_data_sending">Skickar…</string>
   <string name="submit_data_done">Skickat. ID: %s. Ange det i ditt GitHub-ärende.</string>
+  <string name="submit_data_nothing_new">Inget nytt sedan senaste inskickningen. ID: %s.</string>
   <string name="submit_data_failed">Kunde inte skicka data: %s</string>
   <string name="submit_data_last">Senast skickat: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Skanna för att öppna ett GitHub-ärende med ID:t</string>

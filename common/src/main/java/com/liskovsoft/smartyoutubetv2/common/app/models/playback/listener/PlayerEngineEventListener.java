@@ -3,6 +3,7 @@ package com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorManager;
 
@@ -47,6 +48,13 @@ public interface PlayerEngineEventListener {
      * The video's formats were fetched again and their streams swapped in while it played (see SabrSessionRefresher)
      */
     void onStreamsRefreshed(MediaItemFormatInfo formatInfo);
+    /**
+     * The playback goes wrong without an error (see PlaybackHealth's kinds, e.g. stalls again and again): a fix adds its actions to
+     * the failure, recorded after (see ErrorFixerController#onHealthFailure). Nothing by default.
+     */
+    default void onHealthFailure(String kind, PlayerFailure failure) {
+        // NOP
+    }
     void onTrackChanged(FormatItem track);
     void onTrackSelected(FormatItem track);
 }

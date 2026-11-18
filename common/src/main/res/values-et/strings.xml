@@ -205,6 +205,7 @@
   <string name="submit_data_include_video_ids_desc">Videote ID-d salvestatakse seadmes alati. See otsustab ainult, kas need saadetakse.</string>
   <string name="submit_data_sending">Saatmine…</string>
   <string name="submit_data_done">Saadetud. ID: %s. Lisa see oma GitHubi probleemi teatesse.</string>
+  <string name="submit_data_nothing_new">Pärast viimast saatmist pole midagi uut. ID: %s.</string>
   <string name="submit_data_failed">Andmeid ei õnnestunud saata: %s</string>
   <string name="submit_data_last">Viimati saadetud: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">Skanni, et avada GitHubi probleemi teade selle ID-ga</string>

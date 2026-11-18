@@ -220,6 +220,7 @@
     <string name="submit_data_include_video_ids_desc">ID видео всегда записываются на устройстве. Этот параметр решает только, отправлять ли их.</string>
     <string name="submit_data_sending">Отправка…</string>
     <string name="submit_data_done">Отправлено. ID: %s. Укажите его в своём issue на GitHub.</string>
+    <string name="submit_data_nothing_new">Ничего нового с последней отправки. ID: %s.</string>
     <string name="submit_data_failed">Не удалось отправить данные: %s</string>
     <string name="submit_data_last">Последняя отправка: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Отсканируйте, чтобы открыть issue на GitHub с этим ID</string>

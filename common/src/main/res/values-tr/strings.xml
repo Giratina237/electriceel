@@ -220,6 +220,7 @@
     <string name="submit_data_include_video_ids_desc">Video kimlikleri cihazda her zaman kaydedilir. Bu yalnızca gönderilip gönderilmeyeceklerini belirler.</string>
     <string name="submit_data_sending">Gönderiliyor…</string>
     <string name="submit_data_done">Gönderildi. Kimlik: %s. GitHub sorun kaydınıza ekleyin.</string>
+    <string name="submit_data_nothing_new">Son gönderimden bu yana yeni bir şey yok. Kimlik: %s.</string>
     <string name="submit_data_failed">Veriler gönderilemedi: %s</string>
     <string name="submit_data_last">Son gönderim: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Kimlikle bir GitHub sorun kaydı açmak için tarayın</string>

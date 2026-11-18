@@ -59,6 +59,10 @@ public class SabrStream {
      * #onResponseEnd). Fewer is a response with none for another reason, e.g. a redirect.
      */
     private static final int MAX_PENDING_RESPONSES_WITHOUT_MEDIA = 3;
+    /**
+     * Of an unknown part, the bytes after its header told (see #peekHex)
+     */
+    private static final int PEEKED_BYTES = 16;
     private final int[] KNOWN_PARTS = {
             UMPPartId.MEDIA_HEADER,
             UMPPartId.MEDIA,
@@ -743,7 +747,8 @@ public class SabrStream {
             } else {
                 String msg = String.format("Unknown part encountered: id=%s, size=%s, position=%s", part.partId, part.size, part.data.getPosition());
                 if (part.partId > 100) {
-                    throw new UnknownPartError(msg);
+                    // With what came after its header: a UMP part's, or another kind of response's (e.g. a page)
+                    throw new UnknownPartError(msg + ", then " + peekHex(part));
                 }
 
                 Log.e(TAG, msg);
@@ -756,6 +761,39 @@ public class SabrStream {
         }
 
         return part;
+    }
+
+    /**
+     * The first bytes after the part's header, in hex, e.g. "3c 21 44 4f": not read past (peeked, then put back)
+     */
+    private static String peekHex(UMPPart part) {
+        byte[] bytes = new byte[Math.max(0, Math.min(part.size, PEEKED_BYTES))];
+
+        try {
+            if (bytes.length == 0 || !part.data.peekFully(bytes, 0, bytes.length, true)) {
+                return "no bytes";
+            }
+        } catch (IOException e) {
+            return "no bytes (" + e.getClass().getSimpleName() + ")";
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "no bytes (interrupted)";
+        } finally {
+            part.data.resetPeekPosition();
+        }
+
+        StringBuilder result = new StringBuilder();
+
+        for (byte value : bytes) {
+            if (result.length() > 0) {
+                result.append(' ');
+            }
+
+            int unsigned = value & 0xFF;
+            result.append(unsigned < 0x10 ? "0" : "").append(Integer.toHexString(unsigned));
+        }
+
+        return result.toString();
     }
 
     public String getUrl() {

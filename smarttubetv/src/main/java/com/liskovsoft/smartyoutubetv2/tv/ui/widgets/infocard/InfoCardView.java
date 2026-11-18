@@ -28,7 +28,6 @@ import androidx.annotation.Nullable;
 import com.bumptech.glide.Glide;
 import com.liskovsoft.mediaserviceinterfaces.data.InfoCardItem;
 import com.liskovsoft.sharedutils.helpers.Helpers;
-import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 
 /**
@@ -40,7 +39,6 @@ import com.liskovsoft.smartyoutubetv2.tv.R;
  * the video's author, the channel's subscribers or the link's description. A video's length is on its image.
  */
 public class InfoCardView extends FrameLayout {
-    private static final String TAG = InfoCardView.class.getSimpleName();
     private static final int BACKGROUND_COLOR = 0xCC000000;
     private static final int BADGE_COLOR = 0xCC000000;
     private static final int PLACEHOLDER_COLOR = 0x80000000;
@@ -136,9 +134,6 @@ public class InfoCardView extends FrameLayout {
      * shows.
      */
     public void setItem(@Nullable InfoCardItem item) {
-        // FIX83: temporary
-        Log.d(TAG, "FIX83 setItem %s, active %s, shown %s", item != null ? item.getTeaser() : null, isActive(),
-                mItem != null ? mItem.getTeaser() : null);
         mRequestedItem = item;
 
         if (!isActive()) {
@@ -186,9 +181,6 @@ public class InfoCardView extends FrameLayout {
         if (!isActive()) {
             return;
         }
-
-        // FIX83: temporary
-        Log.d(TAG, "FIX83 exit, requested %s", mRequestedItem != null ? mRequestedItem.getTeaser() : null);
 
         View before = mFocusBefore;
         mFocusBefore = null;
@@ -264,12 +256,6 @@ public class InfoCardView extends FrameLayout {
         int cardRight = mFrame.right - mMargin;
         int cardTop = Math.max(mFrame.top + mMargin, getCornerBottom());
 
-        // FIX83: temporary
-        if (mCard.getLeft() != cardRight - mCard.getMeasuredWidth() || mCard.getTop() != cardTop || mCard.getRight() != cardRight) {
-            Log.d(TAG, "FIX83 card at [%s,%s][%s,%s] in frame %s, view %sx%s", cardRight - mCard.getMeasuredWidth(), cardTop, cardRight,
-                    cardTop + mCard.getMeasuredHeight(), mFrame.toShortString(), getWidth(), getHeight());
-        }
-
         mCard.layout(cardRight - mCard.getMeasuredWidth(), cardTop, cardRight, cardTop + mCard.getMeasuredHeight());
     }
 
@@ -308,12 +294,11 @@ public class InfoCardView extends FrameLayout {
             return;
         }
 
-        // FIX83: temporary
-        Log.d(TAG, "FIX83 card %s -> %s", mItem != null ? mItem.getTeaser() : null, item != null ? item.getTeaser() : null);
-
         if (mCard != null) {
             if (mImage != null) {
-                Glide.with(getContext()).clear(mImage);
+                // Not the activity's Glide: it throws once the activity is destroyed, where the player released in
+                // PlaybackFragment#onDestroy takes the card away (as EndScreenView's did, J9T6DZWN)
+                Glide.with(getContext().getApplicationContext()).clear(mImage);
             }
 
             removeView(mCard);

@@ -220,6 +220,7 @@
     <string name="submit_data_include_video_ids_desc">Video-IDs werden immer auf dem Gerät gespeichert. Hiermit wird nur entschieden, ob sie gesendet werden.</string>
     <string name="submit_data_sending">Wird gesendet…</string>
     <string name="submit_data_done">Gesendet. ID: %s. Geben Sie sie in Ihrem GitHub-Issue an.</string>
+    <string name="submit_data_nothing_new">Seit der letzten Übermittlung gibt es nichts Neues. ID: %s.</string>
     <string name="submit_data_failed">Die Daten konnten nicht gesendet werden: %s</string>
     <string name="submit_data_last">Zuletzt gesendet: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Scannen, um ein GitHub-Issue mit der ID zu öffnen</string>

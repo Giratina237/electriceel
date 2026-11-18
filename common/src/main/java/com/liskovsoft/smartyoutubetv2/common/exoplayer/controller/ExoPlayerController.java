@@ -121,6 +121,10 @@ public class ExoPlayerController implements Player.EventListener {
      */
     private long mResumePositionMs = -1;
     /**
+     * An audio segment finished loading since the resume's seek (see #maybeResumeFromKeyframe). Main thread only.
+     */
+    private boolean mIsAudioLoadedSinceResume;
+    /**
      * How the formats tried do (see FormatAttempts): a frame shown means the video works, plus the decoders, the frames dropped
      * and the throughput of the segments
      */
@@ -165,6 +169,12 @@ public class ExoPlayerController implements Player.EventListener {
 
         @Override
         public void onLoadCompleted(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
+            // Muxed (e.g. the URL list's) has the audio too
+            if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
+                    && (mediaLoadData.trackType == C.TRACK_TYPE_AUDIO || mediaLoadData.trackType == C.TRACK_TYPE_DEFAULT)) {
+                mIsAudioLoadedSinceResume = true;
+            }
+
             if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA) {
                 FormatAttempts.onLoad(loadEventInfo.bytesLoaded, loadEventInfo.loadDurationMs, isVideoLoad(mediaLoadData),
                         mediaLoadData.trackType == C.TRACK_TYPE_AUDIO, mediaLoadData.mediaEndTimeMs);
@@ -229,12 +239,15 @@ public class ExoPlayerController implements Player.EventListener {
      * To the player failure log: ExoPlayer retries the segment, a fatal one comes again as an engine error
      */
     private void onHttpError(int responseCode, String track, @Nullable String host, @Nullable Format failed, boolean switched) {
+        // Where the formats came from, as for the other failures: a SABR stream's HTTP 401s told neither (CX17FXZW #1-#4)
         PlayerFailure failure = PlayerFailure.create(mContext, PlayerFailure.KIND_TRACK_LOAD_ERROR)
                 .video(getVideo())
+                .source(FormatAttempts.getClient(), FormatAttempts.getProtocol())
                 .http(responseCode, track, host, failed);
 
         if (mPlayer != null) {
-            failure.position(mPlayer.getCurrentPosition(), mPlayer.getDuration());
+            failure.position(mPlayer.getCurrentPosition(), mPlayer.getDuration())
+                    .formats(getVideoFormat(), getAudioFormat());
         }
 
         if (switched) {
@@ -390,7 +403,13 @@ public class ExoPlayerController implements Player.EventListener {
             FormatAttempts.onStreamFailed(false);
         }
 
-        failure.record();
+        try {
+            // A fix, with its actions recorded (see ErrorFixerController#onHealthFailure)
+            mEventListener.onHealthFailure(kind, failure);
+        } finally {
+            // Recorded as before whatever the fix did
+            failure.record();
+        }
     }
 
     /**
@@ -520,6 +539,7 @@ public class ExoPlayerController implements Player.EventListener {
         FormatAttempts.onPrepare();
         LoadErrors.onPrepare();
         Connections.onPrepare();
+        mHealth.onPrepare();
         mHasPlayedSource = false;
         mSabrManifest = mediaSource instanceof SabrMediaSource ? ((SabrMediaSource) mediaSource).getManifest() : null;
         mPlayer.prepare(mediaSource);
@@ -560,6 +580,7 @@ public class ExoPlayerController implements Player.EventListener {
      * SeekParameters.PREVIOUS_SYNC can't do it, and a global one would make SponsorBlock skip again and again.
      */
     public void setResumePositionMs(long positionMs) {
+        mIsAudioLoadedSinceResume = false;
         setPositionMs(positionMs);
         mResumePositionMs = canSeekTo(positionMs) ? positionMs : -1;
     }
@@ -592,6 +613,14 @@ public class ExoPlayerController implements Player.EventListener {
         long keyframeMs = (keyframeUs + 999) / 1_000;
 
         if (mPlayer == null || keyframeUs < 0 || resumeMs - keyframeMs < MIN_RESUME_KEYFRAME_GAP_MS) {
+            return;
+        }
+
+        // The audio's first segment still loading: the seek back drops it and asks for the audio again (CX17FXZW 18:04:16: 1.65 s more
+        // for it, the start took 4.6 s, where the other resumes played 54-116 ms after their seek). The decoder goes on to the position.
+        // A segment's times don't tell where the audio starts: SABR's are of the segment before, or none, till one comes.
+        if (!mIsAudioLoadedSinceResume) {
+            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms: its audio is still loading", resumeMs, keyframeMs);
             return;
         }
 

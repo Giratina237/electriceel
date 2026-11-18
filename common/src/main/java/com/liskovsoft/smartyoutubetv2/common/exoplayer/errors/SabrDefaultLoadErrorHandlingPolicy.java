@@ -5,6 +5,7 @@ import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrBackoffError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
+import com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 
@@ -22,6 +23,14 @@ public class SabrDefaultLoadErrorHandlingPolicy extends DashDefaultLoadErrorHand
     public long getRetryDelayMsFor(int dataType, long loadDurationMs, IOException exception, int errorCount) {
         if (Helpers.contains(exception.getMessage(), "Wait 5 sec")) {
             return 5_000;
+        }
+
+        // The media server refused the request: sent again, it's refused again. Retried at up to 5 s apart, it never failed (CX17FXZW
+        // #1-#4: HTTP 401 7 times a minute, the poToken's attestation pending, till the user restarted the app, and again after it).
+        // ErrorFixerController picks the fix: another client, or a reload.
+        if (isRefused(exception)) {
+            Log.e(TAG, exception.getMessage() + ", errorCount: " + errorCount);
+            return C.TIME_UNSET; // fatal, no retry. Propagate to ErrorFixerController
         }
 
         Throwable cause = exception.getCause();
@@ -57,5 +66,19 @@ public class SabrDefaultLoadErrorHandlingPolicy extends DashDefaultLoadErrorHand
         }
 
         return super.getRetryDelayMsFor(dataType, loadDurationMs, exception, errorCount);
+    }
+
+    /**
+     * HTTP 401 or 403: not allowed with this request (e.g. its poToken), not a failure on the way
+     */
+    public static boolean isRefused(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof InvalidResponseCodeException) {
+                int responseCode = ((InvalidResponseCodeException) cause).responseCode;
+                return responseCode == 401 || responseCode == 403;
+            }
+        }
+
+        return false;
     }
 }

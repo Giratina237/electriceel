@@ -214,6 +214,7 @@
   <string name="submit_data_include_video_ids_desc">동영상 ID는 항상 기기에 기록됩니다. 이 옵션은 전송 여부만 결정합니다.</string>
   <string name="submit_data_sending">보내는 중…</string>
   <string name="submit_data_done">전송했습니다. ID: %s. GitHub 이슈에 포함하세요.</string>
+  <string name="submit_data_nothing_new">마지막 전송 이후 새로운 데이터가 없습니다. ID: %s.</string>
   <string name="submit_data_failed">데이터를 보내지 못했습니다: %s</string>
   <string name="submit_data_last">마지막 전송: %1$s, %2$s</string>
   <string name="submit_data_issue_qr">스캔하여 ID가 포함된 GitHub 이슈 열기</string>

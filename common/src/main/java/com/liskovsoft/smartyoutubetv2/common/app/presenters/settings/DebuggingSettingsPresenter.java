@@ -147,8 +147,13 @@ public class DebuggingSettingsPresenter extends BasePresenter<Void> {
         }
 
         MessageHelpers.showMessage(context, R.string.submit_data_sending);
+        // None comes when nothing was recorded since the last submission: nothing was sent (see DataSubmitter#submitIfAnyRecorded)
+        boolean[] isSubmitted = {false};
 
-        sSubmitAction = RxHelper.execute(DataSubmitter.submitObserve(context), this::onSubmitted,
+        sSubmitAction = RxHelper.execute(DataSubmitter.submitObserve(context), id -> {
+                    isSubmitted[0] = true;
+                    onSubmitted(id);
+                },
                 error -> {
                     Context current = getContext();
 
@@ -156,6 +161,14 @@ public class DebuggingSettingsPresenter extends BasePresenter<Void> {
                         // E.g. a timeout's message is null
                         String reason = error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName();
                         MessageHelpers.showLongMessage(current, current.getString(R.string.submit_data_failed, reason));
+                    }
+                },
+                () -> {
+                    Context current = getContext();
+                    String lastId = mDebuggingData.getLastSubmissionId();
+
+                    if (!isSubmitted[0] && current != null && lastId != null) {
+                        MessageHelpers.showLongMessage(current, current.getString(R.string.submit_data_nothing_new, lastId));
                     }
                 });
     }

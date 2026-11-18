@@ -6,6 +6,7 @@ import android.content.Context;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import com.liskovsoft.mediaserviceinterfaces.data.MediaFormat;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
@@ -16,9 +17,11 @@ import org.json.JSONObject;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -137,6 +140,12 @@ public final class FormatAttempts {
     private static long sStretchStart = -1;
     private static long sStretchEnd = -1;
     private static long sStoppedBeforeMs = -1;
+    /**
+     * Of the formats the stream played was made of, by their id (the itag): their average bitrate, from their size and length (see
+     * #onFormats). The stream's, the Format's, is YouTube's "bitrate", nearer the peak: 104.7 Mbps for a 4K60 format the connection
+     * kept up with at 52.6 Mbps (CX17FXZW #15).
+     */
+    private static final Map<String, Integer> sAverageKbps = new HashMap<>();
 
     interface Clock {
         long now();
@@ -153,9 +162,13 @@ public final class FormatAttempts {
         @Nullable
         final String protocol;
         /**
-         * Of the video format, as the stream gives it: -1 when it doesn't. What the throughput is to keep up with.
+         * Of the video format, as the stream gives it: -1 when it doesn't
          */
         int videoBitrateKbps = -1;
+        /**
+         * Of the video format, from its size and length (see #onFormats): -1 when not known. What the throughput is to keep up with.
+         */
+        int videoAverageKbps = -1;
         String videoStatus = STATUS_UNKNOWN;
         String audioStatus = STATUS_UNKNOWN;
         String videoDecoder;
@@ -248,6 +261,7 @@ public final class FormatAttempts {
 
         Attempt attempt = new Attempt(PlayerFailure.describeVideo(video), PlayerFailure.describeAudio(audio));
         attempt.videoBitrateKbps = getBitrateKbps(video);
+        attempt.videoAverageKbps = getAverageKbps(video);
         Attempt last = getLast();
 
         if (last != null && last.isSameFormats(attempt) && !sIsLastFailed) {
@@ -435,12 +449,15 @@ public final class FormatAttempts {
         long now = sClock.now();
         long throughputKbps = getRecentThroughputKbps(last, now);
 
-        failure.detail("videoBufferedMs", last.videoLoadedToMs >= 0 ? last.videoLoadedToMs - positionMs : null)
-                .detail("audioBufferedMs", last.audioLoadedToMs >= 0 ? last.audioLoadedToMs - positionMs : null)
+        // Where the last segment loaded of each track ends, past the position: not what's buffered, a segment loaded before a seek
+        // ends wherever it did (negative behind it). The player's buffer is its own detail (see ErrorFixerController#onLongBuffering).
+        failure.detail("videoLoadedAheadMs", last.videoLoadedToMs >= 0 ? last.videoLoadedToMs - positionMs : null)
+                .detail("audioLoadedAheadMs", last.audioLoadedToMs >= 0 ? last.audioLoadedToMs - positionMs : null)
                 .detail("videoLoadAgoMs", last.videoLoadedAt >= 0 ? now - last.videoLoadedAt : null)
                 .detail("audioLoadAgoMs", last.audioLoadedAt >= 0 ? now - last.audioLoadedAt : null)
                 .detail("recentThroughputKbps", throughputKbps >= 0 ? throughputKbps : null)
-                .detail("videoBitrateKbps", last.videoBitrateKbps > 0 ? last.videoBitrateKbps : null);
+                .detail("videoBitrateKbps", last.videoBitrateKbps > 0 ? last.videoBitrateKbps : null)
+                .detail("videoAverageBitrateKbps", last.videoAverageKbps > 0 ? last.videoAverageKbps : null);
     }
 
     /**
@@ -449,14 +466,45 @@ public final class FormatAttempts {
      */
     public static boolean isFastEnough() {
         Attempt last = getLast();
+        int neededKbps = getNeededKbps(last);
 
-        if (last == null || last.videoBitrateKbps <= 0) {
+        if (neededKbps <= 0) {
             return false;
         }
 
         long throughputKbps = getRecentThroughputKbps(last, sClock.now());
 
-        return throughputKbps >= last.videoBitrateKbps;
+        return throughputKbps >= neededKbps;
+    }
+
+    /**
+     * The segments of the format tried came slower than it plays, as far as the last 30 s tell: a lower one may keep up (see
+     * ErrorFixerController#onHealthFailure). False when unknown, e.g. no segment came in the last 30 s: a connection that stops
+     * answering isn't one too slow for the format.
+     */
+    public static boolean isTooSlow() {
+        Attempt last = getLast();
+        int neededKbps = getNeededKbps(last);
+
+        if (neededKbps <= 0) {
+            return false;
+        }
+
+        long throughputKbps = getRecentThroughputKbps(last, sClock.now());
+
+        return throughputKbps >= 0 && throughputKbps < neededKbps;
+    }
+
+    /**
+     * What the throughput is to keep up with to play the attempt's video: its average bitrate, or the stream's when not known. -1 when
+     * neither is.
+     */
+    private static int getNeededKbps(@Nullable Attempt attempt) {
+        if (attempt == null) {
+            return -1;
+        }
+
+        return attempt.videoAverageKbps > 0 ? attempt.videoAverageKbps : attempt.videoBitrateKbps;
     }
 
     /**
@@ -628,6 +676,28 @@ public final class FormatAttempts {
         Attempt last = getLast();
 
         return last != null ? last.playedMs + (last.playingSince >= 0 ? sClock.now() - last.playingSince : 0) : 0;
+    }
+
+    /**
+     * The formats the player's stream is made of (e.g. the adaptive ones of SABR or DASH), null for none: their average bitrates, by
+     * itag. A format's id in the stream is its itag (see SabrManifestParser, YouTubeMPDBuilder#createRepresentationId).
+     */
+    public static void onFormats(@Nullable List<MediaFormat> formats) {
+        sAverageKbps.clear();
+
+        if (formats == null) {
+            return;
+        }
+
+        for (MediaFormat format : formats) {
+            long bytes = format != null ? Helpers.parseLong(format.getClen()) : -1;
+            int durationMs = format != null ? format.getApproxDurationMs() : 0;
+
+            if (format != null && format.getITag() != null && bytes > 0 && durationMs > 0) {
+                // Bytes per ms * 8 is kbit/s
+                sAverageKbps.put(format.getITag(), (int) (bytes * 8 / durationMs));
+            }
+        }
     }
 
     /**
@@ -973,6 +1043,16 @@ public final class FormatAttempts {
         int bitrate = item != null && item.getTrack() != null && item.getTrack().format != null ? item.getTrack().format.bitrate : -1;
 
         return bitrate > 0 ? bitrate / 1000 : -1;
+    }
+
+    /**
+     * Of the format the stream was made from (see #onFormats): -1 when not known, e.g. an HLS one
+     */
+    private static int getAverageKbps(@Nullable FormatItem item) {
+        String id = item != null && item.getTrack() != null && item.getTrack().format != null ? item.getTrack().format.id : null;
+        Integer averageKbps = id != null ? sAverageKbps.get(id) : null;
+
+        return averageKbps != null ? averageKbps : -1;
     }
 
     private static JSONObject toJson(Attempt attempt) throws JSONException {

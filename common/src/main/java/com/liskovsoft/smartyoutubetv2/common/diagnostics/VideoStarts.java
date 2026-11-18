@@ -439,6 +439,12 @@ public final class VideoStarts {
         @Nullable
         String engine;
 
+        /**
+         * Of a reload: why (see VideoStart#reason)
+         */
+        @Nullable
+        String reason;
+
         Timer(String videoId, String trigger, long t0, long ts, boolean isFirstOfRun, long sinceProcessStartMs) {
             Arrays.fill(chunkLoadMs, -1);
             this.videoId = videoId;
@@ -579,12 +585,23 @@ public final class VideoStarts {
      * reloaded every 30 s).
      */
     public static void onReload(@Nullable String videoId) {
+        onReload(videoId, null);
+    }
+
+    /**
+     * @param reason why it's loaded again, e.g. the kind of failure the error fixer acted on (see VideoStart#reason), null when not known
+     */
+    public static void onReload(@Nullable String videoId, @Nullable String reason) {
         if (videoId == null || !videoId.equals(sReloadableId) || getTimer(videoId) != null) {
             return;
         }
 
         sReloadableId = null;
         start(videoId, VideoStart.TRIGGER_RELOAD);
+
+        if (sTimer != null) {
+            sTimer.reason = reason;
+        }
     }
 
     /**
@@ -1334,7 +1351,7 @@ public final class VideoStarts {
 
         return new VideoStart(timer.ts, timer.videoId, timer.trigger, timer.isFirstOfRun, timer.sinceProcessStartMs, timer.client,
                 timer.protocol, timer.engine, timer.isCached, outcome, endMs - timer.t0, stages, timer.positionMs, timer.video,
-                timer.videoBitrateKbps, warmUps, state);
+                timer.videoBitrateKbps, warmUps, state, timer.reason);
     }
 
     /**

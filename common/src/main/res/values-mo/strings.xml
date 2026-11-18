@@ -220,6 +220,7 @@
     <string name="submit_data_include_video_ids_desc">ID-urile videoclipurilor sunt mereu înregistrate pe dispozitiv. Aceasta decide doar dacă sunt trimise.</string>
     <string name="submit_data_sending">Se trimite…</string>
     <string name="submit_data_done">Trimis. ID: %s. Includeți-l în issue-ul dvs. de pe GitHub.</string>
+    <string name="submit_data_nothing_new">Nimic nou de la ultima trimitere. ID: %s.</string>
     <string name="submit_data_failed">Datele nu au putut fi trimise: %s</string>
     <string name="submit_data_last">Ultima trimitere: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Scanați pentru a deschide un issue pe GitHub cu ID-ul</string>

@@ -208,6 +208,7 @@
     <string name="submit_data_include_video_ids_desc">Vaizdo įrašų ID visada įrašomi įrenginyje. Tai nusprendžia tik, ar jie siunčiami.</string>
     <string name="submit_data_sending">Siunčiama…</string>
     <string name="submit_data_done">Išsiųsta. ID: %s. Nurodykite jį savo GitHub problemos pranešime.</string>
+    <string name="submit_data_nothing_new">Nuo paskutinio siuntimo nieko naujo. ID: %s.</string>
     <string name="submit_data_failed">Nepavyko išsiųsti duomenų: %s</string>
     <string name="submit_data_last">Paskutinį kartą išsiųsta: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Nuskenuokite, kad atidarytumėte GitHub problemos pranešimą su ID</string>

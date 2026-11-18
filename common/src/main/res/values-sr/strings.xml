@@ -217,6 +217,7 @@
     <string name="submit_data_include_video_ids_desc">ID-јеви видеа се увек бележе на уређају. Ово само одређује да ли се шаљу.</string>
     <string name="submit_data_sending">Слање…</string>
     <string name="submit_data_done">Послато. ID: %s. Наведите га у свом issue-у на GitHub-у.</string>
+    <string name="submit_data_nothing_new">Ништа ново од последњег слања. ID: %s.</string>
     <string name="submit_data_failed">Слање података није успело: %s</string>
     <string name="submit_data_last">Последње слање: %1$s, %2$s</string>
     <string name="submit_data_issue_qr">Скенирајте да отворите issue на GitHub-у са ID-јем</string>
