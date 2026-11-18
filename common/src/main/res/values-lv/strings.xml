@@ -996,6 +996,8 @@
     <string name="player_quick_skip_videos">Izlaist parastos video ar kreiso/labo pogu</string>
     <string name="player_quick_skip_videos_alt">Izlaist parastos video ar augšup/lejup pogu</string>
     <string name="player_quick_skip_chapters">Nākamā nodaļa ar augšup pogu</string>
+    <string name="shorts_no_more">Vairāk Shorts nav</string>
+    <string name="shorts_not_loaded">Neizdevās ielādēt vairāk Shorts</string>
     <string name="channels_filter">Rādīt kanālu filtra lauku sadaļā Kanāli</string>
     <string name="channel_search_bar">Meklēšanas josla kanāla lapā</string>
     <string name="header_sports">Sports</string>

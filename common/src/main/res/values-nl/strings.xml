@@ -1028,6 +1028,8 @@
   <string name="player_quick_shorts_skip_alt">Shorts overslaan met omhoog-/omlaagknoppen</string>
   <string name="player_quick_skip_videos_alt">Gewone video\'s overslaan met omhoog-/omlaagknoppen</string>
   <string name="player_quick_skip_chapters">Volgend hoofdstuk met de omhoogknop</string>
+  <string name="shorts_no_more">Geen Shorts meer</string>
+  <string name="shorts_not_loaded">Kan geen Shorts meer laden</string>
   <string name="prefer_google_dns">Google DNS verkiezen</string>
   <string name="rounded_card_corners">Afgeronde kaarthoeken</string>
   <string name="app_restore_desc">OPMERKING: De back-up-zip moet handmatig of via bestandsbeheer naar deze map worden gekopieerd, gebruik \'Openen met\'</string>

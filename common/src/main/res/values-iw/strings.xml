@@ -944,6 +944,8 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="player_quick_skip_videos">דילוג על סרטונים רגילים עם לחצני שמאל/ימין</string>
     <string name="player_quick_skip_videos_alt">דילוג על סרטונים רגילים עם לחצני למעלה/למטה</string>
     <string name="player_quick_skip_chapters">הפרק הבא עם לחצן למעלה</string>
+    <string name="shorts_no_more">אין עוד Shorts</string>
+    <string name="shorts_not_loaded">לא ניתן לטעון עוד Shorts</string>
     <string name="channels_filter">הצגת שדה סינון ערוצים בתוך מדור הערוצים</string>
     <string name="channel_search_bar">סרגל חיפוש בתוך דף הערוץ</string>
     <string name="header_sports">ספורט</string>

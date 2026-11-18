@@ -1008,6 +1008,8 @@
   <string name="player_quick_shorts_skip_alt">Kapërce videot e shkurtra me butonat lart/poshtë</string>
   <string name="player_quick_skip_videos_alt">Kapërce videot e zakonshme me butonat lart/poshtë</string>
   <string name="player_quick_skip_chapters">Kapitulli tjetër me butonin lart</string>
+  <string name="shorts_no_more">Nuk ka më video të shkurtra</string>
+  <string name="shorts_not_loaded">Nuk u ngarkuan dot më shumë video të shkurtra</string>
   <string name="prefer_google_dns">Preferoje DNS-in e Google</string>
   <string name="stable_restore">Rikthe versionin e qëndrueshëm (të gjitha të dhënat do të humbasin)</string>
   <string name="auto_backup_category">Kopje rezervë automatike</string>

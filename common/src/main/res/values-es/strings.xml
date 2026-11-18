@@ -1069,6 +1069,8 @@
   <string name="player_quick_shorts_skip_alt">Saltar Shorts con los botones arriba/abajo</string>
   <string name="player_quick_skip_videos_alt">Saltar videos normales con los botones arriba/abajo</string>
   <string name="player_quick_skip_chapters">Siguiente capítulo con el botón arriba</string>
+  <string name="shorts_no_more">No hay más Shorts</string>
+  <string name="shorts_not_loaded">No se pudieron cargar más Shorts</string>
   <string name="prefer_google_dns">Preferir DNS de Google</string>
   <string name="stable_restore">Restaurar la versión estable (se perderán todos los datos)</string>
   <string name="auto_backup_category">Copia de seguridad automática</string>

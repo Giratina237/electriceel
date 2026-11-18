@@ -998,6 +998,8 @@
   <string name="player_quick_shorts_skip_alt">使用向上 / 向下按鈕跳過 Shorts</string>
   <string name="player_quick_skip_videos_alt">使用向上 / 向下按鈕跳過一般影片</string>
   <string name="player_quick_skip_chapters">使用向上按鈕跳到下一個章節</string>
+  <string name="shorts_no_more">沒有更多 Shorts 了</string>
+  <string name="shorts_not_loaded">無法載入更多 Shorts</string>
   <string name="prefer_google_dns">偏好使用 Google DNS</string>
   <string name="auto_backup_category">自動備份</string>
   <string name="once_a_day">一天一次</string>

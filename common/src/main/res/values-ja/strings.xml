@@ -943,6 +943,8 @@
     <string name="player_quick_skip_videos">左右ボタンで動画をスキップする</string>
     <string name="player_quick_skip_videos_alt">上下ボタンで動画をスキップする</string>
     <string name="player_quick_skip_chapters">上ボタンで次のチャプター</string>
+    <string name="shorts_no_more">これ以上ショートはありません</string>
+    <string name="shorts_not_loaded">ショートをさらに読み込めませんでした</string>
     <string name="channels_filter">チャンネルのセクション内でチャンネル検索を表示する</string>
     <string name="channel_search_bar">チャンネルページ内の検索バー</string>
     <string name="header_sports">スポーツ</string>

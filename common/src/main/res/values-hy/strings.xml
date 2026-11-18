@@ -994,6 +994,8 @@
     <string name="player_quick_skip_videos">Բաց թողնել սովորական տեսանյութերը ձախ/աջ կոճակներով</string>
     <string name="player_quick_skip_videos_alt">Բաց թողնել սովորական տեսանյութերը վերև/ներքև կոճակներով</string>
     <string name="player_quick_skip_chapters">Հաջորդ գլուխը վերև կոճակով</string>
+    <string name="shorts_no_more">Այլ Shorts չկան</string>
+    <string name="shorts_not_loaded">Չհաջողվեց բեռնել ավելի շատ Shorts</string>
     <string name="channels_filter">Ցուցադրել ալիքների զտման դաշտը Ալիքներ բաժնում</string>
     <string name="channel_search_bar">Որոնման գոտի ալիքի էջում</string>
     <string name="header_sports">Սպորտ</string>

@@ -995,6 +995,8 @@
   <string name="player_quick_shorts_skip_alt">Bỏ qua Shorts với nút lên/xuống</string>
   <string name="player_quick_skip_videos_alt">Bỏ qua video bình thường với nút lên/xuống</string>
   <string name="player_quick_skip_chapters">Chương tiếp theo với nút lên</string>
+  <string name="shorts_no_more">Không còn Shorts nào</string>
+  <string name="shorts_not_loaded">Không thể tải thêm Shorts</string>
   <string name="prefer_google_dns">Ưu tiên DNS Google</string>
   <string name="dialog_block_channel">Chặn kênh</string>
   <string name="dialog_unblock_channel">Bỏ chặn kênh</string>

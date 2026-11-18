@@ -1006,6 +1006,8 @@
     <string name="player_quick_shorts_skip_alt">Hopp over Shorts med opp/ned-knappene</string>
     <string name="player_quick_skip_videos_alt">Hopp over vanlige videoer med opp/ned-knappene</string>
     <string name="player_quick_skip_chapters">Neste kapittel med opp-knappen</string>
+    <string name="shorts_no_more">Ingen flere Shorts</string>
+    <string name="shorts_not_loaded">Kunne ikke laste inn flere Shorts</string>
     <string name="prefer_google_dns">Foretrekk Google DNS</string>
     <string name="typing_corrections">Slå av autokorrektur under tekstinntasting</string>
     <string name="suggestions_horizontally_scrolled">Horisontalt rullende forslag</string>
