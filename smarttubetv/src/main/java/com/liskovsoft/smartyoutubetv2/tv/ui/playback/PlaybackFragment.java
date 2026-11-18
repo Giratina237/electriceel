@@ -642,6 +642,7 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
         mExoPlayerController.setPlayer(mPlayer);
         mExoPlayerController.setVideoRenderer(renderersFactory.getVideoRenderer());
         mExoPlayerController.setAudioClockInfo(renderersFactory.getAudioClockInfo());
+        renderersFactory.getSentenceSubtitles().setPlayer(mPlayer);
     }
 
     /**

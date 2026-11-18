@@ -2,6 +2,7 @@ package com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.renderer;
 
 import android.content.Context;
 import android.os.Handler;
+import android.os.Looper;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.Renderer;
 import com.google.android.exoplayer2.audio.AudioCapabilities;
@@ -13,9 +14,11 @@ import com.google.android.exoplayer2.audio.MediaCodecAudioRenderer;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
+import com.google.android.exoplayer2.text.TextOutput;
 import com.google.android.exoplayer2.util.AmazonQuirks;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.SilenceDetector;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SentenceSubtitles;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.selector.BlacklistMediaCodecSelector;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
@@ -34,6 +37,7 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
     };
     private final PlayerData mPlayerData;
     private final PlayerTweaksData mPlayerTweaksData;
+    private final SentenceSubtitles mSentenceSubtitles;
     private DebugInfoMediaCodecVideoRenderer mVideoRenderer;
     private AudioClockInfo mAudioClockInfo;
     // 2.12, 2.13
@@ -45,6 +49,7 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
 
         mPlayerData = PlayerData.instance(activity);
         mPlayerTweaksData = PlayerTweaksData.instance(activity);
+        mSentenceSubtitles = new SentenceSubtitles(activity);
 
         setExtensionRendererMode(EXTENSION_RENDERER_MODE_ON);
         // setEnableDecoderFallback(true); // Exo 2.10 and up
@@ -204,6 +209,23 @@ public class CustomOverridesRenderersFactory extends CustomRenderersFactoryBase 
 
         replaceVideoRenderer(out, videoRenderer);
         mVideoRenderer = videoRenderer;
+    }
+
+    /**
+     * Subtitles one sentence at a time, if enabled (see SentenceSubtitles)
+     */
+    // 2.10, 2.11
+    @Override
+    protected void buildTextRenderers(Context context, TextOutput output, Looper outputLooper, @ExtensionRendererMode int extensionRendererMode,
+                                      ArrayList<Renderer> out) {
+        out.add(mSentenceSubtitles.createRenderer(output, outputLooper));
+    }
+
+    /**
+     * What shows the subtitles one sentence at a time: once the player has been created with this factory, it's to be given the player.
+     */
+    public SentenceSubtitles getSentenceSubtitles() {
+        return mSentenceSubtitles;
     }
 
     /**

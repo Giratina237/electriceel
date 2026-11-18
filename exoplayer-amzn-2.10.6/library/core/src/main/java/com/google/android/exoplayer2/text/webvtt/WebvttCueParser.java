@@ -34,6 +34,7 @@ import android.text.style.StyleSpan;
 import android.text.style.TypefaceSpan;
 import android.text.style.UnderlineSpan;
 import com.google.android.exoplayer2.text.Cue;
+import com.google.android.exoplayer2.text.WordTimeSpan;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.ParsableByteArray;
 import com.google.android.exoplayer2.util.Util;
@@ -54,6 +55,12 @@ public final class WebvttCueParser {
       .compile("^(\\S+)\\s+-->\\s+(\\S+)(.*)?$");
 
   private static final Pattern CUE_SETTING_PATTERN = Pattern.compile("(\\S+?):(\\S+)");
+
+  // MOD: the time a word starts to be said, a tag within the cue's text, e.g. <00:00:01.234>. YouTube's automatic captions time
+  // each word but the first of a line so (see WordTimeSpan).
+  private static final String TIMESTAMP = "(?:\\d+:)?\\d{2}:\\d{2}\\.\\d{3}";
+  private static final Pattern TIMESTAMP_PATTERN = Pattern.compile(TIMESTAMP);
+  private static final Pattern TIMESTAMP_TAG_PATTERN = Pattern.compile("<(" + TIMESTAMP + ")>");
 
   private static final char CHAR_LESS_THAN = '<';
   private static final char CHAR_GREATER_THAN = '>';
@@ -159,12 +166,17 @@ public final class WebvttCueParser {
    */
   /* package */ static void parseCueText(String id, String markup, WebvttCue.Builder builder,
       List<WebvttCssStyle> styles) {
+    // MOD: Html.fromHtml drops the timestamp tags as unknown elements. Escaped, they come out of it as text, to be read below.
+    markup = TIMESTAMP_TAG_PATTERN.matcher(markup).replaceAll("&lt;$1&gt;");
     // MOD: Fix embedded styles by decoding html entities
     markup = Html.fromHtml(markup).toString();
 
     SpannableStringBuilder spannedText = new SpannableStringBuilder();
     ArrayDeque<StartTag> startTagStack = new ArrayDeque<>();
     List<StyleMatch> scratchStyleMatches = new ArrayList<>();
+    // MOD: where each timed word starts in spannedText, and when it's said (see TIMESTAMP_PATTERN)
+    List<Integer> wordStarts = null;
+    List<Long> wordTimesUs = null;
     int pos = 0;
     while (pos < markup.length()) {
       char curr = markup.charAt(pos);
@@ -180,6 +192,21 @@ public final class WebvttCueParser {
           boolean isVoidTag = markup.charAt(pos - 2) == CHAR_SLASH;
           String fullTagExpression = markup.substring(ltPos + (isClosingTag ? 2 : 1),
               isVoidTag ? pos - 2 : pos - 1);
+          // MOD: a word's time, see TIMESTAMP_PATTERN
+          if (!isClosingTag && !isVoidTag && TIMESTAMP_PATTERN.matcher(fullTagExpression).matches()) {
+            if (wordStarts == null) {
+              wordStarts = new ArrayList<>();
+              wordTimesUs = new ArrayList<>();
+            }
+            // Html.fromHtml joined the spaces on both sides of the tag when it dropped it: the text stays as it was
+            if (pos < markup.length() && markup.charAt(pos) == CHAR_SPACE && spannedText.length() > 0
+                && spannedText.charAt(spannedText.length() - 1) == CHAR_SPACE) {
+              pos++;
+            }
+            wordStarts.add(spannedText.length());
+            wordTimesUs.add(WebvttParserUtil.parseTimestampUs(fullTagExpression));
+            continue;
+          }
           String tagName = getTagName(fullTagExpression);
           if (tagName == null || !isSupportedTag(tagName)) {
             continue;
@@ -226,6 +253,17 @@ public final class WebvttCueParser {
     }
     applySpansForTag(id, StartTag.buildWholeCueVirtualTag(), spannedText, styles,
         scratchStyleMatches);
+    // MOD: each timed word, up to the next one
+    if (wordStarts != null) {
+      for (int i = 0; i < wordStarts.size(); i++) {
+        int start = wordStarts.get(i);
+        int end = i + 1 < wordStarts.size() ? wordStarts.get(i + 1) : spannedText.length();
+        if (end > start) {
+          spannedText.setSpan(new WordTimeSpan(wordTimesUs.get(i)), start, end,
+              Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+      }
+    }
     builder.setText(spannedText);
   }
 

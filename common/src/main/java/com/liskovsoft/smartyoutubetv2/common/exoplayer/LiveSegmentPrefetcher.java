@@ -10,6 +10,9 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.TransferListener;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaFormat;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
+import com.liskovsoft.youtubeapi.formatbuilders.utils.MediaFormatUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,7 +36,10 @@ import java.util.regex.Pattern;
  * A segment the googlevideo edge hasn't cached is answered in ~1.4 s however old it is, and the player asks for one segment of a track
  * at a time, so 1 s segments came at 0.41x of real time and the stream stalled every few seconds (upstream SmartTube #6009). Requests in
  * parallel are answered in the same ~1.4 s each.<br/>
- * Only the segments the server said exist (X-Head-Seqnum) are asked for ahead: a later one is held until it exists (hang=1).
+ * Only the segments the server said exist (X-Head-Seqnum) are asked for ahead: a later one is held until it exists (hang=1).<br/>
+ * A stream that ended and isn't processed yet (post-live DVR, see #ofEndedStream) is asked for by segment number the same way, its 1 s
+ * segments too: a segment was answered in ~1.1 s, and the video stalled ~5 s every 10-30 s (X4GJ6ZKvUrI, 6 h after the stream ended).
+ * All its segments exist: up to its last one, as long as the server doesn't say its head.
  */
 public final class LiveSegmentPrefetcher implements DataSource.Factory {
     /**
@@ -72,6 +78,10 @@ public final class LiveSegmentPrefetcher implements DataSource.Factory {
      * The segments asked for ahead by their key (see Segment#key)
      */
     private final Map<String, Segment> mSegments = new HashMap<>();
+    /**
+     * Of a stream that ended: its last segment, as its length says (see #getLastSeqNum). -1 for a live stream, or unknown
+     */
+    private final long mLastSeqNum;
     private long mHeadSeqNum = -1;
     private long mKeptBytes;
 
@@ -85,8 +95,30 @@ public final class LiveSegmentPrefetcher implements DataSource.Factory {
 
     @VisibleForTesting
     LiveSegmentPrefetcher(DataSource.Factory upstreamFactory, Executor executor) {
+        this(upstreamFactory, executor, -1);
+    }
+
+    @VisibleForTesting
+    LiveSegmentPrefetcher(DataSource.Factory upstreamFactory, Executor executor, long lastSeqNum) {
         mUpstreamFactory = upstreamFactory;
         mExecutor = executor;
+        mLastSeqNum = lastSeqNum;
+    }
+
+    /**
+     * Of a stream that ended and isn't processed yet (post-live DVR): its formats are still asked for by segment number (see
+     * DashManifestParser2#parseSegmentTemplate). Null for the others, and for one whose segments are long enough to keep up (see
+     * #isNeeded).
+     */
+    @Nullable
+    public static LiveSegmentPrefetcher ofEndedStream(MediaItemFormatInfo formatInfo, DataSource.Factory upstreamFactory) {
+        int segmentDurationUs = getEndedStreamSegmentDurationUs(formatInfo);
+
+        if (!isNeeded(segmentDurationUs)) {
+            return null;
+        }
+
+        return new LiveSegmentPrefetcher(upstreamFactory, sExecutor, getLastSeqNum(formatInfo, segmentDurationUs));
     }
 
     /**
@@ -95,6 +127,49 @@ public final class LiveSegmentPrefetcher implements DataSource.Factory {
      */
     public static boolean isNeeded(int segmentDurationUs) {
         return segmentDurationUs > 0 && segmentDurationUs < 3_000_000;
+    }
+
+    /**
+     * Of a stream that ended and is asked for by segment number: its segments' duration, as its manifest's (see
+     * DashManifestParser2#parseSegmentTemplate). Not live, its segment duration is unknown (see MediaItemFormatInfo#getSegmentDurationUs)
+     * and its formats' target duration is used. 0 for a live stream and for a video.
+     */
+    @VisibleForTesting
+    static int getEndedStreamSegmentDurationUs(MediaItemFormatInfo formatInfo) {
+        List<MediaFormat> formats = formatInfo.getAdaptiveFormats();
+
+        if (formatInfo.isLive() || formats == null) {
+            return 0;
+        }
+
+        for (MediaFormat format : formats) {
+            if (format == null || format.getUrl() == null || !MediaFormatUtils.isLiveMedia(format)) {
+                continue;
+            }
+
+            int segmentDurationUs = formatInfo.getSegmentDurationUs();
+
+            return segmentDurationUs > 0 ? segmentDurationUs : Math.max(format.getTargetDurationSec(), 0) * 1_000_000;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Of a stream that ended: the number of its last segment, as many as fill its length after its start one. The length is rounded to
+     * the second and the target duration isn't exact, so it may be one off. -1 when its length is unknown.
+     */
+    @VisibleForTesting
+    static long getLastSeqNum(MediaItemFormatInfo formatInfo, int segmentDurationUs) {
+        long durationMs = formatInfo.getMediaDurationMs();
+
+        if (durationMs <= 0 || segmentDurationUs <= 0) {
+            return -1;
+        }
+
+        long count = (durationMs * 1_000 + segmentDurationUs - 1) / segmentDurationUs;
+
+        return formatInfo.getStartSegmentNum() + count - 1;
     }
 
     @Override
@@ -145,13 +220,16 @@ public final class LiveSegmentPrefetcher implements DataSource.Factory {
     }
 
     /**
-     * The segments after the one the player asks for, up to the head the server said exists
+     * The segments after the one the player asks for, up to the head the server said exists. Of a stream that ended, up to its last one
+     * as long as the server doesn't say.
      */
     private void prefetchAfter(SegmentId id, List<TransferListener> listeners) {
         List<Segment> started = new ArrayList<>();
 
         synchronized (this) {
-            for (long num = id.num + 1; num <= id.num + PREFETCH_COUNT && num <= mHeadSeqNum; num++) {
+            long head = mHeadSeqNum >= 0 ? mHeadSeqNum : mLastSeqNum;
+
+            for (long num = id.num + 1; num <= id.num + PREFETCH_COUNT && num <= head; num++) {
                 SegmentId next = id.withNum(num);
                 if (mSegments.containsKey(next.key())) {
                     continue;
