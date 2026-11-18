@@ -28,6 +28,7 @@ Electric Eel is a fork of [SmartTube](https://github.com/yuliskov/SmartTube), an
 - Working notifications
 - Working subscription groups
 - End of video cards
+- Middle of video cards
 - Frame by frame forward playback support
 - Quick toggles
 - Ability to exclude channels from individual hidden video types
