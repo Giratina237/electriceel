@@ -59,6 +59,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
   private static final String TAG = "ExoPlayerImplInternal";
 
+  /**
+   * MOD: backport from ExoPlayer 2.13.0 (#4352). How long {@link #release()} and {@link
+   * #setForegroundMode(boolean) setForegroundMode(false)} block the calling thread for the playback
+   * thread. A platform call stuck there (a codec or AudioTrack release) used to hang the caller
+   * with it. Same as upstream's default. A timed-out release does not free the codec: the next
+   * player may find it still held. The app's own sequence (stop, clear surface, release) waits at
+   * most this plus {@code SimpleExoPlayer.DETACH_SURFACE_TIMEOUT_MS}, under the 5 s of an input
+   * ANR.
+   */
+  private static final long RELEASE_TIMEOUT_MS = 500;
+
   // External messages
   public static final int MSG_PLAYBACK_INFO_CHANGED = 0;
   public static final int MSG_PLAYBACK_PARAMETERS_CHANGED = 1;
@@ -234,33 +245,48 @@ import java.util.concurrent.atomic.AtomicBoolean;
       handler
           .obtainMessage(MSG_SET_FOREGROUND_MODE, /* foregroundMode */ 0, 0, processedFlag)
           .sendToTarget();
-      boolean wasInterrupted = false;
-      while (!processedFlag.get() && !released) {
-        try {
-          wait();
-        } catch (InterruptedException e) {
-          wasInterrupted = true;
-        }
-      }
-      if (wasInterrupted) {
-        // Restore the interrupted status.
-        Thread.currentThread().interrupt();
+      // MOD: backport from ExoPlayer 2.13.0, a deadline (see RELEASE_TIMEOUT_MS)
+      waitUninterruptibly(() -> processedFlag.get() || released, RELEASE_TIMEOUT_MS);
+      if (!processedFlag.get() && !released) {
+        Log.w(TAG, "Leaving foreground mode timed out after " + RELEASE_TIMEOUT_MS + " ms");
       }
     }
   }
 
   public synchronized void release() {
-    if (released) {
+    // MOD: backport from ExoPlayer 2.13.0. A dead playback thread can't release anything, and the
+    // wait has a deadline (see RELEASE_TIMEOUT_MS).
+    if (released || !internalPlaybackThread.isAlive()) {
       return;
     }
     handler.sendEmptyMessage(MSG_RELEASE);
+    waitUninterruptibly(() -> released, RELEASE_TIMEOUT_MS);
+    if (!released) {
+      Log.w(TAG, "Release timed out after " + RELEASE_TIMEOUT_MS + " ms");
+    }
+  }
+
+  /** MOD: backport from ExoPlayer 2.13.0. A condition for {@link #waitUninterruptibly}. */
+  private interface WaitCondition {
+    boolean isMet();
+  }
+
+  /**
+   * MOD: backport from ExoPlayer 2.13.0. Waits until {@code condition} is met or {@code timeoutMs}
+   * elapsed. The condition must become true under this object's lock, followed by {@link
+   * #notifyAll()}. An interrupt while waiting is restored once the wait is over.
+   */
+  private synchronized void waitUninterruptibly(WaitCondition condition, long timeoutMs) {
+    long deadlineMs = System.nanoTime() / 1_000_000 + timeoutMs;
+    long remainingMs = timeoutMs;
     boolean wasInterrupted = false;
-    while (!released) {
+    while (!condition.isMet() && remainingMs > 0) {
       try {
-        wait();
+        wait(remainingMs);
       } catch (InterruptedException e) {
         wasInterrupted = true;
       }
+      remainingMs = deadlineMs - System.nanoTime() / 1_000_000;
     }
     if (wasInterrupted) {
       // Restore the interrupted status.

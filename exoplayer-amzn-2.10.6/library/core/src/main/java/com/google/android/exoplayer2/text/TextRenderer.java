@@ -27,6 +27,7 @@ import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.util.Assertions;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import java.lang.annotation.Documented;
@@ -43,6 +44,8 @@ import java.util.List;
  * delegated to a {@link TextOutput}.
  */
 public final class TextRenderer extends BaseRenderer implements Callback {
+
+  private static final String TAG = "TextRenderer";
 
   /**
    * @deprecated Use {@link TextOutput}.
@@ -190,7 +193,8 @@ public final class TextRenderer extends BaseRenderer implements Callback {
       try {
         nextSubtitle = decoder.dequeueOutputBuffer();
       } catch (SubtitleDecoderException e) {
-        throw ExoPlaybackException.createForRenderer(e, getIndex());
+        handleDecoderError(e); // MOD: was a player error (see handleDecoderError)
+        return;
       }
     }
 
@@ -281,7 +285,7 @@ public final class TextRenderer extends BaseRenderer implements Callback {
         }
       }
     } catch (SubtitleDecoderException e) {
-      throw ExoPlaybackException.createForRenderer(e, getIndex());
+      handleDecoderError(e); // MOD: was a player error (see handleDecoderError)
     }
   }
 
@@ -327,6 +331,22 @@ public final class TextRenderer extends BaseRenderer implements Callback {
   private void replaceDecoder() {
     releaseDecoder();
     decoder = decoderFactory.createDecoder(streamFormat);
+  }
+
+  /**
+   * MOD: backport from ExoPlayer 2.11.4 (#6885) and 2.12.0 (#7590). A subtitle that fails to decode
+   * is logged and dropped instead of stopping playback with a player error. The decoder is
+   * recreated, not flushed: a flushed one keeps its error and stops decoding, so every later call
+   * would fail again and the stream would never end.
+   */
+  private void handleDecoderError(SubtitleDecoderException e) {
+    Log.e(TAG, "Subtitle decoding failed. streamFormat=" + streamFormat, e);
+    clearOutput();
+    replaceDecoder();
+    // MOD: not in upstream. The end of the input is read again, for the new decoder: the old one
+    // took it with it. A whole subtitle file is one sample followed by the end, so a file that
+    // failed to decode would otherwise leave this renderer, and the video, never ended.
+    inputStreamEnded = false;
   }
 
   private long getNextEventTime() {

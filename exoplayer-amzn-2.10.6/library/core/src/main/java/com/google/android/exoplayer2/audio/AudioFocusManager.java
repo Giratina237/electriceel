@@ -77,15 +77,12 @@ public final class AudioFocusManager {
   @Documented
   @Retention(RetentionPolicy.SOURCE)
   @IntDef({
-    AUDIO_FOCUS_STATE_LOST_FOCUS,
     AUDIO_FOCUS_STATE_NO_FOCUS,
     AUDIO_FOCUS_STATE_HAVE_FOCUS,
     AUDIO_FOCUS_STATE_LOSS_TRANSIENT,
     AUDIO_FOCUS_STATE_LOSS_TRANSIENT_DUCK
   })
   private @interface AudioFocusState {}
-  /** No audio focus was held, but has been lost by another app taking it permanently. */
-  private static final int AUDIO_FOCUS_STATE_LOST_FOCUS = -1;
   /** No audio focus is currently being held. */
   private static final int AUDIO_FOCUS_STATE_NO_FOCUS = 0;
   /** The requested audio focus is currently held. */
@@ -217,25 +214,23 @@ public final class AudioFocusManager {
       return PLAYER_COMMAND_PLAY_WHEN_READY;
     }
 
-    if (audioFocusState == AUDIO_FOCUS_STATE_NO_FOCUS) {
-      if (Util.SDK_INT >= 26) {
-        focusRequestResult = requestAudioFocusV26();
-      } else {
-        focusRequestResult = requestAudioFocusDefault();
-      }
-      audioFocusState =
-          focusRequestResult == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-              ? AUDIO_FOCUS_STATE_HAVE_FOCUS
-              : AUDIO_FOCUS_STATE_NO_FOCUS;
+    // MOD: backport from ExoPlayer 2.11.4 (#7182). Focus is asked for again in every state but
+    // "have focus". Only asking from "no focus" left a transient loss waiting for a callback, so
+    // playback stayed suppressed for as long as another app held transient focus, even after play.
+    if (audioFocusState == AUDIO_FOCUS_STATE_HAVE_FOCUS) {
+      return PLAYER_COMMAND_PLAY_WHEN_READY;
     }
-
-    if (audioFocusState == AUDIO_FOCUS_STATE_NO_FOCUS) {
-      return PLAYER_COMMAND_DO_NOT_PLAY;
+    if (Util.SDK_INT >= 26) {
+      focusRequestResult = requestAudioFocusV26();
+    } else {
+      focusRequestResult = requestAudioFocusDefault();
     }
-
-    return audioFocusState == AUDIO_FOCUS_STATE_LOSS_TRANSIENT
-        ? PLAYER_COMMAND_WAIT_FOR_CALLBACK
-        : PLAYER_COMMAND_PLAY_WHEN_READY;
+    if (focusRequestResult == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+      setAudioFocusState(AUDIO_FOCUS_STATE_HAVE_FOCUS);
+      return PLAYER_COMMAND_PLAY_WHEN_READY;
+    }
+    setAudioFocusState(AUDIO_FOCUS_STATE_NO_FOCUS);
+    return PLAYER_COMMAND_DO_NOT_PLAY;
   }
 
   private void abandonAudioFocus() {
@@ -247,15 +242,13 @@ public final class AudioFocusManager {
       return;
     }
 
-    if (focusGain != C.AUDIOFOCUS_GAIN
-        || audioFocusState == AUDIO_FOCUS_STATE_LOST_FOCUS
-        || forceAbandon) {
+    if (focusGain != C.AUDIOFOCUS_GAIN || forceAbandon) {
       if (Util.SDK_INT >= 26) {
         abandonAudioFocusV26();
       } else {
         abandonAudioFocusDefault();
       }
-      audioFocusState = AUDIO_FOCUS_STATE_NO_FOCUS;
+      setAudioFocusState(AUDIO_FOCUS_STATE_NO_FOCUS);
     }
   }
 
@@ -296,6 +289,28 @@ public final class AudioFocusManager {
     if (audioFocusRequest != null) {
       audioManager.abandonAudioFocusRequest(audioFocusRequest);
     }
+  }
+
+  /**
+   * MOD: backport from ExoPlayer 2.11.4. Every state change goes through here, so the volume
+   * multiplier always follows the state. It was only updated by the focus listener, and abandoning
+   * focus while ducked left the player's volume ducked for good.
+   */
+  private void setAudioFocusState(@AudioFocusState int audioFocusState) {
+    if (this.audioFocusState == audioFocusState) {
+      return;
+    }
+    this.audioFocusState = audioFocusState;
+
+    float volumeMultiplier =
+        (audioFocusState == AUDIO_FOCUS_STATE_LOSS_TRANSIENT_DUCK)
+            ? AudioFocusManager.VOLUME_MULTIPLIER_DUCK
+            : AudioFocusManager.VOLUME_MULTIPLIER_DEFAULT;
+    if (this.volumeMultiplier == volumeMultiplier) {
+      return;
+    }
+    this.volumeMultiplier = volumeMultiplier;
+    playerControl.setVolumeMultiplier(volumeMultiplier);
   }
 
   private boolean willPauseWhenDucked() {
@@ -386,59 +401,28 @@ public final class AudioFocusManager {
   private class AudioFocusListener implements AudioManager.OnAudioFocusChangeListener {
     @Override
     public void onAudioFocusChange(int focusChange) {
-      // Convert the platform focus change to internal state.
+      // MOD: backport from ExoPlayer 2.11.4. The state is set through setAudioFocusState, which
+      // also updates the volume multiplier. A loss pauses the player before its volume is restored.
       switch (focusChange) {
-        case AudioManager.AUDIOFOCUS_LOSS:
-          audioFocusState = AUDIO_FOCUS_STATE_LOST_FOCUS;
-          break;
-        case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-          audioFocusState = AUDIO_FOCUS_STATE_LOSS_TRANSIENT;
-          break;
-        case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-          if (willPauseWhenDucked()) {
-            audioFocusState = AUDIO_FOCUS_STATE_LOSS_TRANSIENT;
-          } else {
-            audioFocusState = AUDIO_FOCUS_STATE_LOSS_TRANSIENT_DUCK;
-          }
-          break;
         case AudioManager.AUDIOFOCUS_GAIN:
-          audioFocusState = AUDIO_FOCUS_STATE_HAVE_FOCUS;
+          setAudioFocusState(AUDIO_FOCUS_STATE_HAVE_FOCUS);
+          playerControl.executePlayerCommand(PLAYER_COMMAND_PLAY_WHEN_READY);
           break;
-        default:
-          Log.w(TAG, "Unknown focus change type: " + focusChange);
-          // Early return.
-          return;
-      }
-
-      // Handle the internal state (change).
-      switch (audioFocusState) {
-        case AUDIO_FOCUS_STATE_NO_FOCUS:
-          // Focus was not requested; nothing to do.
-          break;
-        case AUDIO_FOCUS_STATE_LOST_FOCUS:
+        case AudioManager.AUDIOFOCUS_LOSS:
           playerControl.executePlayerCommand(PLAYER_COMMAND_DO_NOT_PLAY);
           abandonAudioFocus(/* forceAbandon= */ true);
           break;
-        case AUDIO_FOCUS_STATE_LOSS_TRANSIENT:
-          playerControl.executePlayerCommand(PLAYER_COMMAND_WAIT_FOR_CALLBACK);
-          break;
-        case AUDIO_FOCUS_STATE_LOSS_TRANSIENT_DUCK:
-          // Volume will be adjusted by the code below.
-          break;
-        case AUDIO_FOCUS_STATE_HAVE_FOCUS:
-          playerControl.executePlayerCommand(PLAYER_COMMAND_PLAY_WHEN_READY);
+        case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+        case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+          if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT || willPauseWhenDucked()) {
+            playerControl.executePlayerCommand(PLAYER_COMMAND_WAIT_FOR_CALLBACK);
+            setAudioFocusState(AUDIO_FOCUS_STATE_LOSS_TRANSIENT);
+          } else {
+            setAudioFocusState(AUDIO_FOCUS_STATE_LOSS_TRANSIENT_DUCK);
+          }
           break;
         default:
-          throw new IllegalStateException("Unknown audio focus state: " + audioFocusState);
-      }
-
-      float volumeMultiplier =
-          (audioFocusState == AUDIO_FOCUS_STATE_LOSS_TRANSIENT_DUCK)
-              ? AudioFocusManager.VOLUME_MULTIPLIER_DUCK
-              : AudioFocusManager.VOLUME_MULTIPLIER_DEFAULT;
-      if (AudioFocusManager.this.volumeMultiplier != volumeMultiplier) {
-        AudioFocusManager.this.volumeMultiplier = volumeMultiplier;
-        playerControl.setVolumeMultiplier(volumeMultiplier);
+          Log.w(TAG, "Unknown focus change type: " + focusChange);
       }
     }
   }

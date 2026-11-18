@@ -391,6 +391,9 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
   private boolean codecNeedsDiscardToSpsWorkaround;
   private boolean codecNeedsFlushWorkaround;
   private boolean codecNeedsEosFlushWorkaround;
+  // MOD: backport from ExoPlayer 2.11.4 (#6671), see codecNeedsSosFlushWorkaround
+  private boolean codecNeedsSosFlushWorkaround;
+  private boolean codecHasOutputMediaFormat;
   private boolean codecNeedsEosOutputExceptionWorkaround;
   private boolean codecNeedsMonoChannelCountWorkaround;
   private boolean codecNeedsAdaptationWorkaroundBuffer;
@@ -685,6 +688,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     availableCodecInfos = null;
     codecInfo = null;
     codecFormat = null;
+    codecHasOutputMediaFormat = false; // MOD: backport from ExoPlayer 2.11.4 (#6671)
     resetInputBuffer();
     resetOutputBuffer();
     resetCodecBuffers();
@@ -887,6 +891,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     }
     if (codecDrainAction == DRAIN_ACTION_REINITIALIZE
         || codecNeedsFlushWorkaround
+        || (codecNeedsSosFlushWorkaround && !codecHasOutputMediaFormat) // MOD: 2.11.4 backport
         || (codecNeedsEosFlushWorkaround && codecReceivedEos)) {
       releaseCodec();
       return true;
@@ -963,13 +968,27 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
           DecoderInitializationException.NO_SUITABLE_DECODER_ERROR);
     }
 
+    MediaCodecInfo preferredCodecInfo = availableCodecInfos.peekFirst();
     while (codec == null) {
       MediaCodecInfo codecInfo = availableCodecInfos.peekFirst();
       if (!shouldInitCodec(codecInfo)) {
         return;
       }
       try {
-        initCodec(codecInfo, crypto);
+        try {
+          initCodec(codecInfo, crypto);
+        } catch (Exception e) {
+          // MOD: backport from ExoPlayer 2.17.0 (#8696). Creating the preferred decoder can fail
+          // briefly on some devices, e.g. when a surface moves from a secure codec to another one.
+          // With decoder fallback off it is the only decoder, so one failure was a player error.
+          if (codecInfo == preferredCodecInfo) {
+            Log.w(TAG, "Preferred decoder instantiation failed. Sleeping for 50ms then retrying.");
+            Thread.sleep(/* millis= */ 50);
+            initCodec(codecInfo, crypto);
+          } else {
+            throw e;
+          }
+        }
       } catch (Exception e) {
         Log.w(TAG, "Failed to initialize decoder: " + codecInfo, e);
         // This codec failed to initialize, so fall back to the next codec in the list (if any). We
@@ -1061,6 +1080,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     codecNeedsReconfigureWorkaround = codecNeedsReconfigureWorkaround(codecName);
     codecNeedsDiscardToSpsWorkaround = codecNeedsDiscardToSpsWorkaround(codecName, codecFormat);
     codecNeedsFlushWorkaround = codecNeedsFlushWorkaround(codecName);
+    codecNeedsSosFlushWorkaround = codecNeedsSosFlushWorkaround(codecName); // MOD: 2.11.4 backport
     codecNeedsEosFlushWorkaround = codecNeedsEosFlushWorkaround(codecName);
     codecNeedsEosOutputExceptionWorkaround = codecNeedsEosOutputExceptionWorkaround(codecName);
     codecNeedsMonoChannelCountWorkaround =
@@ -1755,6 +1775,7 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
    * Processes a new output format.
    */
   private void processOutputFormat() throws ExoPlaybackException {
+    codecHasOutputMediaFormat = true; // MOD: backport from ExoPlayer 2.11.4 (#6671)
     MediaFormat format = codec.getOutputFormat();
     if (codecAdaptationWorkaroundMode != ADAPTATION_WORKAROUND_MODE_NEVER
         && format.getInteger(MediaFormat.KEY_WIDTH) == ADAPTATION_WORKAROUND_SLICE_WIDTH_HEIGHT
@@ -2030,6 +2051,24 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     return (Util.SDK_INT <= 25 && "OMX.rk.video_decoder.avc".equals(name))
         || (Util.SDK_INT <= 17 && "OMX.allwinner.video.decoder.avc".equals(name))
         || ("Amazon".equals(Util.MANUFACTURER) && "AFTS".equals(Util.MODEL) && codecInfo.secure);
+  }
+
+  /**
+   * MOD: backport from ExoPlayer 2.11.4 (#6671). Returns whether the decoder is known to behave
+   * incorrectly if flushed prior to having output a {@link MediaFormat}.
+   *
+   * <p>If true is returned, the renderer will work around the issue by instantiating a new decoder
+   * when this case occurs. On Android 10 the stock AAC decoder flushed this way (a seek shortly
+   * after playback starts) can then decode slower than real time.
+   *
+   * <p>See [Internal: b/141097367].
+   *
+   * @param name The name of the decoder.
+   * @return True if the decoder is known to behave incorrectly if flushed prior to having output a
+   *     {@link MediaFormat}. False otherwise.
+   */
+  private static boolean codecNeedsSosFlushWorkaround(String name) {
+    return Util.SDK_INT == 29 && "c2.android.aac.decoder".equals(name);
   }
 
   /**
