@@ -77,6 +77,13 @@ public final class TextRenderer extends BaseRenderer implements Callback {
 
   private static final int MSG_UPDATE_OUTPUT = 0;
 
+  /**
+   * MOD: A message (see ExoPlayer#createMessage) to show the cues of the subtitle shown again, as its events are now. Its payload,
+   * a Runnable or null, runs first on the playback thread: that's where a subtitle that changes while it's shown (see
+   * SimpleSubtitleDecoder#setTransformer) is to be changed, between two of the renderer's looks at it.
+   */
+  public static final int MSG_REFRESH = C.MSG_CUSTOM_BASE + 100;
+
   private final @Nullable Handler outputHandler;
   private final TextOutput output;
   private final SubtitleDecoderFactory decoderFactory;
@@ -91,6 +98,8 @@ public final class TextRenderer extends BaseRenderer implements Callback {
   private SubtitleOutputBuffer subtitle;
   private SubtitleOutputBuffer nextSubtitle;
   private int nextSubtitleEventIndex;
+  // MOD: see MSG_REFRESH
+  private boolean refreshPending;
 
   /**
    * @param output The output.
@@ -134,6 +143,19 @@ public final class TextRenderer extends BaseRenderer implements Callback {
     }
   }
 
+  // MOD: see MSG_REFRESH
+  @Override
+  public void handleMessage(int messageType, @Nullable Object payload) throws ExoPlaybackException {
+    if (messageType == MSG_REFRESH) {
+      if (payload instanceof Runnable) {
+        ((Runnable) payload).run();
+      }
+      refreshPending = true;
+    } else {
+      super.handleMessage(messageType, payload);
+    }
+  }
+
   @Override
   protected void onStreamChanged(Format[] formats, long offsetUs) throws ExoPlaybackException {
     streamFormat = formats[0];
@@ -169,6 +191,15 @@ public final class TextRenderer extends BaseRenderer implements Callback {
         nextSubtitle = decoder.dequeueOutputBuffer();
       } catch (SubtitleDecoderException e) {
         throw ExoPlaybackException.createForRenderer(e, getIndex());
+      }
+    }
+
+    // MOD: see MSG_REFRESH. Ahead of the state check: shown even while paused, as it's what a setting just changed to.
+    if (refreshPending) {
+      refreshPending = false;
+      if (subtitle != null) {
+        nextSubtitleEventIndex = subtitle.getNextEventTimeIndex(positionUs);
+        updateOutput(subtitle.getCues(positionUs));
       }
     }
 

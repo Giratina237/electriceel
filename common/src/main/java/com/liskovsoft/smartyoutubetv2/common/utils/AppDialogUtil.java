@@ -47,6 +47,7 @@ import com.liskovsoft.smartyoutubetv2.common.misc.MotherActivity;
 import com.liskovsoft.smartyoutubetv2.common.misc.MusicAutoplayManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.WatchLaterManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.CensoredWordsData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.SentenceSubtitlesData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SponsorBlockData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
@@ -583,6 +584,15 @@ public class AppDialogUtil {
         return UiOptionItem.from(context.getString(R.string.subtitle_remember),
                 optionItem -> playerData.setSubtitlesPerChannelEnabled(optionItem.isSelected()),
                 playerData.isSubtitlesPerChannelEnabled()
+        );
+    }
+
+    public static OptionItem createSentenceSubtitlesOption(Context context) {
+        SentenceSubtitlesData data = SentenceSubtitlesData.instance(context);
+        return UiOptionItem.from(context.getString(R.string.subtitle_sentences),
+                context.getString(R.string.subtitle_sentences_desc),
+                optionItem -> data.setEnabled(optionItem.isSelected()),
+                data.isEnabled()
         );
     }
 
