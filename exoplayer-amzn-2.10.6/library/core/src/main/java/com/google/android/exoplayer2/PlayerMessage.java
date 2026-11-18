@@ -18,6 +18,7 @@ package com.google.android.exoplayer2;
 import android.os.Handler;
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.util.Assertions;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Defines a player message which can be sent with a {@link Sender} and received by a {@link
@@ -280,6 +281,39 @@ public final class PlayerMessage {
     Assertions.checkState(handler.getLooper().getThread() != Thread.currentThread());
     while (!isProcessed) {
       wait();
+    }
+    return isDelivered;
+  }
+
+  /**
+   * MOD: backport from ExoPlayer 2.13.0 (#5887). Blocks until after the message has been delivered,
+   * the player is no longer able to deliver the message, or the specified timeout elapsed.
+   *
+   * <p>Note that this method can't be called if the current thread is the same thread used by the
+   * message handler set with {@link #setHandler(Handler)} as it would cause a deadlock.
+   *
+   * @param timeoutMs The timeout in milliseconds.
+   * @return Whether the message was delivered successfully.
+   * @throws IllegalStateException If this method is called before {@link #send()}.
+   * @throws IllegalStateException If this method is called on the same thread used by the message
+   *     handler set with {@link #setHandler(Handler)}.
+   * @throws TimeoutException If the {@code timeoutMs} elapsed and this message has not been
+   *     delivered and the player is still able to deliver the message.
+   * @throws InterruptedException If the current thread is interrupted while waiting for the message
+   *     to be delivered.
+   */
+  public synchronized boolean blockUntilDelivered(long timeoutMs)
+      throws InterruptedException, TimeoutException {
+    Assertions.checkState(isSent);
+    Assertions.checkState(handler.getLooper().getThread() != Thread.currentThread());
+    long deadlineMs = System.nanoTime() / 1_000_000 + timeoutMs;
+    long remainingMs = timeoutMs;
+    while (!isProcessed && remainingMs > 0) {
+      wait(remainingMs);
+      remainingMs = deadlineMs - System.nanoTime() / 1_000_000;
+    }
+    if (!isProcessed) {
+      throw new TimeoutException("Message delivery timed out.");
     }
     return isDelivered;
   }

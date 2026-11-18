@@ -60,6 +60,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.TimeoutException;
 
 /**
  * An {@link ExoPlayer} implementation that uses default {@link Renderer} components. Instances can
@@ -77,6 +78,13 @@ public class SimpleExoPlayer extends BasePlayer
   public interface VideoListener extends com.google.android.exoplayer2.video.VideoListener {}
 
   private static final String TAG = "SimpleExoPlayer";
+
+  /**
+   * MOD: backport from ExoPlayer 2.13.0 (#5887). How long replacing or clearing the video surface
+   * blocks the calling thread for the video renderers to let go of the old surface. A platform call
+   * stuck on the playback thread used to hang the caller with it. Same as upstream's default.
+   */
+  private static final long DETACH_SURFACE_TIMEOUT_MS = 2_000;
 
   protected final Renderer[] renderers;
 
@@ -1199,10 +1207,14 @@ public class SimpleExoPlayer extends BasePlayer
       // We're replacing a surface. Block to ensure that it's not accessed after the method returns.
       try {
         for (PlayerMessage message : messages) {
-          message.blockUntilDelivered();
+          message.blockUntilDelivered(DETACH_SURFACE_TIMEOUT_MS); // MOD: had no deadline
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+      } catch (TimeoutException e) {
+        // MOD: backport from ExoPlayer 2.13.0. Upstream also stops the player with an error here.
+        Log.w(TAG, "Detaching the video surface timed out after " + DETACH_SURFACE_TIMEOUT_MS
+            + " ms");
       }
       // If we created the previous surface, we are responsible for releasing it.
       if (this.ownsSurface) {

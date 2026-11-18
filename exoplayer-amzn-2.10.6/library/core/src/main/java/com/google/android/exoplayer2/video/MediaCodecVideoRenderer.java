@@ -1389,6 +1389,9 @@ public class MediaCodecVideoRenderer extends MediaCodecRenderer {
         maxPixels = Util.ceilDivide(width, 16) * Util.ceilDivide(height, 16) * 16 * 16;
         minCompressionRatio = 2;
         break;
+      case MimeTypes.VIDEO_AV1:
+        // MOD: backport from ExoPlayer 2.18.0. AV1 was left to the decoder's default size. Assume
+        // a min compression of 2 similar to the platform's C2SoftAomDec.cpp.
       case MimeTypes.VIDEO_VP8:
         // VPX does not specify a ratio so use the values from the platform's SoftVPX.cpp.
         maxPixels = width * height;
