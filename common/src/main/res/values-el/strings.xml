@@ -974,6 +974,8 @@
   <string name="player_quick_shorts_skip_alt">Παράλειψη Shorts με πάνω/κάτω κουμπί</string>
   <string name="player_quick_skip_videos_alt">Παράλειψη κανονικών βίντεο με πάνω/κάτω κουμπί</string>
   <string name="player_quick_skip_chapters">Επόμενο κεφάλαιο με το πάνω κουμπί</string>
+  <string name="shorts_no_more">Δεν υπάρχουν άλλα Shorts</string>
+  <string name="shorts_not_loaded">Δεν ήταν δυνατή η φόρτωση περισσότερων Shorts</string>
   <string name="prefer_google_dns">Προτίμηση Google DNS</string>
   <string name="add_to_subscriptions_group">Προσθήκη/Αφαίρεση από ομάδα συνδρομών</string>
   <string name="new_subscriptions_group">Νέα ομάδα</string>

@@ -3,6 +3,7 @@ package com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers;
 import android.os.Looper;
 
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SimpleMediaItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerConstants;
@@ -530,6 +531,41 @@ public class VideoLoaderControllerTest {
         assertEquals(Collections.singletonList(0L), controller.mSeeks);
     }
 
+    /**
+     * Down on the last of its Shorts group's cards: it waits for the group's next page, never opens YouTube's next video (SmartTube
+     * #6490), and opens the next Short once the page has it
+     */
+    @Test
+    public void theLastShortOfItsGroupOpensTheNextOnceTheGroupsNextPageHasIt() throws Exception {
+        Video current = video("lastShort");
+        current.nextMediaItem = SimpleMediaItem.from(video("regular"));
+        NextController controller = new NextController(current, true);
+
+        controller.loadNext();
+
+        assertTrue(controller.mOpened.isEmpty());
+        assertEquals(1, controller.mSuggestions.mNextShortCallbacks.size());
+
+        controller.mSuggestions.mNext = video("nextShort");
+        controller.mSuggestions.mNextShortCallbacks.get(0).run();
+
+        assertEquals(1, controller.mOpened.size());
+        assertEquals("nextShort", controller.mOpened.get(0).videoId);
+    }
+
+    /**
+     * Another video without a next one yet waits for YouTube's, as before: no Shorts page is loaded
+     */
+    @Test
+    public void anotherVideoWithoutANextLoadsNoShortsPage() throws Exception {
+        NextController controller = new NextController(video("regular"), false);
+
+        controller.loadNext();
+
+        assertTrue(controller.mSuggestions.mNextShortCallbacks.isEmpty());
+        assertTrue(controller.mOpened.isEmpty());
+    }
+
     private static void applyPlaybackMode(TestController controller, int playbackMode) throws Exception {
         Method method = VideoLoaderController.class.getDeclaredMethod("applyPlaybackModeInt", Video.class, int.class);
         method.setAccessible(true);
@@ -799,6 +835,60 @@ public class VideoLoaderControllerTest {
         Observable<MediaItemFormatInfo> fetchStreams(String videoId) {
             mFetches++;
             return mFetched != null ? Observable.just(mFetched) : Observable.error(new IllegalStateException("offline"));
+        }
+    }
+
+    /**
+     * Asked for the next video: the suggestions give the one set (none: null), and its Shorts group's next page waits (see
+     * SuggestionsController.loadNextShort); the videos it opens are recorded, not opened
+     */
+    private static class NextController extends PlayingController {
+        private final List<Video> mOpened = new ArrayList<>();
+        private final NextSuggestions mSuggestions;
+        private final PlayerEventListener mMain = (PlayerEventListener) Proxy.newProxyInstance(PlayerEventListener.class.getClassLoader(),
+                new Class<?>[]{PlayerEventListener.class}, (proxy, method, args) -> {
+                    if ("onNewVideo".equals(method.getName())) {
+                        mOpened.add((Video) args[0]);
+                    }
+
+                    return null;
+                });
+
+        private NextController(Video video, boolean isShortsGroupPlaying) throws Exception {
+            super(video);
+            setAltContext(RuntimeEnvironment.getApplication());
+            mSuggestions = new NextSuggestions(isShortsGroupPlaying);
+            setField(this, "mSuggestionsController", mSuggestions);
+        }
+
+        @Override
+        protected PlayerEventListener getMainController() {
+            return mMain;
+        }
+    }
+
+    private static class NextSuggestions extends SuggestionsController {
+        private final List<Runnable> mNextShortCallbacks = new ArrayList<>();
+        private final boolean mIsShortsGroupPlaying;
+        private Video mNext;
+
+        private NextSuggestions(boolean isShortsGroupPlaying) {
+            mIsShortsGroupPlaying = isShortsGroupPlaying;
+        }
+
+        @Override
+        public Video getNext() {
+            return mNext;
+        }
+
+        @Override
+        public boolean isShortsGroupPlaying() {
+            return mIsShortsGroupPlaying;
+        }
+
+        @Override
+        public void loadNextShort(Runnable onNextShort) {
+            mNextShortCallbacks.add(onNextShort);
         }
     }
 

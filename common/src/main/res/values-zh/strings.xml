@@ -1007,6 +1007,8 @@
   <string name="player_quick_shorts_skip_alt">使用上/下键跳过短视频</string>
   <string name="player_quick_skip_videos_alt">使用上/下键跳过常规视频</string>
   <string name="player_quick_skip_chapters">使用上键跳到下一章节</string>
+  <string name="shorts_no_more">没有更多短视频了</string>
+  <string name="shorts_not_loaded">无法加载更多短视频</string>
   <string name="prefer_google_dns">首选Google DNS</string>
   <string name="dont_resize_video_to_fit_dialog">不调整视频大小以适应对话框</string>
   <string name="typing_corrections">输入文本时禁用自动纠错</string>

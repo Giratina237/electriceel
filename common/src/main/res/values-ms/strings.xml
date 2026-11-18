@@ -950,6 +950,8 @@
     <string name="player_quick_skip_videos">Langkau video biasa dengan butang kiri/kanan</string>
     <string name="player_quick_skip_videos_alt">Langkau video biasa dengan butang atas/bawah</string>
     <string name="player_quick_skip_chapters">Bab seterusnya dengan butang atas</string>
+    <string name="shorts_no_more">Tiada lagi Shorts</string>
+    <string name="shorts_not_loaded">Tidak dapat memuatkan lebih banyak Shorts</string>
     <string name="channels_filter">Tunjukkan medan Tapis saluran dalam bahagian Saluran</string>
     <string name="channel_search_bar">Bar carian dalam halaman Saluran</string>
     <string name="header_sports">Sukan</string>

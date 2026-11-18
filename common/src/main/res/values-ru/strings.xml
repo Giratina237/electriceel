@@ -944,6 +944,8 @@
     <string name="player_quick_skip_videos">Переключать обычные видео кнопками лево/право</string>
     <string name="player_quick_skip_videos_alt">Переключать обычные видео кнопками вверх/вниз</string>
     <string name="player_quick_skip_chapters">Следующий эпизод кнопкой вверх</string>
+    <string name="shorts_no_more">Больше нет Shorts</string>
+    <string name="shorts_not_loaded">Не удалось загрузить ещё Shorts</string>
     <string name="channels_filter">Показывать поле Фильтровать каналы в разделе Каналы</string>
     <string name="channel_search_bar">Панель поиска на странице канала</string>
     <string name="header_sports">Спорт</string>

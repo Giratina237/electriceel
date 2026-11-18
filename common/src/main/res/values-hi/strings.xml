@@ -945,6 +945,8 @@
   <string name="player_quick_skip_videos">बाएं/दाएं बटन से सामान्य वीडियो छोड़ें</string>
   <string name="player_quick_skip_videos_alt">ऊपर/नीचे बटन से सामान्य वीडियो छोड़ें</string>
   <string name="player_quick_skip_chapters">ऊपर बटन से अगला अध्याय</string>
+  <string name="shorts_no_more">और शॉर्ट्स नहीं हैं</string>
+  <string name="shorts_not_loaded">और शॉर्ट्स लोड नहीं हो सके</string>
   <string name="channels_filter">चैनल अनुभाग में चैनल फ़िल्टर फ़ील्ड दिखाएं</string>
   <string name="channel_search_bar">चैनल पेज में खोज बार</string>
   <string name="header_sports">खेल</string>

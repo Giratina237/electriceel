@@ -945,6 +945,8 @@
   <string name="player_quick_skip_videos">Пропускане на обикновени видеа с бутоните наляво/надясно</string>
   <string name="player_quick_skip_videos_alt">Пропускане на обикновени видеа с бутоните нагоре/надолу</string>
   <string name="player_quick_skip_chapters">Следваща глава с бутона нагоре</string>
+  <string name="shorts_no_more">Няма повече Shorts</string>
+  <string name="shorts_not_loaded">Неуспешно зареждане на още Shorts</string>
   <string name="channels_filter">Показване на поле за филтриране на канали в раздел Канали</string>
   <string name="channel_search_bar">Лента за търсене в страницата на канала</string>
   <string name="header_sports">Спорт</string>

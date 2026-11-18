@@ -958,6 +958,8 @@
     <string name="player_quick_skip_videos">Skip regular videos with left/right buttons</string>
     <string name="player_quick_skip_videos_alt">Skip regular videos with up/down buttons</string>
     <string name="player_quick_skip_chapters">Next chapter with up button</string>
+    <string name="shorts_no_more">No more Shorts</string>
+    <string name="shorts_not_loaded">Couldn\'t load more Shorts</string>
     <string name="channels_filter">Show Filter channels field inside Channels section</string>
     <string name="channel_search_bar">Search bar inside the Channel page</string>
     <string name="header_sports">Sports</string>

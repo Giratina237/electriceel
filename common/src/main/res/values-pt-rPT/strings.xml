@@ -937,6 +937,8 @@
     <string name="player_quick_skip_videos">Ignorar vídeos com os botões esquerda/direita</string>
     <string name="player_quick_skip_videos_alt">Saltar vídeos regulares com os botões cima/baixo</string>
     <string name="player_quick_skip_chapters">Capítulo seguinte com o botão cima</string>
+    <string name="shorts_no_more">Não há mais Shorts</string>
+    <string name="shorts_not_loaded">Não foi possível carregar mais Shorts</string>
     <string name="channels_filter">Mostrar campo Filtro na secção Canais</string>
     <string name="channel_search_bar">Mostrar barra de pesquisa na secção Canais</string>
     <string name="header_sports">Desporto</string>

@@ -55,8 +55,24 @@ public class SuggestionsController extends BasePlayerController {
     private int mNextRetryCount;
     private List<ChapterItem> mChapters;
     private final Runnable mChapterHandler = this::startChapterNotificationServiceIfNeededInt;
+    /**
+     * The load of the next page of a Shorts group (see continueShortsGroup): one at a time, of the group in mShortsContinueGroup. A new
+     * video doesn't dispose it: the next Shorts play on with that page.
+     */
+    private Disposable mShortsContinueAction;
+    private VideoGroup mShortsContinueGroup;
+    /**
+     * Waits for the next Short of mNextShortVideo, run once its group's next page has it (see loadNextShort)
+     */
+    private Runnable mNextShortCallback;
+    private Video mNextShortVideo;
     private static final int MAX_PLAYLIST_CONTINUATIONS = 20;
     private static final int CHAPTER_NOTIFICATION_Id = 565;
+    /**
+     * At most this many cards after the Short playing in its group, the group's next page is loaded ahead (see
+     * continueShortsGroupIfNeeded)
+     */
+    private static final int SHORTS_CONTINUE_AHEAD = 5;
 
     private interface OnVideoGroup {
         void onVideoGroup(VideoGroup group);
@@ -88,6 +104,7 @@ public class SuggestionsController extends BasePlayerController {
     @Override
     public void onVideoLoaded(Video item) {
         loadSuggestions(item);
+        continueShortsGroupIfNeeded(item);
     }
 
     // Could make negative impact on the video load time.
@@ -99,11 +116,13 @@ public class SuggestionsController extends BasePlayerController {
     @Override
     public void onEngineReleased() {
         disposeActions();
+        disposeShortsActions();
     }
 
     @Override
     public void onFinish() {
         disposeActions();
+        disposeShortsActions();
     }
 
     @Override
@@ -323,10 +342,11 @@ public class SuggestionsController extends BasePlayerController {
     }
 
     /**
-     * The video played next: of the queue, the mix, the section the video was opened from, else YouTube's next one. Not one only the
-     * channel's members watch, which the Members setting hides (see MembersVideos): the queue's one after it, else the first suggestion.
-     * YouTube's next one is only an id and a title: it's known to be such when a card of it was seen (e.g. the suggestions), or once it
-     * was tried.
+     * The video played next: of the queue, the mix, the section the video was opened from, else YouTube's next one. A Short of the
+     * Shorts section or of the Shorts row of Home goes on with its group only: null till the group's next page has the next one (see
+     * getShortsGroup). Not one only the channel's members watch, which the Members setting hides (see MembersVideos): the queue's one
+     * after it, else the first suggestion. YouTube's next one is only an id and a title: it's known to be such when a card of it was
+     * seen (e.g. the suggestions), or once it was tried.
      */
     public Video getNext() {
         if (getPlayer() == null || getVideo() == null) {
@@ -410,10 +430,13 @@ public class SuggestionsController extends BasePlayerController {
     private Video getNextInt() {
         Video result = null;
         Video next = Playlist.instance().getNext();
+        VideoGroup shortsGroup = getShortsGroup(getVideo());
 
         if (next != null) {
             next.fromQueue = true;
             result = next;
+        } else if (shortsGroup != null) {
+            result = getNextFromGroup(getVideo(), shortsGroup);
         } else if (!getVideo().isShuffled &&
                 Helpers.startsWith(getVideo().getPlaylistId(), "RD") &&
                 getVideo().hasNextPlaylist()) {
@@ -425,6 +448,159 @@ public class SuggestionsController extends BasePlayerController {
         }
 
         return result;
+    }
+
+    /**
+     * The group of a Short of the Shorts section or of the Shorts row of Home (see Video.belongsToShortsGroup): the next video is its next
+     * one, as the previous one is (see getPreviousFromGroup), never YouTube's next video (SmartTube #6490), whatever the section playlist
+     * setting. Null for another video, or one its group doesn't have.
+     */
+    @Nullable
+    private static VideoGroup getShortsGroup(@Nullable Video video) {
+        if (video == null || !video.belongsToShortsGroup()) {
+            return null;
+        }
+
+        VideoGroup group = video.getGroup(); // read once: a weak reference
+
+        return group != null && group.indexOf(video) >= 0 ? group : null;
+    }
+
+    /**
+     * The video playing is a Short that goes on with its group (see getShortsGroup)
+     */
+    public boolean isShortsGroupPlaying() {
+        return getShortsGroup(getVideo()) != null;
+    }
+
+    /**
+     * In its group, the first video after it that plays: not one the Members setting hides (see MembersVideos). Null when the cards of
+     * the group have none (yet).
+     */
+    @Nullable
+    private Video getNextFromGroup(Video current, VideoGroup group) {
+        boolean found = false;
+
+        for (Video item : group.getVideos()) {
+            if (found && item.hasVideo() && !item.isUpcoming && !MembersVideos.isHidden(getContext(), item)) {
+                return item;
+            }
+
+            if (item.equals(current)) {
+                found = true;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Asked for the next Short (see getNext) when the Short playing is the last of its group's cards (see getShortsGroup): the group's
+     * next page is loaded, or the load ahead of it waited for (see continueShortsGroupIfNeeded). The callback runs once the page has the
+     * next Short, while that Short still plays. Asked again meanwhile, only the last callback runs. Without a next Short in the page, the
+     * Short stays and it says why: there are no more Shorts, or the page didn't load (asked again, it's loaded again).
+     */
+    public void loadNextShort(Runnable onNextShort) {
+        Video video = getVideo();
+        VideoGroup group = getShortsGroup(video);
+
+        if (group == null) {
+            return;
+        }
+
+        mNextShortVideo = video;
+        mNextShortCallback = onNextShort;
+        MessageHelpers.showMessage(getContext(), R.string.wait_data_loading);
+        continueShortsGroup(group);
+    }
+
+    /**
+     * A few Shorts before the end of its group's cards (see SHORTS_CONTINUE_AHEAD), the group's next page is loaded ahead: the next Short
+     * is there when it's asked for (see loadNextShort). Not when there's none to load.
+     */
+    private void continueShortsGroupIfNeeded(Video video) {
+        VideoGroup group = getShortsGroup(video);
+        MediaGroup mediaGroup = group != null ? group.getMediaGroup() : null;
+
+        if (mediaGroup == null || mediaGroup.getNextPageKey() == null) {
+            return;
+        }
+
+        if (group.getSize() - 1 - group.indexOf(video) <= SHORTS_CONTINUE_AHEAD) {
+            continueShortsGroup(group);
+        }
+    }
+
+    /**
+     * The group's next page, added to it: one load at a time
+     */
+    private void continueShortsGroup(VideoGroup group) {
+        if (mShortsContinueGroup == group && RxHelper.isAnyActionRunning(mShortsContinueAction)) {
+            return;
+        }
+
+        RxHelper.disposeActions(mShortsContinueAction);
+        mShortsContinueGroup = group;
+
+        Log.d(TAG, "continueShortsGroup: %s", group.getTitle());
+
+        mShortsContinueAction = HiddenVideoResolver.resolveGroup(getContext(), mContentService.continueGroupObserve(group.getMediaGroup()),
+                        group.getSection())
+                .subscribe(
+                        page -> onShortsPage(group, page),
+                        error -> {
+                            Log.e(TAG, "continueShortsGroup error: %s", error.getMessage());
+                            answerNextShort(group);
+                        },
+                        () -> answerNextShort(group) // without a page: the callback still waits
+                );
+    }
+
+    private void onShortsPage(VideoGroup group, MediaGroup page) {
+        VideoGroup videoGroup = VideoGroup.from(group, page); // added to the group
+        mBrowseProcessor.process(videoGroup);
+        Video video = getVideo();
+
+        if (getPlayer() != null && video != null && getShortsGroup(video) == group) {
+            if (video.isSectionPlaylistEnabled(getContext())) {
+                getPlayer().updateSuggestions(videoGroup); // its row (see appendSectionPlaylistIfNeeded)
+            }
+
+            getPlayer().setNextTitle(getNext());
+        }
+
+        answerNextShort(group);
+    }
+
+    /**
+     * Runs the callback waiting for the next Short (see loadNextShort) once the group has it, else says why the Short stays: there are no
+     * more Shorts (no next page), or the page didn't load or had none
+     */
+    private void answerNextShort(VideoGroup group) {
+        Runnable callback = mNextShortCallback;
+        Video video = mNextShortVideo;
+        mNextShortCallback = null;
+        mNextShortVideo = null;
+
+        if (callback == null || video != getVideo() || getShortsGroup(video) != group) {
+            return;
+        }
+
+        if (getNextFromGroup(video, group) != null) {
+            callback.run();
+            return;
+        }
+
+        MediaGroup mediaGroup = group.getMediaGroup();
+        boolean isEnd = mediaGroup == null || mediaGroup.getNextPageKey() == null;
+        MessageHelpers.showMessage(getContext(), isEnd ? R.string.shorts_no_more : R.string.shorts_not_loaded);
+    }
+
+    private void disposeShortsActions() {
+        RxHelper.disposeActions(mShortsContinueAction);
+        mShortsContinueGroup = null;
+        mNextShortCallback = null;
+        mNextShortVideo = null;
     }
 
     public Video getPrevious() {
@@ -730,7 +906,13 @@ public class SuggestionsController extends BasePlayerController {
             // Make the index consistent with the other sections.
             group.setPosition(-1);
             getPlayer().updateSuggestions(group);
-            focusAndContinueIfNeeded(group, () -> findNextSectionVideoIfNeeded(video));
+
+            if (getShortsGroup(video) != null) {
+                // A Short goes on with its group without it, which loads the group's next page once (see continueShortsGroup)
+                focusAndContinueIfNeeded(group);
+            } else {
+                focusAndContinueIfNeeded(group, () -> findNextSectionVideoIfNeeded(video));
+            }
         }
     }
 

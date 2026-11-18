@@ -945,6 +945,8 @@
   <string name="player_quick_skip_videos">Hoppa över vanliga videor med vänster- och högerknapparna</string>
   <string name="player_quick_skip_videos_alt">Hoppa över vanliga videor med uppåt- och nedåtknapparna</string>
   <string name="player_quick_skip_chapters">Nästa kapitel med uppåtknappen</string>
+  <string name="shorts_no_more">Inga fler Shorts-videor</string>
+  <string name="shorts_not_loaded">Det gick inte att läsa in fler Shorts-videor</string>
   <string name="channels_filter">Visa fältet Filtrera kanaler i avsnittet Kanaler</string>
   <string name="channel_search_bar">Sökfält på kanalsidan</string>
   <string name="header_sports">Sport</string>

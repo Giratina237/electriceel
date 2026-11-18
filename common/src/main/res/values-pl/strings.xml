@@ -1009,6 +1009,8 @@
   <string name="player_quick_shorts_skip_alt">Pomijaj Shorts przyciskami w góra/dół</string>
   <string name="player_quick_skip_videos_alt">Pomijaj zwykłe wideo przyciskami w góra/dół</string>
   <string name="player_quick_skip_chapters">Następny rozdział przyciskiem w górę</string>
+  <string name="shorts_no_more">Brak kolejnych Shorts</string>
+  <string name="shorts_not_loaded">Nie udało się wczytać kolejnych Shorts</string>
   <string name="prefer_google_dns">Preferuj Google DNS</string>
   <string name="action_debug_info">Informacje debugowania</string>
   <string name="dialog_block_channel">Zablokuj Kanał</string>

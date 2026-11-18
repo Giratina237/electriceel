@@ -945,6 +945,8 @@
     <string name="player_quick_skip_videos">Atla Normal videolar sol/sağ düğmeyle</string>
     <string name="player_quick_skip_videos_alt">Atla Normal videolar yukarı/aşağı düğmeyle</string>
     <string name="player_quick_skip_chapters">Yukarı düğmesiyle sonraki bölüm</string>
+    <string name="shorts_no_more">Başka Shorts yok</string>
+    <string name="shorts_not_loaded">Daha fazla Shorts yüklenemedi</string>
     <string name="channels_filter">Kanallar bölümü içindeki Kanalları filtrele alanını göster</string>
     <string name="channel_search_bar">Kanal sayfasında arama çubuğu</string>
     <string name="header_sports">Spor</string>

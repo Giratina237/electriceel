@@ -944,6 +944,8 @@
   <string name="player_quick_skip_videos">ჩვეულებრივი ვიდეოების მარცხნივ/მარჯვენა ღილაკებით გადართვა</string>
   <string name="player_quick_skip_videos_alt">ჩვეულებრივი ვიდეოების ზემოთ/ქვემოთ ღილაკებით გადართვა</string>
   <string name="player_quick_skip_chapters">შემდეგი ეპიზოდი ზემოთ ღილაკით</string>
+  <string name="shorts_no_more">მეტი Shorts არ არის</string>
+  <string name="shorts_not_loaded">მეტი Shorts-ის ჩატვირთვა ვერ მოხერხდა</string>
   <string name="channels_filter">„არხების ფილტრაციის“ ველის ჩვენება არხების განყოფილებაში</string>
   <string name="channel_search_bar">ძებნის პანელი არხის გვერდზე</string>
   <string name="header_sports">სპორტი</string>

@@ -944,6 +944,8 @@
   <string name="player_quick_skip_videos">Omet els vídeos normals amb els botons esquerra/dreta</string>
   <string name="player_quick_skip_videos_alt">Omet els vídeos normals amb els botons amunt/avall</string>
   <string name="player_quick_skip_chapters">Capítol següent amb el botó amunt</string>
+  <string name="shorts_no_more">No hi ha més Shorts</string>
+  <string name="shorts_not_loaded">No s\'han pogut carregar més Shorts</string>
   <string name="channels_filter">Mostra el camp de filtre de canals a la secció Canals</string>
   <string name="channel_search_bar">Barra de cerca a la pàgina del canal</string>
   <string name="header_sports">Esports</string>

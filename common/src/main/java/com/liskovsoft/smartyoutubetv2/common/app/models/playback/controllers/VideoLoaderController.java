@@ -335,6 +335,9 @@ public class VideoLoaderController extends BasePlayerController {
 
         if (next != null) {
             openVideoInt(next, trigger);
+        } else if (mSuggestionsController.isShortsGroupPlaying()) {
+            // The last of its group's cards: the group's next page has the next Short, never YouTube's next video (SmartTube #6490)
+            mSuggestionsController.loadNextShort(() -> loadNext(trigger));
         } else {
             waitMetadataSync(getVideo(), true, trigger);
         }

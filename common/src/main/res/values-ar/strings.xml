@@ -1013,6 +1013,8 @@
   <string name="player_quick_shorts_skip_alt">تخطي Shorts باستخدام الأزرار الأعلى/الأسفل</string>
   <string name="player_quick_skip_videos_alt">تخطي الفيديوهات العادية باستخدام الأزرار الأعلى/الأسفل</string>
   <string name="player_quick_skip_chapters">الفصل التالي باستخدام الزر الأعلى</string>
+  <string name="shorts_no_more">لا توجد Shorts أخرى</string>
+  <string name="shorts_not_loaded">تعذّر تحميل المزيد من Shorts</string>
   <string name="prefer_google_dns">تفضيل Google DNS</string>
   <string name="action_debug_info">معلومات تصحيح الأخطاء</string>
   <string name="dialog_block_channel">حظر القناة</string>
