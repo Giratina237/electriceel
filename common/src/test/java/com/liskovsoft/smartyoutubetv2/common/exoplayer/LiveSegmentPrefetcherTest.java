@@ -8,6 +8,8 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.TransferListener;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaFormat;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 
 import org.junit.After;
 import org.junit.Before;
@@ -18,6 +20,7 @@ import org.robolectric.annotation.Config;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +35,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -229,6 +234,158 @@ public class LiveSegmentPrefetcherTest {
         assertFalse("normal", LiveSegmentPrefetcher.isNeeded(5_000_000));
         assertFalse("unknown", LiveSegmentPrefetcher.isNeeded(0));
         assertFalse("unknown", LiveSegmentPrefetcher.isNeeded(-1));
+    }
+
+    @Test
+    public void anEndedStreamsSegmentsAreAskedForAheadWithoutAHead() throws IOException {
+        mUpstream.head = -1;
+        LiveSegmentPrefetcher prefetcher = new LiveSegmentPrefetcher(mUpstream, Runnable::run, 100);
+
+        readSegment(prefetcher.createDataSource(), AUDIO, 10);
+
+        assertEquals(Arrays.asList("140/10", "140/11", "140/12", "140/13"), mUpstream.requests());
+    }
+
+    @Test
+    public void anEndedStreamsSegmentsPastItsLastOneAreNotAskedForAhead() throws IOException {
+        mUpstream.head = -1;
+        LiveSegmentPrefetcher prefetcher = new LiveSegmentPrefetcher(mUpstream, Runnable::run, 11);
+
+        readSegment(prefetcher.createDataSource(), AUDIO, 10);
+
+        assertEquals(Arrays.asList("140/10", "140/11"), mUpstream.requests());
+    }
+
+    @Test
+    public void theHeadTheServerSaysIsAnEndedStreamsLastSegment() throws IOException {
+        mUpstream.head = 11;
+        // Its length said one more: rounded up to the second
+        LiveSegmentPrefetcher prefetcher = new LiveSegmentPrefetcher(mUpstream, Runnable::run, 12);
+
+        readSegment(prefetcher.createDataSource(), AUDIO, 10);
+
+        assertEquals(Arrays.asList("140/10", "140/11"), mUpstream.requests());
+    }
+
+    @Test
+    public void anEndedStreamWithShortSegmentsHasOne() {
+        // X4GJ6ZKvUrI 6 h after it ended: post-live DVR, its formats' segments of 1 s
+        MediaItemFormatInfo formatInfo = endedStream(1, 0);
+
+        assertEquals(1_000_000, LiveSegmentPrefetcher.getEndedStreamSegmentDurationUs(formatInfo));
+        assertEquals("sq 0 to 6693", 6693, LiveSegmentPrefetcher.getLastSeqNum(formatInfo, 1_000_000));
+        assertNotNull(LiveSegmentPrefetcher.ofEndedStream(formatInfo, mUpstream));
+    }
+
+    @Test
+    public void anEndedStreamsLastSegmentIsAfterItsStartOne() {
+        assertEquals(9092 + 6693, LiveSegmentPrefetcher.getLastSeqNum(endedStream(1, 9092), 1_000_000));
+        assertEquals("1673.5 segments: the last one partly filled", 1673, LiveSegmentPrefetcher.getLastSeqNum(endedStream(4, 0), 4_000_000));
+    }
+
+    @Test
+    public void anEndedStreamOfUnknownLengthHasNoLastSegment() {
+        MediaItemFormatInfo formatInfo = proxy(MediaItemFormatInfo.class, map(
+                "getAdaptiveFormats", Collections.singletonList(liveFormat("140", 1))));
+
+        assertEquals(-1, LiveSegmentPrefetcher.getLastSeqNum(formatInfo, 1_000_000));
+        // Asked for ahead as far as the server says
+        assertNotNull(LiveSegmentPrefetcher.ofEndedStream(formatInfo, mUpstream));
+    }
+
+    @Test
+    public void anEndedStreamWithLongSegmentsHasNone() {
+        MediaItemFormatInfo formatInfo = endedStream(5, 0);
+
+        assertEquals(5_000_000, LiveSegmentPrefetcher.getEndedStreamSegmentDurationUs(formatInfo));
+        assertNull(LiveSegmentPrefetcher.ofEndedStream(formatInfo, mUpstream));
+    }
+
+    @Test
+    public void aLiveStreamHasNoneOfAnEndedStream() {
+        MediaItemFormatInfo formatInfo = proxy(MediaItemFormatInfo.class, map(
+                "isLive", true,
+                "getAdaptiveFormats", Collections.singletonList(liveFormat("140", 1)),
+                "getSegmentDurationUs", 1_000_000));
+
+        assertEquals(0, LiveSegmentPrefetcher.getEndedStreamSegmentDurationUs(formatInfo));
+        assertNull(LiveSegmentPrefetcher.ofEndedStream(formatInfo, mUpstream));
+    }
+
+    @Test
+    public void aVideoHasNone() {
+        // A processed one: its formats are asked for by byte range (indexRange), not by segment number
+        MediaFormat format = proxy(MediaFormat.class, map(
+                "getITag", "140",
+                "getUrl", "https://rr1---sn-example.googlevideo.com/videoplayback?itag=140",
+                "getTargetDurationSec", 1));
+        MediaItemFormatInfo formatInfo = proxy(MediaItemFormatInfo.class, map(
+                "getAdaptiveFormats", Collections.singletonList(format),
+                "getMediaDurationMs", 6_694_000L));
+
+        assertEquals(0, LiveSegmentPrefetcher.getEndedStreamSegmentDurationUs(formatInfo));
+        assertNull(LiveSegmentPrefetcher.ofEndedStream(formatInfo, mUpstream));
+    }
+
+    /**
+     * Of 6694 s (lengthSeconds, its formats have no approxDurationMs), not live
+     */
+    private static MediaItemFormatInfo endedStream(int targetDurationSec, int startSegmentNum) {
+        return proxy(MediaItemFormatInfo.class, map(
+                "isLiveContent", true,
+                "getLengthSeconds", "6694",
+                "getMediaDurationMs", 6_694_000L,
+                "getAdaptiveFormats", Arrays.asList(liveFormat("248", targetDurationSec), liveFormat("140", targetDurationSec)),
+                "getStartSegmentNum", startSegmentNum));
+    }
+
+    private static MediaFormat liveFormat(String itag, int targetDurationSec) {
+        return proxy(MediaFormat.class, map(
+                "getITag", itag,
+                "getUrl", "https://rr1---sn-example.googlevideo.com/videoplayback?itag=" + itag + "&source=yt_live_broadcast&live=1",
+                "getTargetDurationSec", targetDurationSec));
+    }
+
+    private static Map<String, Object> map(Object... keysAndValues) {
+        Map<String, Object> result = new HashMap<>();
+
+        for (int i = 0; i < keysAndValues.length; i += 2) {
+            result.put((String) keysAndValues[i], keysAndValues[i + 1]);
+        }
+
+        return result;
+    }
+
+    /**
+     * Answers the named getters, every other call gets the type's default
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> T proxy(Class<T> type, Map<String, Object> values) {
+        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (self, method, args) -> {
+            if (values.containsKey(method.getName())) {
+                return values.get(method.getName());
+            } else if ("hashCode".equals(method.getName())) {
+                return System.identityHashCode(self);
+            } else if ("equals".equals(method.getName())) {
+                return self == args[0];
+            } else if ("toString".equals(method.getName())) {
+                return type.getSimpleName() + values;
+            }
+
+            Class<?> returnType = method.getReturnType();
+
+            if (returnType == boolean.class) {
+                return false;
+            } else if (returnType == int.class) {
+                return 0;
+            } else if (returnType == long.class) {
+                return 0L;
+            } else if (returnType == float.class) {
+                return 0f;
+            }
+
+            return null;
+        });
     }
 
     private static String readSegment(DataSource source, String trackUrl, long sq) throws IOException {

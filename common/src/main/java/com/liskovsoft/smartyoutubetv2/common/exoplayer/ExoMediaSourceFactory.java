@@ -247,7 +247,11 @@ public class ExoMediaSourceFactory {
     private MediaSource buildDashMediaSource(MediaItemFormatInfo formatInfo) {
         // Are you using FrameworkSampleSource or ExtractorSampleSource when you build your player?
         DashChunkSource.Factory chunkSourceFactory;
-        if (!formatInfo.isLive()) {
+        // A stream that ended and isn't processed yet: asked for by segment number as it was live, 1 s segments too
+        LiveSegmentPrefetcher endedStreamPrefetcher = LiveSegmentPrefetcher.ofEndedStream(formatInfo, getDashMediaDataSourceFactory());
+        if (endedStreamPrefetcher != null) {
+            chunkSourceFactory = getEndedStreamPrefetchChunkSourceFactory(endedStreamPrefetcher);
+        } else if (!formatInfo.isLive()) {
             chunkSourceFactory = getDashFormatsChunkSourceFactory();
         } else if (LiveSegmentPrefetcher.isNeeded(formatInfo.getSegmentDurationUs())) {
             chunkSourceFactory = getLivePrefetchChunkSourceFactory();
@@ -470,6 +474,15 @@ public class ExoMediaSourceFactory {
      */
     private DashChunkSource.Factory getLivePrefetchChunkSourceFactory() {
         return new DefaultDashChunkSource.Factory(new LiveSegmentPrefetcher(getMediaDataSourceFactory()), MAX_SEGMENTS_PER_LOAD);
+    }
+
+    /**
+     * Of a stream that ended and isn't processed yet, with short segments (see LiveSegmentPrefetcher#ofEndedStream): a new one for each
+     * stream, as it keeps the stream's segments. Its segments all exist, none is held: the formats' read timeout, as before it was
+     * asked for ahead (see getDashFormatsChunkSourceFactory).
+     */
+    private static DashChunkSource.Factory getEndedStreamPrefetchChunkSourceFactory(LiveSegmentPrefetcher prefetcher) {
+        return new DefaultDashChunkSource.Factory(prefetcher, MAX_SEGMENTS_PER_LOAD);
     }
 
     /**
