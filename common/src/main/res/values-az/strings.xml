@@ -966,9 +966,6 @@
     <string name="fullscreen_mode">Tam ekran rejimi (sistem panelləri olmadan)</string>
     <string name="player_only_mode">Video tətbiqdən kənarda açılarsa yalnız oynadıcını göstər</string>
     <string name="pinned_channel_rows">Bərkidilmiş kanalları sətrlər şəklində göstər</string>
-    <string name="prefer_google_dns">Google DNS-ə üstünlük ver</string>
-    <string name="prefer_ipv4">IPv4 DNS-ə üstünlük ver</string>
-    <string name="prefer_ipv4_desc">Tətbiqin ümumiyyətlə işləmədiyi halları düzəldə bilər.\nQeyd. Donmalara və qəzalara səbəb ola bilər (xüsusilə Android 8 cihazlarında və ya Dune HD-də)</string>
     <string name="ipv6_test">IPv6 bağlantı testi</string>
     <string name="ipv6_test_desc">Hər tətbiq başlanğıcında bir dəfə. IPv6 işləməsə, yükləmə ilişməsin deyə yenidən başladılana qədər yalnız IPv4 istifadə olunur və oynadıcı OkHttp istifadə edir.</string>
     <string name="long_press_for_settings">TƏNZİMLƏMƏLƏR ÜÇÜN BASIB SAXLAYIN</string>

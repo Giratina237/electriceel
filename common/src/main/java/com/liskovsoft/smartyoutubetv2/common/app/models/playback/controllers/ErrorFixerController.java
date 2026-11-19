@@ -326,8 +326,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             Connections.Lookup lookup = Connections.getLookup();
             failure.detail("lookup", lookup.name().toLowerCase(Locale.US));
 
+            // The DNS fix may be turned off in the DNS settings: the DNS chosen stays whatever happens (#93)
             if (lookup == Connections.Lookup.FAILING && getPlayerTweaksData().getPreferredDnsType() != customDns
-                    && !mIsDnsFixRefuted && !getPlayerTweaksData().isNetworkErrorFixingDisabled()) {
+                    && !mIsDnsFixRefuted && !getPlayerTweaksData().isNetworkErrorFixingDisabled()
+                    && getPlayerTweaksData().isDnsFixEnabled()) {
                 // The formats came, so the network is up, and the player's lookups failed or gave addresses none of which answer:
                 // Google's DNS may give working ones. Kept if a video plays, put back if they fail the same way with it.
                 // The DNS is read at each lookup (see PreferredDns in SharedModules): the engine's restart applies it, not the app's

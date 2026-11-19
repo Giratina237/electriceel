@@ -925,8 +925,6 @@
   <string name="fullscreen_mode">Mode layar penuh (tanpa bar sistem)</string>
   <string name="player_only_mode">Hanya tampilkan pemutar jika video dibuka di luar aplikasi</string>
   <string name="pinned_channel_rows">Tampilkan channel tersemat sebagai baris</string>
-  <string name="prefer_ipv4">Gunakan DNS IPv4</string>
-  <string name="prefer_ipv4_desc">Dapat memperbaiki situasi ketika aplikasi tidak berfungsi sama sekali.\nCatatan. Dapat menyebabkan hang dan crash (terutama pada perangkat Android 8 atau Dune HD)</string>
   <string name="ipv6_test">Tes konektivitas IPv6</string>
   <string name="ipv6_test_desc">Sekali per aplikasi dijalankan. Jika IPv6 gagal, hanya IPv4 yang dipakai sampai dimulai ulang agar pemuatan tidak macet, dan pemutar memakai OkHttp.</string>
   <string name="long_press_for_settings">TEKAN LAMA UNTUK MEMBUKA SETELAN</string>
@@ -1005,7 +1003,6 @@
   <string name="player_quick_skip_chapters">Chapter berikutnya dengan tombol atas</string>
   <string name="shorts_no_more">Tidak ada Shorts lagi</string>
   <string name="shorts_not_loaded">Tidak dapat memuat Shorts lainnya</string>
-  <string name="prefer_google_dns">Gunakan Google DNS</string>
   <string name="card_unlocalized_titles">Judul video yang belum dilokalisasi</string>
   <string name="dont_resize_video_to_fit_dialog">Jangan menyesuaikan video agar muat di dialoog</string>
   <string name="typing_corrections">Matikan koreksi otomatis saat menulis</string>

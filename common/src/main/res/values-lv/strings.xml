@@ -1017,9 +1017,6 @@
     <string name="fullscreen_mode">Pilnekrāna režīms (bez sistēmas joslām)</string>
     <string name="player_only_mode">Rādīt tikai atskaņotāju, ja video atvērts ārpus lietotnes</string>
     <string name="pinned_channel_rows">Rādīt piesprausto kanālu kā rindas</string>
-    <string name="prefer_google_dns">Dot priekšroku Google DNS</string>
-    <string name="prefer_ipv4">Dot priekšroku IPv4 DNS</string>
-    <string name="prefer_ipv4_desc">Var novērst situācijas, kad lietotne nedarbojas vispār.\nPiezīme. Var izraisīt iesalšanu un avārijas (īpaši Android 8 ierīcēs vai Dune HD)</string>
     <string name="ipv6_test">IPv6 savienojamības tests</string>
     <string name="ipv6_test_desc">Reizi katrā lietotnes palaišanā. Ja IPv6 nedarbojas, līdz restartam izmanto tikai IPv4, lai ielāde neiestrēgtu, un atskaņotājs izmanto OkHttp.</string>
     <string name="long_press_for_settings">ILGI NOSPIEDIET, LAI ATVĒRTU IESTATĪJUMUS</string>

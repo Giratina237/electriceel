@@ -965,9 +965,6 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="fullscreen_mode">מצב מסך מלא (ללא פסי מערכת)</string>
     <string name="player_only_mode">הצגת הנגן בלבד אם הסרטון נפתח מחוץ ליישום</string>
     <string name="pinned_channel_rows">הצגת ערוצים מוצמדים כשורות</string>
-    <string name="prefer_google_dns">העדפת Google DNS</string>
-    <string name="prefer_ipv4">העדפת IPv4 DNS</string>
-    <string name="prefer_ipv4_desc">אפשרות זו עשויה לתקן מצבים שבהם היישום לא עובד בכלל.\nהערה: ייתכנו תקיעות וקריסות (במיוחד במכשירי אנדרואיד 8 או Dune HD)</string>
     <string name="ipv6_test">בדיקת קישוריות IPv6</string>
     <string name="ipv6_test_desc">פעם אחת בכל הפעלה. אם IPv6 נכשל, עד ההפעלה מחדש נעשה שימוש ב-IPv4 בלבד כדי שהטעינה לא תיתקע, והנגן משתמש ב-OkHttp.</string>
     <string name="long_press_for_settings">יש ללחוץ לחיצה ארוכה להגדרות</string>

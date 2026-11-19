@@ -78,6 +78,12 @@ public class PlayerTweaksData implements ProfileChangeListener {
     public static final int DNS_TYPE_SYSTEM = GlobalPreferences.DNS_TYPE_SYSTEM;
     public static final int DNS_TYPE_IPV4 = GlobalPreferences.DNS_TYPE_IPV4;
     public static final int DNS_TYPE_GOOGLE = GlobalPreferences.DNS_TYPE_GOOGLE;
+    public static final int DNS_TYPE_CLOUDFLARE = GlobalPreferences.DNS_TYPE_CLOUDFLARE;
+    public static final int DNS_TYPE_QUAD9 = GlobalPreferences.DNS_TYPE_QUAD9;
+    public static final int DNS_TYPE_ADGUARD = GlobalPreferences.DNS_TYPE_ADGUARD;
+    public static final int DNS_TYPE_CUSTOM = GlobalPreferences.DNS_TYPE_CUSTOM;
+    public static final int DNS_PROTOCOL_PLAIN = GlobalPreferences.DNS_PROTOCOL_PLAIN;
+    public static final int DNS_PROTOCOL_DOH = GlobalPreferences.DNS_PROTOCOL_DOH;
     @SuppressLint("StaticFieldLeak")
     private static PlayerTweaksData sInstance;
     private final AppPrefs mPrefs;
@@ -725,6 +731,49 @@ public class PlayerTweaksData implements ProfileChangeListener {
 
     public void setPreferredDnsType(int dnsType) {
         GlobalPreferences.instance(mPrefs.getContext()).setPreferredDnsType(dnsType);
+    }
+
+    public int getPreferredDnsProtocol() {
+        return GlobalPreferences.instance(mPrefs.getContext()).getPreferredDnsProtocol();
+    }
+
+    public void setPreferredDnsProtocol(int protocol) {
+        GlobalPreferences.instance(mPrefs.getContext()).setPreferredDnsProtocol(protocol);
+    }
+
+    public String getCustomDnsPrimary() {
+        return GlobalPreferences.instance(mPrefs.getContext()).getCustomDnsPrimary();
+    }
+
+    public void setCustomDnsPrimary(String address) {
+        GlobalPreferences.instance(mPrefs.getContext()).setCustomDnsPrimary(address);
+    }
+
+    public String getCustomDnsSecondary() {
+        return GlobalPreferences.instance(mPrefs.getContext()).getCustomDnsSecondary();
+    }
+
+    public void setCustomDnsSecondary(String address) {
+        GlobalPreferences.instance(mPrefs.getContext()).setCustomDnsSecondary(address);
+    }
+
+    public String getCustomDohUrl() {
+        return GlobalPreferences.instance(mPrefs.getContext()).getCustomDohUrl();
+    }
+
+    public void setCustomDohUrl(String url) {
+        GlobalPreferences.instance(mPrefs.getContext()).setCustomDohUrl(url);
+    }
+
+    /**
+     * The error fixing may switch the DNS to Google's when the player's lookups fail, whatever DNS is chosen (see ErrorFixerController)
+     */
+    public boolean isDnsFixEnabled() {
+        return GlobalPreferences.instance(mPrefs.getContext()).isDnsFixEnabled();
+    }
+
+    public void setDnsFixEnabled(boolean enable) {
+        GlobalPreferences.instance(mPrefs.getContext()).setDnsFixEnabled(enable);
     }
 
     public boolean isIpv6TestEnabled() {

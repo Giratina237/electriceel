@@ -949,8 +949,6 @@
     <string name="fullscreen_mode">Fullskjermmodus (uten systemlinjer)</string>
     <string name="player_only_mode">Vis kun avspilleren hvis videoen åpnes utenfor appen</string>
     <string name="pinned_channel_rows">Vis festede kanaler som rader</string>
-    <string name="prefer_ipv4">Foretrekk IPv4 DNS</string>
-    <string name="prefer_ipv4_desc">Kan fikse situasjoner der appen ikke fungerer i det hele tatt.\nMerk. Kan forårsake heng og krasj (spesielt på Android 8-enheter eller Dune HD)</string>
     <string name="ipv6_test">Test av IPv6-tilkobling</string>
     <string name="ipv6_test_desc">Én gang per appstart. Hvis IPv6 feiler, brukes bare IPv4 til omstart så innlastingen ikke stopper opp, og avspilleren bruker OkHttp.</string>
     <string name="long_press_for_settings">HOLD INNE FOR INNSTILLINGER</string>
@@ -1009,7 +1007,6 @@
     <string name="player_quick_skip_chapters">Neste kapittel med opp-knappen</string>
     <string name="shorts_no_more">Ingen flere Shorts</string>
     <string name="shorts_not_loaded">Kunne ikke laste inn flere Shorts</string>
-    <string name="prefer_google_dns">Foretrekk Google DNS</string>
     <string name="typing_corrections">Slå av autokorrektur under tekstinntasting</string>
     <string name="suggestions_horizontally_scrolled">Horisontalt rullende forslag</string>
     <string name="stable_restore">Gjenopprett den stabile versjonen (alle data går tapt)</string>

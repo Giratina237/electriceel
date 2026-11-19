@@ -7,6 +7,7 @@ import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.okhttp.OkHttpManager;
+import com.liskovsoft.sharedutils.okhttp.PublicDnsResolver;
 import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerConstants;
@@ -134,29 +135,147 @@ public class GeneralSettingsPresenter extends BasePresenter<Void> {
      * The DNS card of the System settings (was Prefers in the Player settings)
      */
     public void showDns() {
+        AppDialogPresenter settingsPresenter = AppDialogPresenter.instance(getContext());
+
+        appendDnsServer(settingsPresenter);
+        appendDnsProtocol(settingsPresenter);
+        appendCustomDns(settingsPresenter);
+        appendDnsFix(settingsPresenter);
+
+        settingsPresenter.showDialog(getContext().getString(R.string.settings_dns), mOnFinish);
+    }
+
+    /**
+     * One DNS: they were checkboxes of one setting, so two could look chosen at once (#93)
+     */
+    private void appendDnsServer(AppDialogPresenter settingsPresenter) {
+        int[][] servers = {
+                {PlayerTweaksData.DNS_TYPE_SYSTEM, R.string.dns_system},
+                {PlayerTweaksData.DNS_TYPE_IPV4, R.string.dns_system_ipv4_first},
+                {PlayerTweaksData.DNS_TYPE_GOOGLE, R.string.dns_google},
+                {PlayerTweaksData.DNS_TYPE_CLOUDFLARE, R.string.dns_cloudflare},
+                {PlayerTweaksData.DNS_TYPE_QUAD9, R.string.dns_quad9},
+                {PlayerTweaksData.DNS_TYPE_ADGUARD, R.string.dns_adguard},
+                {PlayerTweaksData.DNS_TYPE_CUSTOM, R.string.dns_custom}
+        };
         List<OptionItem> options = new ArrayList<>();
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.prefer_ipv4),
-                getContext().getString(R.string.prefer_ipv4_desc),
-                option -> {
-                    // OkHttp is the only engine that supports custom DNS
-                    mPlayerTweaksData.setPlayerDataSource(option.isSelected() ? PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP : Utils.getFasterDataSource());
-                    mPlayerTweaksData.setPreferredDnsType(option.isSelected() ? PlayerTweaksData.DNS_TYPE_IPV4 : PlayerTweaksData.DNS_TYPE_SYSTEM);
-                    mRestartApp = true;
-                },
-                mPlayerTweaksData.getPreferredDnsType() == PlayerTweaksData.DNS_TYPE_IPV4));
+        for (int[] server : servers) {
+            int dnsType = server[0];
+            options.add(UiOptionItem.from(getContext().getString(server[1]),
+                    option -> setDnsType(dnsType),
+                    mPlayerTweaksData.getPreferredDnsType() == dnsType));
+        }
 
-        options.add(UiOptionItem.from(getContext().getString(R.string.prefer_google_dns),
-                getContext().getString(R.string.prefer_ipv4_desc),
-                option -> {
-                    // OkHttp is the only engine that supports custom DNS
-                    mPlayerTweaksData.setPlayerDataSource(option.isSelected() ? PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP : Utils.getFasterDataSource());
-                    mPlayerTweaksData.setPreferredDnsType(option.isSelected() ? PlayerTweaksData.DNS_TYPE_GOOGLE : PlayerTweaksData.DNS_TYPE_SYSTEM);
-                    mRestartApp = true;
-                },
-                mPlayerTweaksData.getPreferredDnsType() == PlayerTweaksData.DNS_TYPE_GOOGLE));
+        settingsPresenter.appendRadioCategory(getContext().getString(R.string.dns_server), options);
+    }
 
-        showOptions(R.string.settings_dns, options);
+    /**
+     * A DNS of the app's own is OkHttp's only: the player is switched to it, and to the faster engine for the system's DNS. The DNS
+     * is read at each lookup (see PreferredDns in SharedModules): only a switch of the engine asks for a restart.
+     */
+    private void setDnsType(int dnsType) {
+        int dataSource = dnsType == PlayerTweaksData.DNS_TYPE_SYSTEM ? Utils.getFasterDataSource() : PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP;
+
+        if (mPlayerTweaksData.getPreferredDnsType() != dnsType && mPlayerTweaksData.getPlayerDataSource() != dataSource) {
+            mPlayerTweaksData.setPlayerDataSource(dataSource);
+            mRestartApp = true;
+        }
+
+        mPlayerTweaksData.setPreferredDnsType(dnsType);
+    }
+
+    /**
+     * Of the public DNS servers (the system's has its own). DNS-over-TLS is the system's, for every app: its entry tells where.
+     */
+    private void appendDnsProtocol(AppDialogPresenter settingsPresenter) {
+        int protocol = mPlayerTweaksData.getPreferredDnsProtocol();
+        List<OptionItem> options = new ArrayList<>();
+
+        options.add(UiOptionItem.from(getContext().getString(R.string.dns_protocol_plain),
+                option -> mPlayerTweaksData.setPreferredDnsProtocol(PlayerTweaksData.DNS_PROTOCOL_PLAIN),
+                protocol == PlayerTweaksData.DNS_PROTOCOL_PLAIN));
+        options.add(UiOptionItem.from(getContext().getString(R.string.dns_protocol_doh),
+                option -> mPlayerTweaksData.setPreferredDnsProtocol(PlayerTweaksData.DNS_PROTOCOL_DOH),
+                protocol == PlayerTweaksData.DNS_PROTOCOL_DOH));
+
+        OptionItem dot = UiOptionItem.from(getContext().getString(R.string.dns_protocol_dot), option -> {}, false);
+        dot.setEnabled(false);
+        options.add(dot);
+
+        settingsPresenter.appendRadioCategory(getContext().getString(R.string.dns_protocol), options);
+    }
+
+    /**
+     * The servers of the Custom DNS: addresses for plain DNS, a URL for DNS-over-HTTPS
+     */
+    private void appendCustomDns(AppDialogPresenter settingsPresenter) {
+        settingsPresenter.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.dns_custom_primary),
+                getValueOrNotSet(mPlayerTweaksData.getCustomDnsPrimary()),
+                option -> showCustomDnsDialog(settingsPresenter, R.string.dns_custom_primary, R.string.dns_custom_address_hint,
+                        mPlayerTweaksData.getCustomDnsPrimary(), mPlayerTweaksData::setCustomDnsPrimary, PublicDnsResolver::isAddress,
+                        R.string.dns_invalid_address)));
+        settingsPresenter.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.dns_custom_secondary),
+                getValueOrNotSet(mPlayerTweaksData.getCustomDnsSecondary()),
+                option -> showCustomDnsDialog(settingsPresenter, R.string.dns_custom_secondary, R.string.dns_custom_address_hint,
+                        mPlayerTweaksData.getCustomDnsSecondary(), mPlayerTweaksData::setCustomDnsSecondary, PublicDnsResolver::isAddress,
+                        R.string.dns_invalid_address)));
+        settingsPresenter.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.dns_custom_doh_url),
+                getValueOrNotSet(mPlayerTweaksData.getCustomDohUrl()),
+                option -> showCustomDnsDialog(settingsPresenter, R.string.dns_custom_doh_url, R.string.dns_custom_doh_url_hint,
+                        mPlayerTweaksData.getCustomDohUrl(), mPlayerTweaksData::setCustomDohUrl, PublicDnsResolver::isDohUrl,
+                        R.string.dns_invalid_doh_url)));
+    }
+
+    private interface DnsValueSetter {
+        void set(String value);
+    }
+
+    private interface DnsValueCheck {
+        boolean isValid(String value);
+    }
+
+    /**
+     * Empty clears it. Not valid: the field stays, with a message. Saved: the DNS card again, with the value.
+     */
+    private void showCustomDnsDialog(AppDialogPresenter settingsPresenter, int titleResId, int hintResId, String value,
+                                     DnsValueSetter setter, DnsValueCheck check, int invalidResId) {
+        settingsPresenter.closeDialog();
+        SimpleEditDialog.showUrl(
+                getContext(),
+                getContext().getString(titleResId),
+                getContext().getString(hintResId),
+                value,
+                newValue -> {
+                    String trimmed = newValue != null ? newValue.trim() : "";
+
+                    if (!trimmed.isEmpty() && !check.isValid(trimmed)) {
+                        MessageHelpers.showMessage(getContext(), invalidResId);
+                        return false;
+                    }
+
+                    setter.set(trimmed.isEmpty() ? null : trimmed);
+                    // Titled as the System card opens it, "System - DNS" (see ModernSettingsCardsFragment)
+                    settingsPresenter.setTitlePrefix(getContext().getString(R.string.settings_system));
+                    settingsPresenter.enableNestedTitles(true);
+                    showDns();
+                    settingsPresenter.setTitlePrefix(null);
+                    settingsPresenter.enableNestedTitles(false);
+                    return true;
+                },
+                // An optional server is cleared with an empty field
+                true);
+    }
+
+    private String getValueOrNotSet(String value) {
+        return value != null ? value : getContext().getString(R.string.dns_not_set);
+    }
+
+    private void appendDnsFix(AppDialogPresenter settingsPresenter) {
+        settingsPresenter.appendSingleSwitch(UiOptionItem.from(getContext().getString(R.string.dns_fix),
+                getContext().getString(R.string.dns_fix_desc),
+                option -> mPlayerTweaksData.setDnsFixEnabled(option.isSelected()),
+                mPlayerTweaksData.isDnsFixEnabled()));
     }
 
     /**

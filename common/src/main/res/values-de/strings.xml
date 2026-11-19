@@ -958,9 +958,6 @@
     <string name="fullscreen_mode">Vollbildmodus (ohne Systemleisten)</string>
     <string name="player_only_mode">Nur den Player anzeigen, wenn das Video außerhalb der App geöffnet wird</string>
     <string name="pinned_channel_rows">Angeheftete Kanäle als Reihen anzeigen</string>
-    <string name="prefer_google_dns">Google DNS bevorzugen</string>
-    <string name="prefer_ipv4">IPv4 DNS bevorzugen</string>
-    <string name="prefer_ipv4_desc">Könnte Situationen beheben, in denen die App überhaupt nicht funktioniert.\nHinweis: Kann Einfrieren und Abstürze verursachen (besonders auf Android 8 Geräten oder Dune HD)</string>
     <string name="ipv6_test">IPv6-Verbindungstest</string>
     <string name="ipv6_test_desc">Einmal pro App-Start. Schlägt IPv6 fehl, wird bis zum Neustart nur IPv4 genutzt, damit das Laden nicht hängt, und der Player nutzt OkHttp.</string>
     <string name="long_press_for_settings">LANGE DRÜCKEN FÜR EINSTELLUNGEN</string>

@@ -966,9 +966,6 @@
   <string name="fullscreen_mode">फ़ुलस्क्रीन मोड (सिस्टम बार के बिना)</string>
   <string name="player_only_mode">यदि वीडियो ऐप के बाहर खोला गया है तो केवल प्लेयर दिखाएं</string>
   <string name="pinned_channel_rows">पिन किए गए चैनल को पंक्तियों में दिखाएं</string>
-  <string name="prefer_google_dns">Google DNS को प्राथमिकता दें</string>
-  <string name="prefer_ipv4">IPv4 DNS को प्राथमिकता दें</string>
-  <string name="prefer_ipv4_desc">उन स्थितियों को ठीक कर सकता है जब ऐप बिल्कुल काम नहीं कर रहा हो।\nनोट: इससे हैंग और क्रैश हो सकते हैं (विशेषकर Android 8 डिवाइस या Dune HD पर)</string>
   <string name="ipv6_test">IPv6 कनेक्टिविटी जाँच</string>
   <string name="ipv6_test_desc">हर बार ऐप चलने पर एक बार। IPv6 विफल होने पर ऐप दोबारा शुरू होने तक केवल IPv4 चलता है ताकि लोडिंग न अटके, और प्लेयर OkHttp का उपयोग करता है।</string>
   <string name="long_press_for_settings">सेटिंग के लिए देर तक दबाएं</string>

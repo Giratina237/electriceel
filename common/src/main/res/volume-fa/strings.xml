@@ -657,8 +657,6 @@
   <string name="fullscreen_mode">حالت تمام صفحه (بدون نوارهای سیستم)</string>
   <string name="player_only_mode">نمایش فقط پخش کننده اگر ویدیو خارج از برنامه باز شود</string>
   <string name="pinned_channel_rows">نمایش کانال ثابت شده به عنوان ردیف‌ها</string>
-  <string name="prefer_ipv4">ترجیح DNS IPv4</string>
-  <string name="prefer_ipv4_desc">ممکن است در مواردی که برنامه اصلا کار نمی‌کند، کمک کند.\nتوجه: ممکن است باعث خرابی و خطا شود (به ویژه در دستگاه‌های Android 8 یا Dune HD).</string>
   <string name="long_press_for_settings">فشار طولانی برای تنظیمات</string>
   <string name="long_press_for_options">فشار طولانی برای گزینه‌ها</string>
   <string name="device_specific_backup">پشتیبان‌گیری فقط برای این دستگاه</string>

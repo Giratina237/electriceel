@@ -87,6 +87,7 @@ public class ErrorFixerControllerTest {
     private PlayerFailureLog mLog;
     private int mSavedEngine;
     private int mSavedDns;
+    private boolean mSavedDnsFix;
     private boolean mSavedIpv6Test;
 
     @Before
@@ -96,6 +97,8 @@ public class ErrorFixerControllerTest {
         mSavedEngine = getTweaks().getPlayerDataSource();
         getTweaks().setPlayerDataSource(PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP);
         mSavedDns = getTweaks().getPreferredDnsType();
+        mSavedDnsFix = getTweaks().isDnsFixEnabled();
+        getTweaks().setDnsFixEnabled(true);
         mSavedIpv6Test = getGlobalPrefs().isIpv6TestEnabled();
         setTvPotRejected(false);
         setIpv6Working(null);
@@ -114,6 +117,7 @@ public class ErrorFixerControllerTest {
         PlayerFailureLog.useForTesting(null);
         getTweaks().setPlayerDataSource(mSavedEngine);
         getTweaks().setPreferredDnsType(mSavedDns);
+        getTweaks().setDnsFixEnabled(mSavedDnsFix);
         getGlobalPrefs().setIpv6TestEnabled(mSavedIpv6Test);
         Utils.sHandler.removeCallbacksAndMessages(null);
         setTvPotRejected(false);
@@ -335,6 +339,40 @@ public class ErrorFixerControllerTest {
         assertEquals(Arrays.asList("dns_google", "restart_engine"), getActions(event));
         assertEquals("failing", event.getJSONObject("details").getString("lookup"));
         assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * A DNS the user chose is switched too while the DNS fix is on (the default): it's put back if Google's doesn't help
+     */
+    @Test
+    public void aChosenDnsIsSwitchedWhileTheDnsFixIsOn() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_CLOUDFLARE);
+        TestController controller = new TestController(video("p5miU3x4Sr8"));
+        lookupFails();
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("dns_google", "restart_engine"), getActions(mLog.readAll().get(0)));
+        assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * The DNS fix turned off in the DNS settings: the DNS chosen stays though the lookups fail (#93). The client is switched, as
+     * for a hang the DNS isn't told to cause.
+     */
+    @Test
+    public void aDnsFixTurnedOffKeepsTheDnsChosen() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_CLOUDFLARE);
+        getTweaks().setDnsFixEnabled(false);
+        TestController controller = new TestController(video("p5miU3x4Sr8"));
+        lookupFails();
+
+        controller.onLongBuffering();
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(event));
+        assertEquals("failing", event.getJSONObject("details").getString("lookup"));
+        assertEquals(PlayerTweaksData.DNS_TYPE_CLOUDFLARE, getTweaks().getPreferredDnsType());
     }
 
     /**

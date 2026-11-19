@@ -57,12 +57,21 @@ public class SimpleEditDialog {
      * (textUri|textPersonName) adds up to a postal address, which keyboards autocorrect.
      */
     public static void showUrl(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange) {
+        showUrl(context, dialogTitle, dialogHint, defaultValue, onChange, false);
+    }
+
+    /**
+     * @param isEmptyAllowed an empty field is a value too (e.g. an optional server cleared), given to onChange as ""
+     */
+    public static void showUrl(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange,
+                               boolean isEmptyAllowed) {
         show(context, dialogTitle, dialogHint, defaultValue, onChange, null,
-                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, NO_MICROPHONE);
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, NO_MICROPHONE,
+                isEmptyAllowed);
     }
 
     private static void show(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange, Runnable onDismiss, int inputType) {
-        show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss, inputType, null);
+        show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss, inputType, null, false);
     }
 
     /**
@@ -70,7 +79,7 @@ public class SimpleEditDialog {
      * @param privateImeOptions for the keyboard (see EditorInfo.privateImeOptions), null for none
      */
     private static void show(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange, Runnable onDismiss,
-                             int inputType, String privateImeOptions) {
+                             int inputType, String privateImeOptions, boolean isEmptyAllowed) {
         AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.AppDialog);
         LayoutInflater inflater = LayoutInflater.from(context);
         View contentView = inflater.inflate(R.layout.simple_edit_dialog, null);
@@ -136,7 +145,7 @@ public class SimpleEditDialog {
         configDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener((view) -> {
             String newValue = editField.getText().toString();
 
-            if (newValue.isEmpty()) {
+            if (newValue.isEmpty() && !isEmptyAllowed) {
                 // Empty fields not allowed
                 editField.setHint(R.string.enter_value);
                 return;

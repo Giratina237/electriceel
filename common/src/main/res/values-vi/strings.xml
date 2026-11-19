@@ -934,7 +934,6 @@
   <string name="nothing_found">Không tìm thấy gì</string>
   <string name="channel_filter_hint">Lọc kênh</string>
   <string name="place_comments_left">Đặt bình luận ở bên trái</string>
-  <string name="prefer_ipv4">Ưu tiên DNS IPv4</string>
   <string name="disable_network_error_fixing">Vô hiệu hóa chức năng tự động sửa lỗi mạng</string>
   <string name="disable_network_error_fixing_desc">Bạn có thể cần phải bật tùy chọn này nếu bạn đang sử dụng VPN</string>
   <string name="playlists_rows">Hiển thị mục Danh sách phát dưới dạng hàng</string>
@@ -961,7 +960,6 @@
   <string name="keyboard_fix">Ngăn việc nút OK vô tình mở bàn phím (G20s và các thiết bị khác)</string>
   <string name="auto_frame_rate_desc">Tùy chọn này loại bỏ hiện tượng giật hình trong các cảnh có chuyển động nhanh, ví dụ như ở các video phát trực tiếp về thể thao</string>
   <string name="player_only_mode">Chỉ hiển thị trình phát nếu video được mở bên ngoài ứng dụng</string>
-  <string name="prefer_ipv4_desc">Có thể sửa các trường hợp khi ứng dụng hoàn toàn không hoạt động.\nLưu ý: Có thể gây ra tình trạng đơ hoặc thoát đột ngột ứng dụng (đặc biệt là ở các thiết bị Android 8 hoặc Dune HD)</string>
   <string name="ipv6_test">Kiểm tra kết nối IPv6</string>
   <string name="ipv6_test_desc">Mỗi lần chạy ứng dụng một lần. Nếu IPv6 lỗi, chỉ dùng IPv4 tới khi khởi động lại để việc tải không bị treo, và trình phát dùng OkHttp.</string>
   <string name="calm_msg">Chúng tôi đang sửa lỗi này. Hãy kiểm tra cập nhật thường xuyên</string>
@@ -998,7 +996,6 @@
   <string name="player_quick_skip_chapters">Chương tiếp theo với nút lên</string>
   <string name="shorts_no_more">Không còn Shorts nào</string>
   <string name="shorts_not_loaded">Không thể tải thêm Shorts</string>
-  <string name="prefer_google_dns">Ưu tiên DNS Google</string>
   <string name="dialog_block_channel">Chặn kênh</string>
   <string name="dialog_unblock_channel">Bỏ chặn kênh</string>
   <string name="confirm_block_channel">Ẩn tất cả nội dung từ %s\?</string>

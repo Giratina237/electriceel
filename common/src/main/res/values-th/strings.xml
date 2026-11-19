@@ -1014,9 +1014,6 @@
     <string name="fullscreen_mode">โหมดเต็มหน้าจอ (ไม่มีแถบระบบ)</string>
     <string name="player_only_mode">แสดงเฉพาะเครื่องเล่นหากเปิดวิดีโอจากนอกแอป</string>
     <string name="pinned_channel_rows">แสดงช่องที่ปักหมุดเป็นแถว</string>
-    <string name="prefer_google_dns">ใช้ Google DNS เป็นหลัก</string>
-    <string name="prefer_ipv4">ใช้ IPv4 DNS เป็นหลัก</string>
-    <string name="prefer_ipv4_desc">อาจแก้ไขกรณีที่แอปไม่ทำงานเลย\nหมายเหตุ อาจทำให้ค้างและแอปปิดตัว (โดยเฉพาะบนอุปกรณ์ Android 8 หรือ Dune HD)</string>
     <string name="ipv6_test">ทดสอบการเชื่อมต่อ IPv6</string>
     <string name="ipv6_test_desc">ตรวจหนึ่งครั้งต่อการเปิดแอป หาก IPv6 ใช้ไม่ได้ จะใช้เฉพาะ IPv4 จนกว่าจะเริ่มแอปใหม่เพื่อไม่ให้การโหลดค้าง และเครื่องเล่นจะใช้ OkHttp</string>
     <string name="long_press_for_settings">กดค้างเพื่อตั้งค่า</string>

@@ -931,8 +931,6 @@
   <string name="fullscreen_mode">Teljes képernyős mód (rendszersávok nélkül)</string>
   <string name="player_only_mode">Csak a lejátszó megjelenítése, ha a videót az alkalmazáson kívül nyitották meg</string>
   <string name="pinned_channel_rows">A rögzített csatorna megjelenítése soronként</string>
-  <string name="prefer_ipv4">IPv4 DNS előnyben részesítése</string>
-  <string name="prefer_ipv4_desc">Kijavíthatja azokat a helyzeteket, amikor az alkalmazás egyáltalán nem működik.\nMegjegyzés. Lefagyást és összeomlást okozhat (különösen Android 8 vagy Dune HD eszközökön)</string>
   <string name="ipv6_test">IPv6-kapcsolat tesztelése</string>
   <string name="ipv6_test_desc">Alkalmazásindításonként egyszer. Ha az IPv6 nem működik, újraindításig csak IPv4 megy, hogy a betöltés ne akadjon el, a lejátszó pedig OkHttp-t használ.</string>
   <string name="long_press_for_settings">HOSSZAN MEGNYOMVA: Beállítások</string>
@@ -1017,7 +1015,6 @@
   <string name="local_backup_not_supported">Az automatikus biztonsági mentés az Android TV 11+ rendszeren a rendszerkorlátozások miatt nem támogatott. Használja helyette a GDRive-ot.</string>
   <string name="rounded_card_corners">Lekerekített kártya sarkok</string>
   <string name="install_bridge">ATV/Amazon híd telepítése</string>
-  <string name="prefer_google_dns">Google DNS-t előnyben részesítése</string>
   <string name="player_quick_shorts_skip_alt">Rövid klip lapozás fel/le gomb</string>
   <string name="player_quick_skip_videos_alt">A normál videók kihagyása a fel/le gombokkal</string>
   <string name="player_quick_skip_chapters">Következő fejezet a fel gombbal</string>

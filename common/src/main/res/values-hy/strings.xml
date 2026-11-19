@@ -1015,9 +1015,6 @@
     <string name="fullscreen_mode">Լիաէկրան ռեժիմ (առանց համակարգային գոտիների)</string>
     <string name="player_only_mode">Ցուցադրել միայն նվագարկիչը, եթե տեսանյութը բացվել է հավելվածից դուրս</string>
     <string name="pinned_channel_rows">Ցուցադրել ամրացված ալիքը որպես շարքեր</string>
-    <string name="prefer_google_dns">Նախընտրել Google DNS-ը</string>
-    <string name="prefer_ipv4">Նախընտրել IPv4 DNS-ը</string>
-    <string name="prefer_ipv4_desc">Կարող է լուծել այն իրավիճակները, երբ հավելվածը ընդհանրապես չի աշխատում։\nՆշում. կարող է առաջացնել կախումներ և խափանումներ (հատկապես Android 8 սարքերում կամ Dune HD-ում)</string>
     <string name="ipv6_test">IPv6 կապի թեստ</string>
     <string name="ipv6_test_desc">Մեկ անգամ ամեն գործարկման ժամանակ։ Եթե IPv6-ը չի աշխատում, մինչև վերագործարկում միայն IPv4 է օգտագործվում, որ բեռնումը չխցանվի, և նվագարկիչն օգտագործում է OkHttp։</string>
     <string name="long_press_for_settings">ԿԱՐԳԱՎՈՐՈՒՄՆԵՐԻ ՀԱՄԱՐ ԵՐԿԱՐ ՍԵՂՄԵՔ</string>
