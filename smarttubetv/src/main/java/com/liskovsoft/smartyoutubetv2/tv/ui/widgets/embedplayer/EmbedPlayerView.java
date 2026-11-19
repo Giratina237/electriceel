@@ -586,6 +586,7 @@ public class EmbedPlayerView extends PlayerView implements PlaybackView {
         mPlayerInitializer = new ExoPlayerInitializer(getContext());
         mPlaybackPresenter.setView(this);
         mExoPlayerController = new ExoPlayerController(getContext(), mPlaybackPresenter);
+        mExoPlayerController.setEmbed(true);
         mExoPlayerController.setOnVideoLoaded(this::onVideoLoaded);
         mPlaybackPresenter.onViewInitialized(); // init all controllers
 

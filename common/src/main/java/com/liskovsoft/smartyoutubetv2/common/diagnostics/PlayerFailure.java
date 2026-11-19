@@ -69,6 +69,10 @@ public final class PlayerFailure {
     private Long mPositionMs;
     private Long mDurationMs;
     private Boolean mStartedPlaying;
+    /**
+     * It happened in a card's preview (the embed player), not the player the user watches (see #embed)
+     */
+    private boolean mIsEmbed;
     private JSONObject mError;
     private String mErrorClass;
     private String mErrorMessage;
@@ -170,6 +174,16 @@ public final class PlayerFailure {
             mVideoId = video.videoId;
             mIsLive = video.isLive;
         }
+
+        return this;
+    }
+
+    /**
+     * In a card's preview, the embed player: the user doesn't see its errors (see ErrorFixerController#runEngineErrorAction, which
+     * closes it), and they would read as the player's own (BVNWJ4GF #1–#5: 503s and a 403 on 360p, a preview)
+     */
+    public PlayerFailure embed(boolean isEmbed) {
+        mIsEmbed = isEmbed;
 
         return this;
     }
@@ -460,6 +474,8 @@ public final class PlayerFailure {
             result.put("kind", mKind);
             putOpt(result, "videoId", mVideoId);
             putOpt(result, "live", mIsLive);
+            // Only when it is: the player the user watches is most of them
+            putOpt(result, "embed", mIsEmbed ? Boolean.TRUE : null);
             putOpt(result, "positionMs", mPositionMs);
             putOpt(result, "durationMs", mDurationMs);
             putOpt(result, "startedPlaying", mStartedPlaying);

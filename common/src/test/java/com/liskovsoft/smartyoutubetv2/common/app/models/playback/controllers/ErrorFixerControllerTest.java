@@ -6,6 +6,7 @@ import android.os.SystemClock;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.audio.AudioSink;
+import com.google.android.exoplayer2.source.sabr.parser.exceptions.BrokenPartError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
@@ -15,20 +16,25 @@ import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.HttpDataSource.HttpDataSourceException;
 import com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException;
 import com.google.android.exoplayer2.upstream.Loader.UnexpectedLoaderException;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.Connections;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
+import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.common.utils.NetworkEngineFallback;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.app.PoTokenGate;
 import com.liskovsoft.youtubeapi.videoinfo.V2.ClientAttempts;
@@ -103,12 +109,14 @@ public class ErrorFixerControllerTest {
         setTvPotRejected(false);
         setIpv6Working(null);
         getPlayerData().setTempVideoFormat(null);
+        getPlayerData().setTempAudioFormat(null);
         // No segment loaded or loading
         VideoStarts.onPrepare();
         LoadErrors.resetForTesting();
         Connections.resetForTesting();
         Connections.onPrepare();
         ProtectionStatuses.resetForTesting(null);
+        NetworkEngineFallback.resetForTesting();
         ShadowToast.reset();
     }
 
@@ -126,6 +134,7 @@ public class ErrorFixerControllerTest {
         LoadErrors.resetForTesting();
         Connections.resetForTesting();
         ProtectionStatuses.resetForTesting(null);
+        NetworkEngineFallback.resetForTesting();
     }
 
     /**
@@ -193,6 +202,80 @@ public class ErrorFixerControllerTest {
                 new UnexpectedLoaderException(new UnknownPartError("Unknown part encountered: id=1459, size=1131850, position=5")));
 
         assertEquals(Arrays.asList("network_reload 1/3", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * A part whose payload isn't the protobuf its id says, or whose size can't be skipped: as broken as a part no id starts, not the
+     * client's (DMQEWB9B #1 and FVNAAYZD #13, #15 switched the client)
+     */
+    @Test
+    public void aBrokenSabrPartReloadsWithTheSameClient() throws Exception {
+        TestController controller = new TestController(video("-GLlqOV-qm0"));
+        controller.onPlay();
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new BrokenPartError("com.google.protobuf.InvalidProtocolBufferException$InvalidWireTypeException: "
+                        + "Protocol message tag had invalid wire type.")));
+
+        assertEquals(Arrays.asList("network_reload 1/3", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * Cronet and the default engine read a SABR response out of step, and OkHttp never did: the video's reload reads with OkHttp, and
+     * the engine saved in the settings is the user's. The same video loaded again keeps it, the next goes back to the chosen engine.
+     */
+    @Test
+    public void aBrokenSabrResponseOfAnotherEngineReadsWithOkHttpForThatVideoOnly() throws Exception {
+        getTweaks().setPlayerDataSource(PlayerTweaksData.PLAYER_DATA_SOURCE_DEFAULT);
+        TestController controller = new TestController(video("-GLlqOV-qm0"));
+        controller.onPlay();
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new UnknownPartError("Unknown part encountered: id=1459, size=1131850, position=5")));
+
+        assertEquals(Arrays.asList("network_reload 1/3", "engine_okhttp_for_video", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(Utils.NETWORK_ENGINE_OKHTTP, Utils.getEffectiveNetworkEngine(RuntimeEnvironment.getApplication()));
+        assertEquals(PlayerTweaksData.PLAYER_DATA_SOURCE_DEFAULT, getTweaks().getPlayerDataSource());
+
+        controller.onNewVideo(video("-GLlqOV-qm0"));
+
+        assertEquals(Utils.NETWORK_ENGINE_OKHTTP, Utils.getEffectiveNetworkEngine(RuntimeEnvironment.getApplication()));
+
+        controller.onNewVideo(video("dQw4w9WgXcQ"));
+
+        assertEquals(Utils.NETWORK_ENGINE_DEFAULT, Utils.getEffectiveNetworkEngine(RuntimeEnvironment.getApplication()));
+    }
+
+    /**
+     * OkHttp is in use already: nothing to switch to, and a response broken again says it isn't the engine's
+     */
+    @Test
+    public void aBrokenSabrResponseOfOkHttpIsReloadedAsBefore() throws Exception {
+        TestController controller = new TestController(video("-GLlqOV-qm0"));
+        controller.onPlay();
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new UnknownPartError("Unknown part encountered: id=1459, size=1131850, position=5")));
+
+        assertEquals(Arrays.asList("network_reload 1/3", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(false, NetworkEngineFallback.isOkHttp());
+    }
+
+    /**
+     * A broken connection (a read timeout) isn't a response read out of step: the engine stays
+     */
+    @Test
+    public void aBrokenConnectionKeepsTheEngine() throws Exception {
+        getTweaks().setPlayerDataSource(PlayerTweaksData.PLAYER_DATA_SOURCE_DEFAULT);
+        TestController controller = new TestController(video("-GLlqOV-qm0"));
+        controller.onPlay();
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new IllegalStateException(new HttpDataSourceException(
+                        new SocketTimeoutException("timeout"), dataSpec(), HttpDataSourceException.TYPE_READ))));
+
+        assertEquals(Arrays.asList("network_reload 1/3", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(false, NetworkEngineFallback.isOkHttp());
     }
 
     /**
@@ -600,6 +683,58 @@ public class ErrorFixerControllerTest {
     }
 
     /**
+     * What every client said is the playability's: the error of a fetch that gave no formats is no exception of the player's, and isn't
+     * recorded as one (a chain of members-only videos was 19 failures with it, 8E1WXX00)
+     */
+    @Test
+    public void anUnplayableVideosEmptyFetchIsNotAnError() throws Exception {
+        ClientAttempts.clear("members");
+        ClientAttempts.record("members", ClientAttempts.Attempt.unplayable("TV", "UNPLAYABLE", "This video is available to this channel's members"));
+        TestController controller = new TestController(video("members"));
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals("unplayable", event.getString("kind"));
+        assertEquals(false, event.has("error"));
+        assertEquals("UNPLAYABLE", event.getJSONObject("playability").getString("status"));
+    }
+
+    /**
+     * The player has no video at hand (DMQEWB9B #1: no video ID, position or formats): the failure is of the one the formats tried are
+     * of
+     */
+    @Test
+    public void aFailureWithoutAVideoHasTheOneTheFormatsAreOf() throws Exception {
+        FormatAttempts.onNewVideo(RuntimeEnvironment.getApplication(), "bjJy8qsTBgw");
+        TestController controller = new TestController(null);
+
+        try {
+            controller.runFormatErrorAction(new IllegalStateException("boom"));
+
+            assertEquals("bjJy8qsTBgw", mLog.readAll().get(0).getString("videoId"));
+        } finally {
+            FormatAttempts.end(RuntimeEnvironment.getApplication());
+        }
+    }
+
+    /**
+     * One that failed otherwise has its error
+     */
+    @Test
+    public void aFormatErrorKeepsItsError() throws Exception {
+        ClientAttempts.clear("offline2");
+        ClientAttempts.record("offline2", ClientAttempts.Attempt.exception("WEB", new IllegalStateException("timeout")));
+        TestController controller = new TestController(video("offline2"));
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals("format_error", event.getString("kind"));
+        assertEquals("IllegalStateException", event.getJSONObject("error").getString("class"));
+    }
+
+    /**
      * Its why is the player's title, seen only with the controls: they come up with it
      */
     @Test
@@ -791,6 +926,91 @@ public class ErrorFixerControllerTest {
         assertEquals(0, controller.mPlayEnds);
     }
 
+    /**
+     * A live stream stalls in the last minutes of its timeline (FVNAAYZD #29: 25 s before its end): it may have ended, so its metadata
+     * is read again while the reload goes on. Not live any more, it ended: what the reload would load isn't, and playing ends.
+     */
+    @Test
+    public void aLiveStreamThatStalledNearItsEndIsEndedByItsMetadata() throws Exception {
+        Video live = video("pfsI290BV4U");
+        live.isLive = true;
+        TestController controller = new TestController(live, null, playerStub(atMs(3_601_200, 3_626_700)));
+        controller.onPlay();
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("live_end_check", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(0, controller.mPlayEnds);
+
+        controller.mOnMetadata.onMetadata(metadata(false));
+
+        assertEquals(1, controller.mPlayEnds);
+        assertEquals(1, controller.mCancels);
+        assertEquals(true, live.isLiveEnd);
+    }
+
+    /**
+     * Live still, by what the server says: the stall is a connection's, and the stream is reloaded as before
+     */
+    @Test
+    public void aLiveStreamTheServerCallsLiveIsNotEnded() throws Exception {
+        Video live = video("pfsI290BV4U");
+        live.isLive = true;
+        TestController controller = new TestController(live, null, playerStub(atMs(3_601_200, 3_626_700)));
+        controller.onPlay();
+
+        controller.onLongBuffering();
+        controller.mOnMetadata.onMetadata(metadata(true));
+
+        assertEquals(0, controller.mPlayEnds);
+        assertEquals(0, controller.mCancels);
+        assertEquals(false, live.isLiveEnd);
+    }
+
+    /**
+     * At its head, far from the end of its timeline, a live stream's stall is no end: nothing is asked
+     */
+    @Test
+    public void aLiveStreamThatStalledFarFromItsEndIsNotChecked() throws Exception {
+        Video live = video("pfsI290BV4U");
+        live.isLive = true;
+        TestController controller = new TestController(live, null, playerStub(atMs(1_000_000, 3_626_700)));
+        controller.onPlay();
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(null, controller.mOnMetadata);
+    }
+
+    /**
+     * Asked again within a minute it isn't: each stall of a stream that goes on doesn't ask the server
+     */
+    @Test
+    public void aLiveStreamIsCheckedOncePerMinute() throws Exception {
+        Video live = video("pfsI290BV4U");
+        live.isLive = true;
+        TestController controller = new TestController(live, null, playerStub(atMs(3_601_200, 3_626_700)));
+        controller.onPlay();
+
+        controller.onLongBuffering();
+        controller.onPlay();
+        controller.onLongBuffering();
+
+        List<JSONObject> events = mLog.readAll();
+
+        assertEquals(Arrays.asList("live_end_check", "reload_video"), getActions(events.get(0)));
+        assertEquals(1, controller.mMetadataLoads);
+    }
+
+    /**
+     * What the server says of a video, only whether it's live
+     */
+    private static MediaItemMetadata metadata(boolean isLive) {
+        return (MediaItemMetadata) Proxy.newProxyInstance(MediaItemMetadata.class.getClassLoader(), new Class<?>[]{MediaItemMetadata.class},
+                (proxy, method, args) -> "isLive".equals(method.getName()) ? isLive : method.getReturnType() == boolean.class ? false : null);
+    }
+
     private static Map<String, Object> atMs(long positionMs, long durationMs) {
         Map<String, Object> answers = new HashMap<>();
         answers.put("getPositionMs", positionMs);
@@ -825,6 +1045,44 @@ public class ErrorFixerControllerTest {
         controller.onLongBuffering();
 
         assertEquals(Arrays.asList("reload_video"), getActions(mLog.readAll().get(1)));
+    }
+
+    /**
+     * The sound was silent for all it played (RF6HBNNH #5: a 4 kbps Opus track, 16 s of nothing, no fix): AAC for this video, and the
+     * engine restarts
+     */
+    @Test
+    public void aSoundSilentFromTheStartPlaysAacForTheVideo() throws Exception {
+        TestController controller = new TestController(video("7uzblA-p8Xo"), null,
+                playerStub(Collections.<String, Object>singletonMap("getAudioFormat", ExoFormatItem.fromAudioSpecs("opus,en"))));
+        controller.onPlay();
+        PlayerFailure failure = PlayerFailure.create(RuntimeEnvironment.getApplication(), PlaybackHealth.KIND_AUDIO_SILENT)
+                .detail("silentFromStart", true);
+
+        controller.onHealthFailure(PlaybackHealth.KIND_AUDIO_SILENT, failure);
+        failure.record();
+
+        assertEquals(Arrays.asList("audio_fallback:mp4a", "restart_engine"), getActions(mLog.readAll().get(0)));
+        assertEquals(1, controller.mRestarts.size());
+        assertEquals("mp4a", getPlayerData().getTempAudioFormat().getTrack().format.codecs);
+    }
+
+    /**
+     * Silent for a stretch of a sound that came (a quiet part of the video): not the stream's, left as it is
+     */
+    @Test
+    public void aSoundThatWentSilentLaterIsLeftAlone() throws Exception {
+        TestController controller = new TestController(video("7uzblA-p8Xo"), null,
+                playerStub(Collections.<String, Object>singletonMap("getAudioFormat", ExoFormatItem.fromAudioSpecs("opus,en"))));
+        controller.onPlay();
+        PlayerFailure failure = PlayerFailure.create(RuntimeEnvironment.getApplication(), PlaybackHealth.KIND_AUDIO_SILENT)
+                .detail("silentFromStart", false);
+
+        controller.onHealthFailure(PlaybackHealth.KIND_AUDIO_SILENT, failure);
+        failure.record();
+
+        assertEquals(Collections.<String>emptyList(), getActions(mLog.readAll().get(0)));
+        assertEquals(0, controller.mRestarts.size());
     }
 
     /**
@@ -1349,6 +1607,15 @@ public class ErrorFixerControllerTest {
         private final List<Integer> mReloads = new ArrayList<>();
         private final List<Integer> mRestarts = new ArrayList<>();
         /**
+         * The reloads and restarts asked for that were taken back (see VideoLoaderController#cancelPendingFixes)
+         */
+        private int mCancels;
+        /**
+         * The last metadata load asked for, answered by the test (see #loadMetadata), null for none
+         */
+        private MediaServiceManager.OnMetadata mOnMetadata;
+        private int mMetadataLoads;
+        /**
          * Of the video's formats (see PlayerFailure.PROTOCOL_ constants), null when it has none
          */
         private String mProtocol;
@@ -1396,7 +1663,21 @@ public class ErrorFixerControllerTest {
                 void restartEngine(int delayMs) {
                     mRestarts.add(delayMs);
                 }
+
+                @Override
+                void cancelPendingFixes() {
+                    mCancels++;
+                }
             });
+        }
+
+        /**
+         * Not the server's: the test answers it
+         */
+        @Override
+        void loadMetadata(Video video, MediaServiceManager.OnMetadata onMetadata) {
+            mOnMetadata = onMetadata;
+            mMetadataLoads++;
         }
 
         @Override

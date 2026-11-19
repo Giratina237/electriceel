@@ -67,6 +67,7 @@ import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.misc.WeakHashSet;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.okhttp.OkHttpManager;
+import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
 import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerConstants;
@@ -938,8 +939,12 @@ public class Utils {
         return Helpers.getDeviceName().startsWith("Oculus Quest");
     }
 
+    /**
+     * Not on the caller's thread: the broadcast is a call into the system, and the main thread waited for it for an ANR at the start
+     * (N2XFS7TZ #4, SplashPresenter's background tasks, which run on it)
+     */
     public static void updateChannels(Context context) {
-        startReceiver(context, UPDATE_CHANNELS_RECEIVER_CLASS_NAME);
+        RxHelper.execute(RxHelper.fromRunnable(() -> startReceiver(context, UPDATE_CHANNELS_RECEIVER_CLASS_NAME)));
     }
 
     public static void startRemoteControl(Context context) {
@@ -1149,6 +1154,11 @@ public class Utils {
     public static String getEffectiveNetworkEngine(Context context) {
         if (OkHttpManager.isIpv6Disabled()) {
             return NETWORK_ENGINE_OKHTTP_NO_IPV6;
+        }
+
+        // For the video a SABR response was read out of step in: told as OkHttp, with the chosen engine in the failure's engineSelected
+        if (NetworkEngineFallback.isOkHttp()) {
+            return NETWORK_ENGINE_OKHTTP;
         }
 
         int source = PlayerTweaksData.instance(context).getPlayerDataSource();

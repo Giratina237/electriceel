@@ -1027,6 +1027,7 @@ public class VideoLoaderController extends BasePlayerController {
 
         return addPickedClient(PlayerFailure.create(getContext(), kind)
                 .video(video)
+                .embed(isEmbedPlayer())
                 .source(mFormatClient, null)
                 .playability(formatInfo.getPlayabilityStatus(), formatInfo.getPlayabilityReason())
                 .clientAttempts(video != null ? ClientAttempts.get(video.videoId) : null));
@@ -1117,6 +1118,16 @@ public class VideoLoaderController extends BasePlayerController {
         long nowMs = SystemClock.elapsedRealtime();
 
         return mReloadDueMs >= 0 && nowMs < mReloadDueMs || mRestartDueMs >= 0 && nowMs < mRestartDueMs;
+    }
+
+    /**
+     * What a reload or an engine restart asked for would reload isn't there any more (e.g. the live stream it was for ended, see
+     * ErrorFixerController#checkLiveEnd): not run
+     */
+    void cancelPendingFixes() {
+        Utils.removeCallbacks(mReloadVideo, mRestartEngine);
+        mReloadDueMs = -1;
+        mRestartDueMs = -1;
     }
 
     /**

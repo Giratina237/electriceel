@@ -4,6 +4,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.extractor.ExtractorInput;
+import com.google.android.exoplayer2.source.sabr.parser.exceptions.BrokenPartError;
+import com.google.android.exoplayer2.source.sabr.parser.exceptions.BrokenResponseError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.MediaSegmentMismatchError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrStreamError;
@@ -40,6 +42,7 @@ import com.google.android.exoplayer2.source.sabr.protos.videostreaming.StreamPro
 import com.google.android.exoplayer2.source.sabr.protos.videostreaming.StreamerContext;
 import com.google.android.exoplayer2.source.sabr.protos.videostreaming.StreamerContext.ClientInfo;
 import com.google.android.exoplayer2.upstream.HttpDataSource.HttpDataSourceException;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.querystringparser.UrlQueryString;
@@ -63,6 +66,10 @@ public class SabrStream {
      * Of an unknown part, the bytes after its header told (see #peekHex)
      */
     private static final int PEEKED_BYTES = 16;
+    /**
+     * How many of the parts read last a broken response tells (see #getPartTrail)
+     */
+    private static final int PART_TRAIL_LENGTH = 8;
     private final int[] KNOWN_PARTS = {
             UMPPartId.MEDIA_HEADER,
             UMPPartId.MEDIA,
@@ -124,6 +131,17 @@ public class SabrStream {
      * the last one's)
      */
     private volatile int nextRequestPolicyCount;
+    /**
+     * The parts the response being read gave, the last PART_TRAIL_LENGTH of them (see #getPartTrail). On the loader's thread, as the
+     * parts are read.
+     */
+    private final int[] partTrailIds = new int[PART_TRAIL_LENGTH];
+    private final int[] partTrailSizes = new int[PART_TRAIL_LENGTH];
+    private int partTrailCount;
+    /**
+     * Where the last part's header ended in its response, -1 before the first
+     */
+    private long partTrailPosition = -1;
 
     /**
      * Told each wait the server asks for (see NextRequestPolicy#getBackoffTimeMs), e.g. for the app's timing of video starts: one
@@ -223,18 +241,26 @@ public class SabrStream {
     public SabrPart parse(@NonNull ExtractorInput extractorInput) {
         SabrPart result = null;
 
-        while (result == null && (multiResult == null || multiResult.isEmpty())) {
-            UMPPart part = nextKnownUMPPart(extractorInput);
+        try {
+            while (result == null && (multiResult == null || multiResult.isEmpty())) {
+                UMPPart part = nextKnownUMPPart(extractorInput);
 
-            if (part == null) {
-                break;
+                if (part == null) {
+                    break;
+                }
+
+                result = parsePart(part);
+
+                if (result == null) {
+                    multiResult = parseMultiPart(part);
+                }
             }
+        } catch (BrokenResponseError e) {
+            // Where in the response it went wrong, told with the error: a first part is a response that isn't UMP, a later one a read
+            // that went out of step
+            e.setPartTrail(getPartTrail());
 
-            result = parsePart(part);
-
-            if (result == null) {
-                multiResult = parseMultiPart(part);
-            }
+            throw e;
         }
 
         if (result instanceof MediaSegmentDataSabrPart) {
@@ -448,7 +474,7 @@ public class SabrStream {
         try {
             mediaHeader = MediaHeader.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         try {
@@ -516,7 +542,7 @@ public class SabrStream {
         try {
             sps = StreamProtectionStatus.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process StreamProtectionStatus: %s", sps);
@@ -567,7 +593,7 @@ public class SabrStream {
         try {
             sabrRedirect = SabrRedirect.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process SabrRedirect: %s", sabrRedirect);
@@ -597,7 +623,7 @@ public class SabrStream {
         try {
             fmtInitMetadata = FormatInitializationMetadata.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process FormatInitializationMetadata: %s", fmtInitMetadata);
@@ -612,7 +638,7 @@ public class SabrStream {
         try {
             nextRequestPolicy = NextRequestPolicy.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process NextRequestPolicy: %s", nextRequestPolicy);
@@ -631,7 +657,7 @@ public class SabrStream {
         try {
             sabrError = SabrError.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process SabrError: %s", sabrError);
@@ -644,7 +670,7 @@ public class SabrStream {
         try {
             sabrCtxUpdate = SabrContextUpdate.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process SabrContextUpdate: %s", sabrCtxUpdate);
@@ -657,7 +683,7 @@ public class SabrStream {
         try {
             sabrCtxSendingPolicy = SabrContextSendingPolicy.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process SabrContextSendingPolicy: %s", sabrCtxSendingPolicy);
@@ -683,7 +709,7 @@ public class SabrStream {
         try {
             reloadPlayerResponse = ReloadPlayerResponse.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process ReloadPlayerResponse: %s", reloadPlayerResponse);
@@ -700,7 +726,7 @@ public class SabrStream {
         try {
             liveMetadata = LiveMetadata.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process LiveMetadata: %s", liveMetadata);
@@ -713,7 +739,7 @@ public class SabrStream {
         try {
             sabrSeek = SabrSeek.parseFrom(part.toStream());
         } catch (IOException e) {
-            throw new IllegalStateException(e);
+            throw partError(e);
         }
 
         Log.d(TAG, "Process SabrSeek: %s", sabrSeek);
@@ -740,6 +766,8 @@ public class SabrStream {
                 break;
             }
 
+            rememberPart(part);
+
             // Normal reading: 47, 58. 52, 53, 42, 35, 20, 21, 22, 20...
             if (contains(KNOWN_PARTS, part.partId)) {
                 Log.d(TAG, "Found known part: id=%s, size=%s, position=%s", part.partId, part.size, part.data.getPosition());
@@ -761,6 +789,47 @@ public class SabrStream {
         }
 
         return part;
+    }
+
+    private void rememberPart(UMPPart part) {
+        long position = part.data.getPosition();
+
+        // Where the response is read to, past the last part's within a response (its header and payload come between): not past it is
+        // another response's first part
+        if (position <= partTrailPosition) {
+            partTrailCount = 0;
+        }
+
+        partTrailPosition = position;
+        partTrailIds[partTrailCount % PART_TRAIL_LENGTH] = part.partId;
+        partTrailSizes[partTrailCount % PART_TRAIL_LENGTH] = part.size;
+        partTrailCount++;
+    }
+
+    /**
+     * The parts of the response being read, the last PART_TRAIL_LENGTH of them oldest first, as "id:size", e.g. "35:12 20:1500": the
+     * broken part is the last. Only itself for a response whose first part it was.
+     */
+    /* package */ String getPartTrail() {
+        StringBuilder trail = new StringBuilder();
+
+        for (int i = Math.max(0, partTrailCount - PART_TRAIL_LENGTH); i < partTrailCount; i++) {
+            if (trail.length() > 0) {
+                trail.append(' ');
+            }
+
+            trail.append(partTrailIds[i % PART_TRAIL_LENGTH]).append(':').append(partTrailSizes[i % PART_TRAIL_LENGTH]);
+        }
+
+        return trail.toString();
+    }
+
+    /**
+     * A part's payload that doesn't read as the protobuf its id says is a broken response (see BrokenPartError). Any other failure of
+     * the read is the connection's, under the same wrapper as before.
+     */
+    private static IllegalStateException partError(IOException e) {
+        return e instanceof InvalidProtocolBufferException ? new BrokenPartError(e.toString(), e) : new IllegalStateException(e);
     }
 
     /**

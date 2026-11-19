@@ -30,11 +30,11 @@ import com.google.android.exoplayer2.source.sabr.manifest.SabrManifest;
 import com.google.android.exoplayer2.source.sabr.parser.adapter.SabrFragmentedMp4Adapter;
 import com.google.android.exoplayer2.source.sabr.parser.adapter.SabrMatroskaAdapter;
 import com.google.android.exoplayer2.source.sabr.parser.SabrStream;
+import com.google.android.exoplayer2.source.sabr.parser.exceptions.BrokenResponseError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrBackoffError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
-import com.google.android.exoplayer2.source.sabr.parser.exceptions.UnknownPartError;
 import com.google.android.exoplayer2.source.sabr.parser.models.AudioSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.CaptionSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.FormatSelector;
@@ -579,9 +579,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     public boolean onChunkLoadError(Chunk chunk, boolean cancelable, Exception e, long blacklistDurationMs) {
         Throwable cause = e.getCause();
 
-        if (cause instanceof UnknownPartError) {
-            // What the response was, told with the error (T33S5T0B: a part id of 109 where the response began)
-            ((UnknownPartError) cause).setContentType(getContentType(chunk));
+        if (cause instanceof BrokenResponseError) {
+            // What the response was, told with the error (T33S5T0B: a part id of 109 where the response began): its type, and whether it
+            // came encoded or short of its length, which an engine's connection may handle unlike another's
+            ((BrokenResponseError) cause).setResponse(getResponseHeader(chunk, "Content-Type"), getResponseHeader(chunk, "Content-Encoding"),
+                    parseLength(getResponseHeader(chunk, "Content-Length")), chunk.bytesLoaded());
         }
 
         Log.e(TAG, "Chunk load failed: " + e.getMessage());
@@ -803,10 +805,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     }
 
     /**
-     * Of the chunk's response, e.g. "application/vnd.yt-ump": null when it had none. Its name in any case (OkHttp tells it in lower case).
+     * Of the chunk's response, e.g. "application/vnd.yt-ump" for "Content-Type": null when it had none. The name in any case (OkHttp
+     * tells it in lower case).
      */
     @Nullable
-    private static String getContentType(Chunk chunk) {
+    private static String getResponseHeader(Chunk chunk, String name) {
         Map<String, List<String>> headers = chunk.getResponseHeaders();
 
         if (headers == null) {
@@ -814,12 +817,27 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         }
 
         for (Map.Entry<String, List<String>> header : headers.entrySet()) {
-            if ("Content-Type".equalsIgnoreCase(header.getKey()) && header.getValue() != null && !header.getValue().isEmpty()) {
+            if (name.equalsIgnoreCase(header.getKey()) && header.getValue() != null && !header.getValue().isEmpty()) {
                 return header.getValue().get(0);
             }
         }
 
         return null;
+    }
+
+    /**
+     * -1 for none, or what isn't a number
+     */
+    private static long parseLength(@Nullable String contentLength) {
+        if (contentLength == null) {
+            return -1;
+        }
+
+        try {
+            return Long.parseLong(contentLength.trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
