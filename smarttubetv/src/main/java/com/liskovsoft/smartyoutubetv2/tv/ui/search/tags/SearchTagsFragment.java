@@ -271,6 +271,11 @@ public class SearchTagsFragment extends SearchTagsFragmentBase {
         mSearchPresenter.onSearchSettingsClicked();
     }
 
+    @Override
+    public void setSearchOptionsActive(boolean active) {
+        // The classic settings orb has no active look
+    }
+
     private void checkScrollEnd(Video item) {
         VideoGroupObjectAdapter resultsAdapter = getItemResultsAdapter(item);
 

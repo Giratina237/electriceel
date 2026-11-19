@@ -15,4 +15,8 @@ public interface SearchView {
     String getSearchText();
     void startVoiceRecognition();
     void finishReally();
+    /**
+     * Any search filter or sort order other than the default is set
+     */
+    void setSearchOptionsActive(boolean active);
 }

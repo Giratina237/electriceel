@@ -69,6 +69,7 @@ public class ModernSearchFragment extends Fragment implements SearchView {
     private String mSearchedQuery;
     private ModernVoiceSearch mVoice;
     private View mMic;
+    private View mFilters;
     private boolean mFocusResultsPending;
     private boolean mIsFragmentCreated;
     private final ViewTreeObserver.OnGlobalFocusChangeListener mFocusListener = (oldFocus, newFocus) -> onFocusMoved(newFocus);
@@ -117,7 +118,12 @@ public class ModernSearchFragment extends Fragment implements SearchView {
         mMic = root.findViewById(R.id.modern_search_mic);
         mMic.setBackground(ModernColorScheme.micBackground(requireContext()));
         mMic.setOnClickListener(v -> startVoiceRecognition());
-        mVoice = new ModernVoiceSearch(requireContext(), new ModernVoiceSearch.Callback() {
+        // As the classic search bar's settings orb: the filters and the sort order. Same look as the mic, activated (the
+        // accent) while any is set.
+        mFilters = root.findViewById(R.id.modern_search_filters);
+        mFilters.setBackground(ModernColorScheme.micBackground(requireContext()));
+        mFilters.setOnClickListener(v -> mPresenter.onSearchSettingsClicked());
+        mVoice =new ModernVoiceSearch(requireContext(), new ModernVoiceSearch.Callback() {
             @Override
             public void onListening(boolean listening) {
                 mMic.setActivated(listening);
@@ -306,6 +312,13 @@ public class ModernSearchFragment extends Fragment implements SearchView {
     public void finishReally() {
         if (getActivity() instanceof LeanbackActivity) {
             ((LeanbackActivity) getActivity()).finishReally();
+        }
+    }
+
+    @Override
+    public void setSearchOptionsActive(boolean active) {
+        if (mFilters != null) {
+            mFilters.setActivated(active);
         }
     }
 

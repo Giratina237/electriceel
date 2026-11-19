@@ -51,6 +51,21 @@
                 android:textCursorDrawable="@drawable/modern_search_cursor"
                 android:textSize="@dimen/modern_search_field_text"
                 android:textStyle="bold" />
+
+            <!-- The search filters (upload date, duration, type, features, sort), as the classic search bar's settings orb.
+                 Activated while any is set. -->
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/modern_search_filters"
+                android:layout_width="@dimen/modern_search_mic_size"
+                android:layout_height="@dimen/modern_search_mic_size"
+                android:layout_marginStart="@dimen/modern_search_box_gap"
+                android:background="@drawable/modern_mic_circle"
+                android:contentDescription="@string/settings_search"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:padding="9dp"
+                android:src="@drawable/modern_ic_tune"
+                app:tint="@color/modern_top_bar_content" />
         </LinearLayout>
 
         <!-- Previous searches and suggestions: one column across the screen -->

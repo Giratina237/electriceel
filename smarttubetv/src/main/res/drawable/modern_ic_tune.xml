@@ -1,0 +1,10 @@
+<!-- Material Symbols "tune" with the rounded ends of Material Symbols Rounded, Apache License 2.0 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M160,200H480A40,40 0,0 1,480,280H160A40,40 0,0 1,160,200ZM680,160V320A40,40 0,0 1,600,320V160A40,40 0,0 1,680,160ZM680,200H800A40,40 0,0 1,800,280H680A40,40 0,0 1,680,200ZM160,440H280A40,40 0,0 1,280,520H160A40,40 0,0 1,160,440ZM360,400V560A40,40 0,0 1,280,560V400A40,40 0,0 1,360,400ZM480,440H800A40,40 0,0 1,800,520H480A40,40 0,0 1,480,440ZM160,680H320A40,40 0,0 1,320,760H160A40,40 0,0 1,160,680ZM520,640V800A40,40 0,0 1,440,800V640A40,40 0,0 1,520,640ZM520,680H800A40,40 0,0 1,800,760H520A40,40 0,0 1,520,680Z"/>
+</vector>

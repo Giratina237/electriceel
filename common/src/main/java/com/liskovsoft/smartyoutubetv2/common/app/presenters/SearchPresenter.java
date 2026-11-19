@@ -74,6 +74,8 @@ public class SearchPresenter extends BasePresenter<SearchView> implements VideoG
         }
 
         getView().setTagsProvider(new MediaServiceSearchTagProvider(getSearchData().isSearchHistoryDisabled()));
+        // A new view of the same search (e.g. the skin switched) shows the filters still set
+        getView().setSearchOptionsActive(hasSearchOptions());
 
         startSearchInt();
     }
@@ -372,7 +374,7 @@ public class SearchPresenter extends BasePresenter<SearchView> implements VideoG
             options.add(UiOptionItem.from(getContext().getString(pair[0]),
                     optionItem -> {
                         mUploadDateOptions = pair[1];
-                        loadSearchResult();
+                        onSearchOptionsChanged();
                     },
                     mUploadDateOptions == pair[1]));
         }
@@ -391,7 +393,7 @@ public class SearchPresenter extends BasePresenter<SearchView> implements VideoG
             options.add(UiOptionItem.from(getContext().getString(pair[0]),
                     optionItem -> {
                         mDurationOptions = pair[1];
-                        loadSearchResult();
+                        onSearchOptionsChanged();
                     },
                     mDurationOptions == pair[1]));
         }
@@ -411,7 +413,7 @@ public class SearchPresenter extends BasePresenter<SearchView> implements VideoG
             options.add(UiOptionItem.from(getContext().getString(pair[0]),
                     optionItem -> {
                         mTypeOptions = pair[1];
-                        loadSearchResult();
+                        onSearchOptionsChanged();
                     },
                     mTypeOptions == pair[1]));
         }
@@ -429,7 +431,7 @@ public class SearchPresenter extends BasePresenter<SearchView> implements VideoG
             options.add(UiOptionItem.from(getContext().getString(pair[0]),
                     optionItem -> {
                         mFeatureOptions = optionItem.isSelected() ? mFeatureOptions | pair[1] : mFeatureOptions & ~pair[1];
-                        loadSearchResult();
+                        onSearchOptionsChanged();
                     },
                     (mFeatureOptions & pair[1]) == pair[1]));
         }
@@ -440,20 +442,33 @@ public class SearchPresenter extends BasePresenter<SearchView> implements VideoG
     private void appendSortByCategory(AppDialogPresenter settingsPresenter) {
         List<OptionItem> options = new ArrayList<>();
 
+        // No upload date or rating: YouTube ignores both since its January 2026 filter change (the results come in the
+        // relevance order), and the results don't carry what a local sort would need (no rating; only an "N days ago"
+        // in the UI language, for the first page loaded)
         for (int[] pair : new int[][] {
                 {R.string.sort_by_relevance, 0},
-                {R.string.sort_by_date, SearchOptions.SORT_BY_UPLOAD_DATE},
-                {R.string.sort_by_views, SearchOptions.SORT_BY_VIEW_COUNT},
-                {R.string.sort_by_rating, SearchOptions.SORT_BY_RATING}}) {
+                {R.string.sort_by_views, SearchOptions.SORT_BY_VIEW_COUNT}}) {
             options.add(UiOptionItem.from(getContext().getString(pair[0]),
                     optionItem -> {
                         mSortingOptions = pair[1];
-                        loadSearchResult();
+                        onSearchOptionsChanged();
                     },
                     mSortingOptions == pair[1]));
         }
 
         settingsPresenter.appendRadioCategory(getContext().getString(R.string.search_sorting), options);
+    }
+
+    private boolean hasSearchOptions() {
+        return (mUploadDateOptions | mDurationOptions | mTypeOptions | mFeatureOptions | mSortingOptions) != 0;
+    }
+
+    private void onSearchOptionsChanged() {
+        if (getView() != null) {
+            getView().setSearchOptionsActive(hasSearchOptions());
+        }
+
+        loadSearchResult();
     }
 
     public void forceFinish() {
