@@ -121,6 +121,7 @@ public final class SentenceSubtitles implements SubtitleDecoderFactory, OnDataCh
     @Override
     public SubtitleDecoder createDecoder(Format format) {
         SubtitleDecoder decoder = SubtitleDecoderFactory.DEFAULT.createDecoder(format);
+        StyledCaptions.onTrackChanged();
 
         if (decoder instanceof SimpleSubtitleDecoder && isWholeFile(format)) {
             ((SimpleSubtitleDecoder) decoder).setTransformer(new Transformer());
@@ -148,6 +149,7 @@ public final class SentenceSubtitles implements SubtitleDecoderFactory, OnDataCh
 
         @Override
         public Subtitle transform(Subtitle subtitle) {
+            StyledCaptions.onFileDecoded(subtitle);
             Switch result = new Switch(subtitle, this);
 
             if (mIsEnabled) {

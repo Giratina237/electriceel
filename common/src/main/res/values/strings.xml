@@ -1106,6 +1106,8 @@
     <string name="mute_censored_words_desc">Mutes the words YouTube\'s automatic captions show as [ __ ], with subtitles on or off. Only on videos with automatic captions.</string>
     <string name="subtitle_sentences">One sentence at a time</string>
     <string name="subtitle_sentences_desc">Shows each sentence whole, from when it starts until the next one does. Automatic captions without punctuation are split at the pauses. Not on live streams.</string>
+    <string name="caption_styles">Caption colors and placement</string>
+    <string name="caption_styles_desc">Shows the colors, italics and places captions were given, such as a color per speaker. On by itself for captions that have them.</string>
     <string name="player_end_screen">Show end screen cards</string>
     <string name="player_end_screen_desc">The videos, playlists, channels and links a creator puts over the end of a video. Press up to pick one.</string>
     <string name="player_info_cards">Show mid-video cards</string>

@@ -27,6 +27,8 @@ public class SubtitleSettingsPresenter extends BasePresenter<Void> {
 
         settingsPresenter.appendSingleSwitch(AppDialogUtil.createSubtitleChannelOption(getContext()));
         settingsPresenter.appendSingleSwitch(AppDialogUtil.createSentenceSubtitlesOption(getContext()));
+        // No video's captions here: off in general (see CaptionStylesData)
+        settingsPresenter.appendSingleSwitch(AppDialogUtil.createCaptionStylesOption(getContext(), false));
         settingsPresenter.appendSingleSwitch(AppDialogUtil.createMuteCensoredWordsOption(getContext()));
         // Can't work properly. There is no robust language detection.
         //appendSubtitleLanguageCategory(settingsPresenter);

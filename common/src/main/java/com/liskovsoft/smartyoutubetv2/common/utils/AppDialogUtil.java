@@ -48,6 +48,7 @@ import com.liskovsoft.smartyoutubetv2.common.misc.MusicAutoplayManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.WatchLaterManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.CensoredWordsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SentenceSubtitlesData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.CaptionStylesData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SponsorBlockData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
@@ -593,6 +594,18 @@ public class AppDialogUtil {
                 context.getString(R.string.subtitle_sentences_desc),
                 optionItem -> data.setEnabled(optionItem.isSelected()),
                 data.isEnabled()
+        );
+    }
+
+    /**
+     * @param isShownStyled the captions shown now have colors, italics or places of their own (see StyledCaptions#isTrackStyled)
+     */
+    public static OptionItem createCaptionStylesOption(Context context, boolean isShownStyled) {
+        CaptionStylesData data = CaptionStylesData.instance(context);
+        return UiOptionItem.from(context.getString(R.string.caption_styles),
+                context.getString(R.string.caption_styles_desc),
+                optionItem -> data.setEnabled(optionItem.isSelected()),
+                data.isEnabled(isShownStyled)
         );
     }
 

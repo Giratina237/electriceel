@@ -243,6 +243,7 @@ public final class SyncedSettings {
         add("player.pitch", 58, Type.FLOAT, "Pitch");
         add("player.skipShorts", 59, Type.BOOL, "Skip Shorts");
         whole("player.subtitleSentences", SentenceSubtitlesData.class.getSimpleName(), "Subtitles one sentence at a time");
+        whole("player.captionStyles", CaptionStylesData.class.getSimpleName(), "Caption colors and placement");
 
         section("Player tweaks", PlayerTweaksData.VIDEO_PLAYER_TWEAKS_DATA, true);
         // Not the workarounds of hardware, decoders, streams and audio output: 0-5, 7-10, 12, 18, 21, 26-30, 34, 38, 42, 47, 51, 54, 59

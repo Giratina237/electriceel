@@ -18,6 +18,7 @@ import com.google.android.exoplayer2.ui.SubtitleView;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AppPrefs;
+import com.liskovsoft.smartyoutubetv2.common.prefs.CaptionStylesData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.common.DataChangeBase.OnDataChange;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 
@@ -31,6 +32,7 @@ public class SubtitleManager implements TextOutput, OnDataChange {
     private final List<SubtitleStyle> mSubtitleStyles = new ArrayList<>();
     private final AppPrefs mPrefs;
     private final PlayerData mPlayerData;
+    private final CaptionStylesData mCaptionStylesData;
     private CharSequence subsBuffer;
 
     public static class SubtitleStyle {
@@ -61,6 +63,8 @@ public class SubtitleManager implements TextOutput, OnDataChange {
         mPrefs = AppPrefs.instance(mContext);
         mPlayerData = PlayerData.instance(mContext);
         mPlayerData.setOnChange(this);
+        mCaptionStylesData = CaptionStylesData.instance(mContext);
+        mCaptionStylesData.setOnChange(this);
         configureSubtitleView();
     }
 
@@ -71,8 +75,16 @@ public class SubtitleManager implements TextOutput, OnDataChange {
 
     @Override
     public void onCues(List<Cue> cues) {
-        if (mSubtitleView != null) {
-            mSubtitleView.setCues(forceCenterAlignment(cues));
+        if (mSubtitleView == null) {
+            return;
+        }
+
+        // In the colors, italics and places their author gave them (see StyledCaptions)
+        if (mCaptionStylesData.isApplied() && StyledCaptions.containsStyled(cues)) {
+            mSubtitleView.setCues(StyledCaptions.place(cues));
+            subsBuffer = null;
+        } else {
+            mSubtitleView.setCues(forceCenterAlignment(StyledCaptions.withJoinedLines(cues)));
         }
     }
 
@@ -137,8 +149,9 @@ public class SubtitleManager implements TextOutput, OnDataChange {
 
     private void configureSubtitleView() {
         if (mSubtitleView != null) {
-            // disable default style
-            mSubtitleView.setApplyEmbeddedStyles(false);
+            // Only the colors and italics of the captions that have them (see StyledCaptions), not their sizes: the size setting's kept
+            mSubtitleView.setApplyEmbeddedStyles(mCaptionStylesData.isApplied());
+            mSubtitleView.setApplyEmbeddedFontSizes(false);
 
             SubtitleStyle subtitleStyle = getSubtitleStyle();
 

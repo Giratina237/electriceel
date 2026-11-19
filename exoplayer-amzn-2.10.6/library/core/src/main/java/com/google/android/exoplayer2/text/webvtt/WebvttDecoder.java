@@ -20,8 +20,10 @@ import com.google.android.exoplayer2.ParserException;
 import com.google.android.exoplayer2.text.SimpleSubtitleDecoder;
 import com.google.android.exoplayer2.text.SubtitleDecoderException;
 import com.google.android.exoplayer2.util.ParsableByteArray;
+import com.google.android.exoplayer2.util.Util;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * A {@link SimpleSubtitleDecoder} for WebVTT.
@@ -38,6 +40,11 @@ public final class WebvttDecoder extends SimpleSubtitleDecoder {
 
   private static final String COMMENT_START = "NOTE";
   private static final String STYLE_START = "STYLE";
+  // MOD: YouTube writes its cues' styles (e.g. a color per speaker) into the header, between these lines, not into a STYLE block
+  private static final String YOUTUBE_STYLE_START = "Style:";
+  private static final String YOUTUBE_STYLE_END = "##";
+  // YouTube's "green" is #00FF00 (CSS's lime), as its own player and its srv3 captions have it. CSS's green is #008000.
+  private static final Pattern YOUTUBE_GREEN = Pattern.compile("(color\\s*:\\s*)green\\b");
 
   private final WebvttCueParser cueParser;
   private final ParsableByteArray parsableWebvttData;
@@ -68,7 +75,7 @@ public final class WebvttDecoder extends SimpleSubtitleDecoder {
     } catch (ParserException e) {
       throw new SubtitleDecoderException(e);
     }
-    while (!TextUtils.isEmpty(parsableWebvttData.readLine())) {}
+    readHeader(parsableWebvttData);
 
     int event;
     ArrayList<WebvttCue> subtitles = new ArrayList<>();
@@ -115,6 +122,31 @@ public final class WebvttDecoder extends SimpleSubtitleDecoder {
     }
     parsableWebvttData.setPosition(currentInputPosition);
     return foundEvent;
+  }
+
+  /**
+   * MOD: skips the rest of the header, but for the styles YouTube writes into it
+   */
+  private void readHeader(ParsableByteArray parsableWebvttData) {
+    String line;
+    while (!TextUtils.isEmpty(line = parsableWebvttData.readLine())) {
+      if (!YOUTUBE_STYLE_START.equals(line)) {
+        continue;
+      }
+
+      StringBuilder css = new StringBuilder();
+      while (!TextUtils.isEmpty(line = parsableWebvttData.readLine()) && !YOUTUBE_STYLE_END.equals(line)) {
+        css.append(line).append('\n');
+      }
+
+      String fixedCss = YOUTUBE_GREEN.matcher(css).replaceAll("$1lime");
+      definedStyles.addAll(cssParser.parseBlock(new ParsableByteArray(Util.getUtf8Bytes(fixedCss))));
+
+      if (TextUtils.isEmpty(line)) {
+        // The header ended within the styles
+        return;
+      }
+    }
   }
 
   private static void skipComment(ParsableByteArray parsableWebvttData) {

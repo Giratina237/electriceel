@@ -34,6 +34,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMe
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.AutoFrameRateSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStart;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.StyledCaptions;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.SubtitleTrack;
 import com.liskovsoft.smartyoutubetv2.common.misc.ChildModeManager;
@@ -243,6 +244,8 @@ public class PlayerUIController extends BasePlayerController {
 
         settingsPresenter.appendSingleSwitch(AppDialogUtil.createSubtitleChannelOption(getContext()));
         settingsPresenter.appendSingleSwitch(AppDialogUtil.createSentenceSubtitlesOption(getContext()));
+        settingsPresenter.appendSingleSwitch(AppDialogUtil.createCaptionStylesOption(getContext(),
+                isSubtitleSelected() && StyledCaptions.isTrackStyled()));
         settingsPresenter.appendSingleSwitch(AppDialogUtil.createMuteCensoredWordsOption(getContext()));
 
         OptionCategory stylesCategory = AppDialogUtil.createSubtitleStylesCategory(getContext());
