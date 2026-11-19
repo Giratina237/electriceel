@@ -135,6 +135,7 @@ public class DiagnosticsContractTest {
         assertTrue(hasProtection);
         // What the player was told and did, why an attempt began, the playback mode and where the sound goes: checked too
         assertTrue(failures.toString().contains("\"commands\""));
+        assertTrue(failures.toString().contains("\"embed\":true"));
         assertTrue(failures.toString().contains("\"" + FormatAttempts.REASON_AFTER_FAILURE + "\""));
         assertTrue(failures.toString().contains("\"playbackMode\""));
         assertTrue(report.getJSONObject("app").getJSONObject("settings").has("playbackMode"));
@@ -367,8 +368,10 @@ public class DiagnosticsContractTest {
         FormatAttempts.onVideoRendered();
         FormatAttempts.onAudioPlayed();
 
+        // A card's preview's: its flag is in the schema
         PlayerFailure.create(getContext(), PlayerFailure.KIND_TRACK_LOAD_ERROR)
                 .video(video)
+                .embed(true)
                 .position(30_000, 212_000)
                 .http(404, "audio", null)
                 .action("select_other_codec")

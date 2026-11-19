@@ -14,14 +14,15 @@ import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.audio.AudioTrackCounts;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderErrorException;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderInitializationException;
+import com.google.android.exoplayer2.source.sabr.parser.exceptions.BrokenResponseError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrBackoffError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
-import com.google.android.exoplayer2.source.sabr.parser.exceptions.UnknownPartError;
 import com.google.android.exoplayer2.source.sabr.parser.parts.PoTokenStatusSabrPart.PoTokenStatus;
 import com.google.android.exoplayer2.upstream.HttpDataSource.HttpDataSourceException;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
@@ -51,8 +52,10 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUti
 import com.liskovsoft.smartyoutubetv2.common.misc.BufferingDetector;
 import com.liskovsoft.smartyoutubetv2.common.misc.BufferingDetector.OnLongBuffering;
 import com.liskovsoft.smartyoutubetv2.common.misc.MembersVideos;
+import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.common.utils.NetworkEngineFallback;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
 import com.liskovsoft.youtubeapi.videoinfo.V2.ClientAttempts;
@@ -107,8 +110,22 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * play (see runLongBufferingAction)
      */
     private static final long LOAD_HELD_STALL_MS = 5_000;
+    /**
+     * An audio track of fewer bits a second than this carries no sound (see applySilentAudioFallback): the lowest an audio format
+     * offers is about 48 kbps
+     */
+    private static final int MIN_SOUND_BITRATE = 16_000;
+    /**
+     * A live stream's metadata is read again at most this often for a video (see checkLiveEnd)
+     */
+    private static final long LIVE_END_CHECK_MS = 60_000;
     private final BufferingDetector mBufferingDetector = new BufferingDetector(this);
     private VideoLoaderController mVideoLoaderController;
+    /**
+     * The video whose live stream's metadata was read again last, and when (elapsed realtime): see checkLiveEnd
+     */
+    private String mLiveEndCheckVideoId;
+    private long mLiveEndCheckTimeMs;
     private int mDecoderErrorCount;
     /**
      * The video the decoder error count and fallbacks are for (see applyDecoderErrorFallback)
@@ -272,6 +289,15 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return;
         }
 
+        // Silent for all it played: the stream's. A sound that came and went is the video's.
+        if (PlaybackHealth.KIND_AUDIO_SILENT.equals(kind)) {
+            if (Boolean.TRUE.equals(failure.getDetail("silentFromStart"))) {
+                applySilentAudioFallback(failure);
+            }
+
+            return;
+        }
+
         FormatItem video = getPlayer().getVideoFormat();
         Format format = video != null && video.getTrack() != null ? video.getTrack().format : null;
         boolean isTooSlow = PlaybackHealth.KIND_STALLS.equals(kind) && FormatAttempts.isTooSlow();
@@ -283,7 +309,35 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
     }
 
+    /**
+     * The sound played silent from the start, for 15 s: AAC in the language of the track for this video, as for an audio decoder's
+     * error, unless it's AAC already. The format is marked failed already (see ExoPlayerController#recordHealthFailure), and the
+     * restart plays the video from here. Not for a track too small to carry a sound (RF6HBNNH #5 and #7: Opus at 3 and 4 kbps, which
+     * is a video with no sound): its silence is the video's, and another format of it is as silent.
+     */
+    private void applySilentAudioFallback(PlayerFailure failure) {
+        FormatItem audio = getPlayer().getAudioFormat();
+        Format format = audio != null && audio.getTrack() != null ? audio.getTrack().format : null;
+
+        if (format != null && format.bitrate > 0 && format.bitrate < MIN_SOUND_BITRATE) {
+            return;
+        }
+
+        FormatItem fallback = applyAudioFallback(format);
+
+        // None: AAC is played already, or its format isn't known. Nothing else to go on with.
+        if (fallback == null) {
+            return;
+        }
+
+        failure.action("audio_fallback:" + getFallbackName(fallback)).action("restart_engine");
+        mVideoLoaderController.restartEngine(failure.getKind());
+    }
+
     private void runLongBufferingAction(PlayerFailure failure) {
+        // The fixes below go on: a live stream that goes on is reloaded as before
+        checkLiveEnd(failure);
+
         if (isStreamEnded() || isAtVideoEnd()) {
             failure.action("play_end");
             getMainController().onPlayEnd();
@@ -457,6 +511,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mBufferingDetector.start();
         FormatAttempts.onNewVideo(getContext(), item != null ? item.videoId : null);
         PlayerCommands.onNewVideo(item != null ? item.videoId : null);
+        // OkHttp was for the video it was asked for: the chosen engine again for another one
+        NetworkEngineFallback.onNewVideo(item != null ? item.videoId : null);
 
         if (item != null && item.videoId != null && item.videoId.equals(mDecoderErrorVideoId)) {
             // The same video reloaded (e.g. on a SABR error). The reload cleared the temp formats, the fallback still applies.
@@ -573,6 +629,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             getMainController().onPlayEnd();
             return;
         }
+
+        checkLiveEnd(failure);
 
         if (applySabrReloadPlayerAction(error, failure)) {
             return;
@@ -799,18 +857,51 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
         failure.action("network_reload " + mNetworkErrorReloads + "/" + MAX_NETWORK_ERROR_RELOADS);
 
+        if (isBrokenResponse(error)) {
+            applyOkHttpFallback(video, failure);
+        }
+
         return true;
     }
 
     /**
+     * A SABR response read out of step happened with Cronet or the default engine 20 times in 628 plays, and with OkHttp none in 679
+     * (2026-11-19's submissions: FVNAAYZD, RF6HBNNH, F8DMFX2M, 84ENEA2S, 2Q5RK79E, DMQEWB9B). Whether it's the engine's isn't known:
+     * the video's reload reads with OkHttp, and a response broken again says it isn't (its failure has the engine in use). For this video
+     * only, the engine saved in the settings is the user's (see NetworkEngineFallback). The reload builds the player's connections anew
+     * (see ExoMediaSourceFactory#releaseIfEngineChanged).
+     */
+    private void applyOkHttpFallback(Video video, PlayerFailure failure) {
+        if (getPlayerTweaksData().isNetworkErrorFixingDisabled()) {
+            return;
+        }
+
+        String engine = null;
+
+        try {
+            engine = Utils.getEffectiveNetworkEngine(getContext());
+        } catch (RuntimeException e) {
+            // Cronet couldn't be checked: it's not OkHttp that's in use
+        }
+
+        if (Helpers.equalsAny(engine, Utils.NETWORK_ENGINE_OKHTTP, Utils.NETWORK_ENGINE_OKHTTP_NO_IPV6)) {
+            return;
+        }
+
+        failure.action("engine_okhttp_for_video");
+        NetworkEngineFallback.useOkHttpFor(video.videoId);
+    }
+
+    /**
      * The response read had bytes its format doesn't start with, broken on the way or read out of step, not the client's formats: a
-     * SABR one no part starts with (see SabrStream#nextKnownUMPPart), or a segment the extractor can't parse once the video played
-     * (CX17FXZW #13: "Skipping atom with length > 2147483647" in a DASH segment, right after a 17.7 s stall at 706 kbps). One that
-     * fails the same way each time is the client's after MAX_NETWORK_ERROR_RELOADS.
+     * SABR one no part starts with (see SabrStream#nextKnownUMPPart), a part whose size can't be skipped or whose payload isn't its
+     * protobuf (DMQEWB9B #1, FVNAAYZD #13 and #15: these were the client's switch), or a segment the extractor can't parse once the
+     * video played (CX17FXZW #13: "Skipping atom with length > 2147483647" in a DASH segment, right after a 17.7 s stall at 706 kbps).
+     * One that fails the same way each time is the client's after MAX_NETWORK_ERROR_RELOADS.
      */
     private static boolean isBrokenResponse(Throwable error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
-            if (cause instanceof UnknownPartError || cause instanceof ParserException) {
+            if (cause instanceof BrokenResponseError || cause instanceof ParserException) {
                 return true;
             }
         }
@@ -1056,8 +1147,13 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         List<ClientAttempts.Attempt> attempts = getVideo() != null ? ClientAttempts.get(getVideo().videoId) : null;
         ClientAttempts.Attempt unplayable = getUnplayable(attempts);
         PlayerFailure failure = newFailure(unplayable != null ? PlayerFailure.KIND_UNPLAYABLE : PlayerFailure.KIND_FORMAT_ERROR)
-                .error(error)
                 .clientAttempts(attempts);
+
+        // Every client said it can't be played: the error is only that no formats came ("fromNullable result is null"), and it said
+        // nothing the playability doesn't (19 of 8E1WXX00's 31 failures, a chain of members-only videos). Not recorded as one.
+        if (unplayable == null || !isEmptyResult(error)) {
+            failure.error(error);
+        }
 
         // The start ends at the failed fetch, not when the user leaves (see VideoStarts#onFormatsFailed)
         if (getVideo() != null) {
@@ -1074,6 +1170,13 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         } finally {
             failure.record();
         }
+    }
+
+    /**
+     * The fetch of the formats gave none: RxHelper's error for a null result, which tells nothing of why
+     */
+    private static boolean isEmptyResult(@Nullable Throwable error) {
+        return error != null && Helpers.containsAny(error.getMessage(), "fromNullable result is null");
     }
 
     /**
@@ -1348,6 +1451,64 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
+     * A live stream stalls, or fails to load, close to the end of its timeline: it may have ended while it played. Its metadata knows
+     * (see Video#sync): that is read at the first and a minute after, while the fix below goes on. A stream the server calls live
+     * isn't touched. Once its stream ended, its reloads load segments past the end that 404 and stall again, 7 failures and 3 minutes in
+     * FVNAAYZD #29–#35, and what the video's metadata said was only read again once a reload had loaded it, as in #9 and #10 (21 s).
+     */
+    private void checkLiveEnd(PlayerFailure failure) {
+        Video video = getVideo();
+
+        if (video == null || getPlayer() == null || !video.isLive || video.isLiveEnd) {
+            return;
+        }
+
+        long durationMs = getPlayer().getDurationMs();
+
+        // A live stream stalling at its head is a connection's, not an end: only the last minutes of its timeline are checked
+        if (durationMs <= 0 || durationMs - getPlayer().getPositionMs() >= STREAM_END_THRESHOLD_MS) {
+            return;
+        }
+
+        long nowMs = SystemClock.elapsedRealtime();
+
+        if (Helpers.equals(video.videoId, mLiveEndCheckVideoId) && nowMs - mLiveEndCheckTimeMs < LIVE_END_CHECK_MS) {
+            return;
+        }
+
+        mLiveEndCheckVideoId = video.videoId;
+        mLiveEndCheckTimeMs = nowMs;
+        failure.action("live_end_check");
+        loadMetadata(video, metadata -> onLiveEndChecked(video, metadata));
+    }
+
+    /**
+     * Not the player's own metadata load: a test's
+     */
+    void loadMetadata(Video video, MediaServiceManager.OnMetadata onMetadata) {
+        MediaServiceManager.instance().loadMetadata(video, onMetadata);
+    }
+
+    /**
+     * The metadata of a live stream that stalled near its end (see checkLiveEnd): not live any more, it ended, and the reload asked for
+     * is of a stream with nothing left to play
+     */
+    private void onLiveEndChecked(Video video, @Nullable MediaItemMetadata metadata) {
+        if (metadata == null || metadata.isLive() || getPlayer() == null || getVideo() != video) {
+            return;
+        }
+
+        video.isLiveEnd = true;
+        Log.d(TAG, "The live stream ended: " + video.videoId);
+
+        if (mVideoLoaderController != null) {
+            mVideoLoaderController.cancelPendingFixes();
+        }
+
+        getMainController().onPlayEnd();
+    }
+
+    /**
      * A video (not a live stream) that played, stalled at its end: it ended. One that never played is stuck at its start
      */
     private boolean isAtVideoEnd() {
@@ -1465,7 +1626,13 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * The video, where the player is at, its formats and where they're from
      */
     private PlayerFailure newFailure(String kind) {
-        PlayerFailure failure = PlayerFailure.create(getContext(), kind).video(getVideo());
+        Video video = getVideo();
+        PlayerFailure failure = PlayerFailure.create(getContext(), kind).video(video).embed(isEmbedPlayer());
+
+        if (video == null) {
+            // None at hand, e.g. the player is gone: the one the formats tried are of (DMQEWB9B #1 had no video ID at all)
+            failure.videoId(FormatAttempts.getVideoId());
+        }
 
         if (mVideoLoaderController != null) {
             failure.source(mVideoLoaderController.getFormatClient(), mVideoLoaderController.getFormatProtocol());

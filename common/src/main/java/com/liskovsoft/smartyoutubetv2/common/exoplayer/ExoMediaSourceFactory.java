@@ -45,6 +45,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.DashDefaultLoadErr
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.SabrDefaultLoadErrorHandlingPolicy;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.common.utils.NetworkEngineFallback;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.googlecommon.common.helpers.DefaultHeaders;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CancelableCalls;
@@ -84,6 +85,11 @@ public class ExoMediaSourceFactory {
     private DataSource.Factory mMediaDataSourceFactory;
     private DataSource.Factory mSabrMediaDataSourceFactory;
     private DataSource.Factory mDashMediaDataSourceFactory;
+    /**
+     * The engine the factories above were built for (see #getDataSource), -1 before the first: they're built again for another (e.g. the
+     * one OkHttp a video's SABR response asked for, see NetworkEngineFallback, and the chosen one for the next video)
+     */
+    private int mBuiltDataSource = -1;
 
     /**
      * At the process start, before any video's formats are fetched: a live stream whose formats have no URLs is asked its head over
@@ -158,6 +164,26 @@ public class ExoMediaSourceFactory {
     }
 
     /**
+     * The engine of the player's connections: the one chosen in the settings, unless it can't be, or a video's SABR response asked for
+     * OkHttp (see NetworkEngineFallback). IPv6 doesn't connect: only OkHttp can leave it out, the saved engine is used again after a
+     * restart.
+     */
+    private int getDataSource() {
+        return OkHttpManager.isIpv6Disabled() || NetworkEngineFallback.isOkHttp() ? PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP
+                : PlayerTweaksData.instance(mContext).getPlayerDataSource();
+    }
+
+    /**
+     * The factories are kept for the sources made, they're built for the engine of the time: another one is asked for (e.g. OkHttp for
+     * a video, then the chosen one for the next) makes them anew
+     */
+    private void releaseIfEngineChanged() {
+        if (mBuiltDataSource != -1 && mBuiltDataSource != getDataSource()) {
+            release();
+        }
+    }
+
+    /**
      * Returns a new HttpDataSource factory.
      *
      * @param useBandwidthMeter Whether to set {@link #BANDWIDTH_METER} as a listener to the new
@@ -165,9 +191,8 @@ public class ExoMediaSourceFactory {
      * @return A new HttpDataSource factory.
      */
     private HttpDataSource.Factory buildHttpDataSourceFactory(boolean useBandwidthMeter, int readTimeoutMs) {
-        PlayerTweaksData tweaksData = PlayerTweaksData.instance(mContext);
-        // IPv6 doesn't connect: only OkHttp can leave it out, the saved engine is used again after a restart
-        int source = OkHttpManager.isIpv6Disabled() ? PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP : tweaksData.getPlayerDataSource();
+        int source = getDataSource();
+        mBuiltDataSource = source;
         DefaultBandwidthMeter bandwidthMeter = useBandwidthMeter ? BANDWIDTH_METER : null;
         return source == PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP ? buildOkHttpDataSourceFactory(bandwidthMeter, readTimeoutMs) :
                         source == PlayerTweaksData.PLAYER_DATA_SOURCE_CRONET && CronetManager.getEngine(mContext) != null ? buildCronetDataSourceFactory(bandwidthMeter, readTimeoutMs) :
@@ -429,6 +454,7 @@ public class ExoMediaSourceFactory {
         mMediaDataSourceFactory = null;
         mSabrMediaDataSourceFactory = null;
         mDashMediaDataSourceFactory = null;
+        mBuiltDataSource = -1;
     }
 
     @NonNull
@@ -452,6 +478,8 @@ public class ExoMediaSourceFactory {
      * switches to the alternate network before the buffer runs dry.
      */
     private DataSource.Factory getSabrMediaDataSourceFactory() {
+        releaseIfEngineChanged();
+
         if (mSabrMediaDataSourceFactory == null) {
             mSabrMediaDataSourceFactory = buildDataSourceFactory(USE_BANDWIDTH_METER, SABR_READ_TIMEOUT_MS);
         }
@@ -489,6 +517,8 @@ public class ExoMediaSourceFactory {
      * A host that doesn't answer is left for the ones the YouTube app falls back to (see GoogleVideoFallback)
      */
     private DataSource.Factory getDashMediaDataSourceFactory() {
+        releaseIfEngineChanged();
+
         if (mDashMediaDataSourceFactory == null) {
             mDashMediaDataSourceFactory = GoogleVideoFallbackDataSource.wrap(buildDataSourceFactory(USE_BANDWIDTH_METER, DASH_READ_TIMEOUT_MS));
         }
@@ -501,6 +531,8 @@ public class ExoMediaSourceFactory {
      * getDashMediaDataSourceFactory). Not SABR's (see getSabrMediaDataSourceFactory).
      */
     private DataSource.Factory getMediaDataSourceFactory() {
+        releaseIfEngineChanged();
+
         if (mMediaDataSourceFactory == null) {
             mMediaDataSourceFactory = GoogleVideoFallbackDataSource.wrap(buildDataSourceFactory(USE_BANDWIDTH_METER));
         }

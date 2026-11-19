@@ -214,6 +214,18 @@ public class ExoPlayerController implements Player.EventListener {
         }
     };
 
+    /**
+     * The player is a card's preview (see EmbedPlayerView), not the one the user watches: told in its failures
+     */
+    private boolean mIsEmbed;
+
+    /**
+     * Of the embed player's controller, right after it's made
+     */
+    public void setEmbed(boolean isEmbed) {
+        mIsEmbed = isEmbed;
+    }
+
     public ExoPlayerController(Context context, PlayerEventListener eventListener) {
         PlayerTweaksData playerTweaksData = PlayerTweaksData.instance(context);
         mContext = context.getApplicationContext();
@@ -244,6 +256,7 @@ public class ExoPlayerController implements Player.EventListener {
         // Where the formats came from, as for the other failures: a SABR stream's HTTP 401s told neither (CX17FXZW #1-#4)
         PlayerFailure failure = PlayerFailure.create(mContext, PlayerFailure.KIND_TRACK_LOAD_ERROR)
                 .video(getVideo())
+                .embed(mIsEmbed)
                 .source(FormatAttempts.getClient(), FormatAttempts.getProtocol())
                 .http(responseCode, track, host, failed);
 
@@ -354,6 +367,7 @@ public class ExoPlayerController implements Player.EventListener {
     private void recordHealthFailure(String kind, PlaybackHealth.Sample sample) {
         PlayerFailure failure = PlayerFailure.create(mContext, kind)
                 .video(getVideo())
+                .embed(mIsEmbed)
                 .position(sample.positionMs, mPlayer.getDuration())
                 .formats(getVideoFormat(), getAudioFormat())
                 .source(FormatAttempts.getClient(), FormatAttempts.getProtocol())
@@ -416,6 +430,12 @@ public class ExoPlayerController implements Player.EventListener {
 
         // A tunneled decoder shows the frames itself: where it's at against the position (see TunneledFrames)
         VideoDecoderState.addTunnelingDetails(failure);
+
+        // Silent for all it played (the stream's), or for a long stretch of a sound that came (a quiet part: the video's): the fix is of the
+        // first (see ErrorFixerController#applySilentAudioFallback)
+        if (PlaybackHealth.KIND_AUDIO_SILENT.equals(kind)) {
+            failure.detail("silentFromStart", PlaybackHealth.isSilentFromStart(sample));
+        }
 
         // The stream that didn't work: frame drops and stalls play, worse. A clock that stands still isn't the video stream's.
         if (PlaybackHealth.KIND_NO_VIDEO.equals(kind) || PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && !isClockStuck) {
