@@ -55,6 +55,13 @@ public interface PlayerEngineEventListener {
     default void onHealthFailure(String kind, PlayerFailure failure) {
         // NOP
     }
+    /**
+     * A live stream's segments answer 404 on both tracks, and none loaded since, for a while (see LiveSegmentsGone): a fix adds its
+     * actions to the 404's failure, recorded after (see ErrorFixerController#onLiveSegmentsGone). Nothing by default.
+     */
+    default void onLiveSegmentsGone(PlayerFailure failure) {
+        // NOP
+    }
     void onTrackChanged(FormatItem track);
     void onTrackSelected(FormatItem track);
 }

@@ -945,7 +945,7 @@ public class AppDialogUtil {
     }
 
     /**
-     * The YouTube client's name, as the clients' order shows it: the ones that are signed in (TV and TV_DOWNGRADED) say so
+     * The YouTube client's name, as the clients' order shows it: the ones that are signed in (TV, TV_SAMSUNG and TV_DOWNGRADED) say so
      *
      * @param client e.g. TV, one of the order's (see MediaServiceData#getClientOrder)
      */

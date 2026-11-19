@@ -45,6 +45,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.ExoMediaSourceFactory;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.LiveSegmentsGone;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CensoredWords.Range;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.FrameStepper;
@@ -127,6 +128,10 @@ public class ExoPlayerController implements Player.EventListener {
      */
     private boolean mIsAudioLoadedSinceResume;
     /**
+     * A live stream's segments answer 404 on both tracks, none loaded since (see #onHttpError). Main thread only.
+     */
+    private final LiveSegmentsGone mLiveSegmentsGone = new LiveSegmentsGone();
+    /**
      * How the formats tried do (see FormatAttempts): a frame shown means the video works, plus the decoders, the frames dropped
      * and the throughput of the segments
      */
@@ -180,6 +185,15 @@ public class ExoPlayerController implements Player.EventListener {
             if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA) {
                 FormatAttempts.onLoad(loadEventInfo.bytesLoaded, loadEventInfo.loadDurationMs, isVideoLoad(mediaLoadData),
                         mediaLoadData.trackType == C.TRACK_TYPE_AUDIO, mediaLoadData.mediaEndTimeMs);
+
+                // The track's 404s before it were the live edge's. Muxed has the audio too.
+                if (isVideoLoad(mediaLoadData)) {
+                    mLiveSegmentsGone.onLoaded(true);
+                }
+
+                if (mediaLoadData.trackType == C.TRACK_TYPE_AUDIO || mediaLoadData.trackType == C.TRACK_TYPE_DEFAULT) {
+                    mLiveSegmentsGone.onLoaded(false);
+                }
             }
 
             if (isTimedLoad(mediaLoadData)) {
@@ -261,7 +275,32 @@ public class ExoPlayerController implements Player.EventListener {
             }
         }
 
-        failure.record();
+        long goneMs = getLiveSegmentsGoneMs(responseCode, track);
+
+        try {
+            if (goneMs >= 0) {
+                // A fix, with its actions recorded (see ErrorFixerController#onLiveSegmentsGone)
+                failure.detail("liveSegmentsGoneMs", goneMs);
+                mEventListener.onLiveSegmentsGone(failure);
+            }
+        } finally {
+            failure.record();
+        }
+    }
+
+    /**
+     * Of a live stream's 404 on its audio or video: how long the segments of both tracks have been gone (see LiveSegmentsGone), -1
+     * when they aren't
+     */
+    private long getLiveSegmentsGoneMs(int responseCode, String track) {
+        Video video = getVideo();
+        boolean isVideo = PlayerFailure.TRACK_VIDEO.equals(track);
+
+        if (responseCode != 404 || video == null || !video.isLive || !isVideo && !PlayerFailure.TRACK_AUDIO.equals(track)) {
+            return -1;
+        }
+
+        return mLiveSegmentsGone.onNotFound(video.videoId, isVideo, SystemClock.elapsedRealtime());
     }
 
     /**
