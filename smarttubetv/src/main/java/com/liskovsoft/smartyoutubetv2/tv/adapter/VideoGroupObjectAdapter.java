@@ -10,7 +10,9 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class VideoGroupObjectAdapter extends ObjectAdapter {
@@ -21,6 +23,7 @@ public class VideoGroupObjectAdapter extends ObjectAdapter {
     private static final int TYPE_ADD = 0;
     private static final int TYPE_REMOVE = 1;
     private static final int TYPE_SYNC = 2;
+    private Runnable mOnEmptied;
 
     public VideoGroupObjectAdapter(VideoGroup videoGroup, Presenter presenter) {
         super(presenter);
@@ -209,6 +212,66 @@ public class VideoGroupObjectAdapter extends ObjectAdapter {
                 group.remove(video);
             }
         }
+    }
+
+    /**
+     * Shows a change of Watch later at once on the cards of its videos, in every row and on every screen that has them, not only
+     * the card it was edited from (see VideoGroup#syncWatchLater): marks them or takes the mark off, or removes them where they're
+     * hidden. Set as the listener of WatchLaterManager when the app starts.
+     *
+     * @param changes by video id: it's in Watch later now (true) or not (false)
+     */
+    public static void syncWatchLater(Map<String, Boolean> changes) {
+        // A card may be in two adapters at once (see notifyOtherAdapters): its group decides once, for both
+        Map<Video, Integer> results = new IdentityHashMap<>();
+
+        for (VideoGroupObjectAdapter adapter : sAdapterRegistry.asList()) {
+            adapter.syncWatchLater(changes, results);
+        }
+    }
+
+    private void syncWatchLater(Map<String, Boolean> changes, Map<Video, Integer> results) {
+        boolean isRemoved = false;
+
+        // By position, as removeNotInterested
+        for (int i = mVideoItems.size() - 1; i >= 0; i--) {
+            Video video = mVideoItems.get(i);
+            VideoGroup group = video.getGroup();
+            Boolean isInWatchLater = video.videoId != null ? changes.get(video.videoId) : null;
+
+            if (group == null || isInWatchLater == null) {
+                continue;
+            }
+
+            Integer result = results.get(video);
+
+            if (result == null) {
+                result = group.syncWatchLater(video, isInWatchLater);
+                results.put(video, result);
+            }
+
+            if (result == VideoGroup.WATCH_LATER_HIDDEN) {
+                mVideoItems.remove(i);
+                notifyItemRangeRemoved(i, 1);
+                // The row continues from its size (see append)
+                group.remove(video);
+                isRemoved = true;
+            } else if (result == VideoGroup.WATCH_LATER_MARK_CHANGED) {
+                notifyItemRangeChanged(i, 1);
+            }
+        }
+
+        if (isRemoved && isEmpty() && mOnEmptied != null) {
+            mOnEmptied.run();
+        }
+    }
+
+    /**
+     * Its last card went other than through an update of its screen (see syncWatchLater): the screen lets its row go too, as it
+     * does after a removal
+     */
+    public void setOnEmptied(Runnable onEmptied) {
+        mOnEmptied = onEmptied;
     }
 
     public void removeAuthor(VideoGroup group) {

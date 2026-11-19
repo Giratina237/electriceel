@@ -31,10 +31,12 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.AudioOutputProbe;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.AudioTracksSinceBoot;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LastState;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.ExoMediaSourceFactory;
+import com.liskovsoft.smartyoutubetv2.common.misc.WatchLaterManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.HomeScreenPlaylistsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.NetworkData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
+import com.liskovsoft.smartyoutubetv2.tv.adapter.VideoGroupObjectAdapter;
 import com.liskovsoft.smartyoutubetv2.tv.ui.adddevice.AddDeviceActivity;
 import com.liskovsoft.smartyoutubetv2.tv.ui.browse.BrowseActivity;
 import com.liskovsoft.smartyoutubetv2.tv.ui.channel.ChannelActivity;
@@ -111,6 +113,8 @@ public class MainApplication extends MultiDexApplication implements Configuratio
 
         // The channels can be updated with nothing else of the app running
         HomeScreenPlaylistsData.registerChannelsSource(this);
+        // A change of Watch later shows at once on the cards of every screen
+        WatchLaterManager.setOnChanged(VideoGroupObjectAdapter::syncWatchLater);
         // A live stream with only a SABR URL is asked its head over it, before the player exists (e.g. a prefetch)
         ExoMediaSourceFactory.installSabrLiveHead();
     }

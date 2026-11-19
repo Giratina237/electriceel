@@ -3,6 +3,8 @@ package com.liskovsoft.smartyoutubetv2.common.misc;
 import android.annotation.SuppressLint;
 import android.content.Context;
 
+import androidx.annotation.Nullable;
+
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
 import com.liskovsoft.mediaserviceinterfaces.oauth.Account;
 import com.liskovsoft.sharedutils.helpers.FileHelpers;
@@ -17,6 +19,7 @@ import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
 
 import java.io.File;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +38,8 @@ import io.reactivex.subjects.BehaviorSubject;
  * for {@link #MAX_HOLD_MS} at most.
  * It's kept on disk, so a start doesn't wait for it, and read again in the background once it's {@link #REFRESH_PERIOD_MS} old.<br/>
  * Videos added or removed in the app count right away (see {@link #onPlaylistEdited}), and it's read again at once
- * when YouTube changed it (see {@link #reload}).
+ * when YouTube changed it (see {@link #reload}).<br/>
+ * The cards already shown follow each change, in every row and on every screen that has the video (see {@link OnChanged}).
  */
 public class WatchLaterManager {
     private static final String TAG = WatchLaterManager.class.getSimpleName();
@@ -49,6 +53,7 @@ public class WatchLaterManager {
     private static final long MAX_HOLD_MS = 10_000;
     @SuppressLint("StaticFieldLeak")
     private static WatchLaterManager sInstance;
+    private static OnChanged sOnChanged;
     private final Context mContext;
     private final File mIdsFile;
     private Loader mLoader;
@@ -65,7 +70,6 @@ public class WatchLaterManager {
     // The list saved on disk is known
     private final BehaviorSubject<Boolean> mRestored = BehaviorSubject.create();
     private final Runnable mSaveIds = () -> RxHelper.runAsync(this::saveIds);
-    private OnEdited mOnEdited;
 
     interface Loader {
         /**
@@ -74,11 +78,14 @@ public class WatchLaterManager {
         Observable<List<String>> getVideoIds();
     }
 
-    public interface OnEdited {
+    public interface OnChanged {
         /**
-         * The video was added to Watch later or removed from it in the app
+         * Videos went in Watch later or out of it: edited in the app, or found when the list is read again (e.g. edited on
+         * another device). On the main thread.
+         *
+         * @param changes by video id: it's in Watch later now (true) or not (false)
          */
-        void onEdited(Video video, boolean isAdded);
+        void onChanged(Map<String, Boolean> changes);
     }
 
     interface AccountSource {
@@ -302,16 +309,58 @@ public class WatchLaterManager {
         }
 
         mPendingEdits.clear();
+        Snapshot previous = mSnapshot;
         mSnapshot = new Snapshot(account, Collections.unmodifiableSet(result), System.currentTimeMillis());
         mFailedAccount = null;
         Utils.postDelayed(mSaveIds, SAVE_DELAY_MS);
+        // The cards shown meanwhile were marked by the list before
+        notifyChanged(getChanges(previous, account, result));
     }
 
     /**
-     * Told about each edit of Watch later made in the app, e.g. to show it on the card at once
+     * What the list read changes for the cards already shown: the videos added and removed since the list before.
+     * Without a list of the account before, each of its videos: the cards shown before it was read (e.g. while it was read
+     * for longer than they were held, or when another account was picked) know none of them.
      */
-    public void setOnEdited(OnEdited listener) {
-        mOnEdited = listener;
+    private static Map<String, Boolean> getChanges(@Nullable Snapshot previous, String account, Set<String> videoIds) {
+        Map<String, Boolean> changes = new HashMap<>();
+
+        if (previous == null || !previous.account.equals(account)) {
+            for (String videoId : videoIds) {
+                changes.put(videoId, true);
+            }
+
+            return changes;
+        }
+
+        for (String videoId : videoIds) {
+            if (!previous.videoIds.contains(videoId)) {
+                changes.put(videoId, true);
+            }
+        }
+
+        for (String videoId : previous.videoIds) {
+            if (!videoIds.contains(videoId)) {
+                changes.put(videoId, false);
+            }
+        }
+
+        return changes;
+    }
+
+    /**
+     * Told about each change of Watch later, to show it on the cards at once. Called when the app starts.
+     */
+    public static void setOnChanged(OnChanged listener) {
+        sOnChanged = listener;
+    }
+
+    private static void notifyChanged(Map<String, Boolean> changes) {
+        OnChanged listener = sOnChanged;
+
+        if (listener != null && !changes.isEmpty()) {
+            listener.onChanged(changes);
+        }
     }
 
     /**
@@ -325,10 +374,8 @@ public class WatchLaterManager {
 
         WatchLaterManager manager = instance(context);
         manager.onWatchLaterEdited(video.videoId, isAdded);
-
-        if (manager.mOnEdited != null) {
-            manager.mOnEdited.onEdited(video, isAdded);
-        }
+        // Also when the list had it already: a card shown before the list was read again doesn't
+        notifyChanged(Collections.singletonMap(video.videoId, isAdded));
     }
 
     private void onWatchLaterEdited(String videoId, boolean isAdded) {

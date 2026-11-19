@@ -59,6 +59,12 @@ public class VideoGroup {
      * Add at the begin of the existing group
      */
     public static final int ACTION_PREPEND = 5;
+    /**
+     * What a change of Watch later does to a card already added (see syncWatchLater)
+     */
+    public static final int WATCH_LATER_UNCHANGED = 0;
+    public static final int WATCH_LATER_MARK_CHANGED = 1;
+    public static final int WATCH_LATER_HIDDEN = 2;
     private static final String TAG = VideoGroup.class.getSimpleName();
     private static final float WATCHED_PERCENT = 80; // as Hide watched videos from Subscriptions (see MediaGroupOptions of MediaServiceCore)
     private int mId;
@@ -939,8 +945,52 @@ public class VideoGroup {
     /**
      * In the account's Watch later, only in the sections picked in the Watch later setting.
      * Also marks the video when the setting marks instead of hiding, or its channel is excluded from the hiding. The list is read before the group is created (see HiddenVideoResolver).
+     * The card follows the changes made after (see syncWatchLater).
      */
     private boolean isHiddenWatchLater(Video video) {
+        if (!isWatchLaterCard(video) || !WatchLaterManager.instance(GlobalPreferences.context()).contains(video.videoId)) {
+            return false;
+        }
+
+        if (isHiddenInWatchLater(video)) {
+            return true;
+        }
+
+        video.isInWatchLater = true;
+
+        return false;
+    }
+
+    /**
+     * Watch later changed after the card was added (see WatchLaterManager.OnChanged): the card follows it as a new one would
+     * (see isHiddenWatchLater). One hidden already doesn't come back.
+     *
+     * @param isInWatchLater the video is in Watch later now
+     * @return {@link #WATCH_LATER_HIDDEN} when the card goes, {@link #WATCH_LATER_MARK_CHANGED} when it's marked or its mark is
+     * taken off, otherwise {@link #WATCH_LATER_UNCHANGED}
+     */
+    public int syncWatchLater(Video video, boolean isInWatchLater) {
+        if (!isWatchLaterCard(video)) {
+            return WATCH_LATER_UNCHANGED;
+        }
+
+        if (isInWatchLater && isHiddenInWatchLater(video)) {
+            return WATCH_LATER_HIDDEN;
+        }
+
+        if (video.isInWatchLater == isInWatchLater) {
+            return WATCH_LATER_UNCHANGED;
+        }
+
+        video.isInWatchLater = isInWatchLater;
+
+        return WATCH_LATER_MARK_CHANGED;
+    }
+
+    /**
+     * Watch later marks or hides the card: a video, in a section picked in the Watch later setting, not in the playlist itself
+     */
+    private boolean isWatchLaterCard(Video video) {
         int sectionId = getFilterSectionId();
 
         // No context before the app is initialized (GlobalPreferences)
@@ -952,19 +1002,15 @@ public class VideoGroup {
             return false;
         }
 
-        WatchLaterManager manager = WatchLaterManager.instance(GlobalPreferences.context());
+        return WatchLaterManager.instance(GlobalPreferences.context()).isEnabled(sectionId);
+    }
 
-        if (!manager.isEnabled(sectionId) || !manager.contains(video.videoId)) {
-            return false;
-        }
-
-        if (manager.isHidden(sectionId) && !isExcludedChannel(FilterExclusionData.FILTER_WATCH_LATER, video)) {
-            return true;
-        }
-
-        video.isInWatchLater = true;
-
-        return false;
+    /**
+     * Hidden rather than marked, when it's in Watch later
+     */
+    private boolean isHiddenInWatchLater(Video video) {
+        return WatchLaterManager.instance(GlobalPreferences.context()).isHidden(getFilterSectionId())
+                && !isExcludedChannel(FilterExclusionData.FILTER_WATCH_LATER, video);
     }
 
     /**

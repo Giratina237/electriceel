@@ -201,13 +201,17 @@ public class WatchLaterManagerTest {
     @Test
     public void editsAreReportedForTheCards() {
         List<String> reported = new ArrayList<>();
-        mManager.setOnEdited((video, isAdded) -> reported.add(video.videoId + (isAdded ? "+" : "-")));
+        WatchLaterManager.setOnChanged(changes -> {
+            for (Map.Entry<String, Boolean> change : changes.entrySet()) {
+                reported.add(change.getKey() + (change.getValue() ? "+" : "-"));
+            }
+        });
 
         edit(WatchLaterManager.WATCH_LATER_PLAYLIST_ID, "new", true);
         edit(WatchLaterManager.WATCH_LATER_PLAYLIST_ID, "later1", false);
         edit("PLother", "later2", true);
 
-        mManager.setOnEdited(null);
+        WatchLaterManager.setOnChanged(null);
         assertEquals(Arrays.asList("new+", "later1-"), reported);
     }
 

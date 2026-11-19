@@ -121,7 +121,14 @@ public class ShelfListModel {
         }
 
         VideoGroupObjectAdapter adapter = new VideoGroupObjectAdapter(group, mCardPresenter);
-        mAdapters.put(group.getId(), adapter);
+        int id = group.getId();
+        mAdapters.put(id, adapter);
+        // As the classic rows: its last card hidden as in Watch later, no empty shelf is left. Not another shelf with its id.
+        adapter.setOnEmptied(() -> {
+            if (mAdapters.get(id) == adapter) {
+                removeById(id);
+            }
+        });
         Shelf shelf = new Shelf(group.getTitle(), isShorts(group), adapter);
 
         int position = group.getPosition();

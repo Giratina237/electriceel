@@ -283,6 +283,12 @@ public abstract class MultipleRowsFragment extends RowsSupportFragment implement
             VideoGroupObjectAdapter videoGroupAdapter = new VideoGroupObjectAdapter(group, group.isShorts() ? mShortsPresenter : mCardPresenter);
 
             mVideoGroupAdapters.put(videoGroupId, videoGroupAdapter);
+            // Its last card hidden as in Watch later: no empty row is left, as after a removal. Not another row with its id.
+            videoGroupAdapter.setOnEmptied(() -> {
+                if (mVideoGroupAdapters != null && mVideoGroupAdapters.get(videoGroupId) == videoGroupAdapter) {
+                    removeById(videoGroupId);
+                }
+            });
 
             ListRow row = new ListRow(rowHeader, videoGroupAdapter);
 
