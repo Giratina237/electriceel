@@ -140,7 +140,7 @@ You can select which categories you want to skip in the settings. Unlike the bro
 
 ## Support
 
-You can report in our Telegram group or via [issue tracker on Github](https://github.com/cygnusx-1-org/electriceel/issues) (account required).
+You can report in our Discord group or via [issue tracker on Github](https://github.com/cygnusx-1-org/electriceel/issues) (account required).
 
 ## Donations
 [<img src="./assets/badges/buymeacoffee_badge.png"
