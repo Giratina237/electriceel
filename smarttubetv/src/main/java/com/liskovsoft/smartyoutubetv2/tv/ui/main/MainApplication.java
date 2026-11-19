@@ -52,7 +52,6 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.skin.SkinRegistry;
 import com.liskovsoft.smartyoutubetv2.tv.ui.settingscards.SettingsCardsActivity;
 import com.liskovsoft.smartyoutubetv2.tv.ui.signin.SignInActivity;
 import com.liskovsoft.smartyoutubetv2.tv.ui.webbrowser.WebBrowserActivity;
-import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
 
 import org.conscrypt.Conscrypt;
 
@@ -120,9 +119,9 @@ public class MainApplication extends MultiDexApplication implements Configuratio
     }
 
     /**
-     * Hidden, the UI's images and the TV poToken's WebView only make the process a bigger target for the low memory killer: it kills
-     * one with a foreground service running too (e.g. the remote control's, see AppExits). The images shown stay: Glide keeps the
-     * ones in use, and by itself only halves its cache for a hidden UI.
+     * Hidden, the UI's images only make the process a bigger target for the low memory killer: it kills one with a foreground service
+     * running too (e.g. the remote control's, see AppExits). The images shown stay: Glide keeps the ones in use, and by itself only
+     * halves its cache for a hidden UI. The TV poToken's WebView isn't kept past its token (see TvPoTokenProvider#closeMinted).
      */
     @Override
     public void onTrimMemory(int level) {
@@ -130,7 +129,6 @@ public class MainApplication extends MultiDexApplication implements Configuratio
 
         if (level >= TRIM_MEMORY_UI_HIDDEN) {
             Glide.get(this).clearMemory();
-            YouTubeServiceManager.instance().trimMemory();
         }
     }
 
