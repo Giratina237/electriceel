@@ -33,8 +33,10 @@ import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.BackgroundColorSpan;
+import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.util.DisplayMetrics;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.text.CaptionStyleCompat;
 import com.google.android.exoplayer2.text.Cue;
 import com.google.android.exoplayer2.util.Log;
@@ -96,6 +98,8 @@ import com.liskovsoft.sharedutils.misc.RoundedBackgroundSpan;
 
   // Derived drawing variables.
   private StaticLayout textLayout;
+  // MOD: the text without colors of its own, for its outline: they would paint over the edge color (e.g. a color per speaker)
+  @Nullable private StaticLayout edgeLayout;
   private int textLeft;
   private int textTop;
   private int textPaddingX;
@@ -296,6 +300,7 @@ import com.liskovsoft.sharedutils.misc.RoundedBackgroundSpan;
     Alignment textAlignment = cueTextAlignment == null ? Alignment.ALIGN_CENTER : cueTextAlignment;
     textLayout = new StaticLayout(cueText, textPaint, availableWidth, textAlignment, spacingMult,
         spacingAdd, true);
+    edgeLayout = null;
     // MOD: same height for multiline and single line subs (use 3 lines height)
     //int textHeight = textLayout.getLineBaseline(0) * 3; // base line has same height across single and multi line
     int textHeight = textLayout.getHeight();
@@ -358,6 +363,9 @@ import com.liskovsoft.sharedutils.misc.RoundedBackgroundSpan;
     // Update the derived drawing variables.
     this.textLayout = new StaticLayout(cueText, textPaint, textWidth, textAlignment, spacingMult,
         spacingAdd, true);
+    CharSequence edgeText = withoutTextColors(cueText);
+    this.edgeLayout = edgeText == cueText ? null : new StaticLayout(edgeText, textPaint, textWidth, textAlignment,
+        spacingMult, spacingAdd, true);
     this.textLeft = textLeft;
     this.textTop = textTop;
     this.textPaddingX = textPaddingX;
@@ -413,7 +421,7 @@ import com.liskovsoft.sharedutils.misc.RoundedBackgroundSpan;
       textPaint.setStrokeWidth(outlineWidth);
       textPaint.setColor(edgeColor);
       textPaint.setStyle(Style.FILL_AND_STROKE);
-      layout.draw(canvas);
+      (edgeLayout != null ? edgeLayout : layout).draw(canvas);
     } else if (edgeType == CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW) {
       textPaint.setShadowLayer(shadowRadius, shadowOffset, shadowOffset, edgeColor);
     } else if (edgeType == CaptionStyleCompat.EDGE_TYPE_RAISED
@@ -435,6 +443,24 @@ import com.liskovsoft.sharedutils.misc.RoundedBackgroundSpan;
     textPaint.setShadowLayer(0, 0, 0, 0);
 
     canvas.restoreToCount(saveCount);
+  }
+
+  /**
+   * MOD: the text without the colors of its own (see #edgeLayout), or the text itself when it has none
+   */
+  /* package */ static CharSequence withoutTextColors(CharSequence text) {
+    if (!(text instanceof Spanned)
+        || ((Spanned) text).getSpans(0, text.length(), ForegroundColorSpan.class).length == 0) {
+      return text;
+    }
+
+    SpannableStringBuilder result = new SpannableStringBuilder(text);
+
+    for (ForegroundColorSpan span : result.getSpans(0, result.length(), ForegroundColorSpan.class)) {
+      result.removeSpan(span);
+    }
+
+    return result;
   }
 
   private void drawBitmapLayout(Canvas canvas) {

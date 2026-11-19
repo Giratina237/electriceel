@@ -19,6 +19,7 @@ import android.text.SpannableStringBuilder;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.text.Cue;
 import com.google.android.exoplayer2.text.Subtitle;
+import com.google.android.exoplayer2.text.SubtitleCues;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Util;
 import java.util.ArrayList;
@@ -29,7 +30,7 @@ import java.util.List;
 /**
  * A representation of a WebVTT subtitle.
  */
-/* package */ final class WebvttSubtitle implements Subtitle {
+/* package */ final class WebvttSubtitle implements Subtitle, SubtitleCues {
 
   private static final long MAX_CUE_LENGTH_US = 10_000_000; // NOTE: lower values may broke some videos
   private final List<WebvttCue> cues;
@@ -57,6 +58,11 @@ import java.util.List;
     }
     sortedCueTimesUs = Arrays.copyOf(cueTimesUs, cueTimesUs.length);
     Arrays.sort(sortedCueTimesUs);
+  }
+
+  @Override
+  public List<WebvttCue> getAllCues() {
+    return Collections.unmodifiableList(cues);
   }
 
   @Override

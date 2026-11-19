@@ -59,7 +59,7 @@ public class AppPrefs extends SharedPreferencesBase implements AccountChangeList
             OldVideosData.class.getSimpleName(), AiSListFilterData.class.getSimpleName(), SponsorBlockData.SPONSOR_BLOCK_DATA,
             HideContentData.HIDE_CONTENT_DATA, DeArrowData.class.getSimpleName(), SearchData.SEARCH_DATA,
             DuplicatesData.class.getSimpleName(), CensoredWordsData.class.getSimpleName(), SentenceSubtitlesData.class.getSimpleName(),
-            ChannelGroupFilterData.class.getSimpleName(),
+            CaptionStylesData.class.getSimpleName(), ChannelGroupFilterData.class.getSimpleName(),
             OpenedVideosData.class.getSimpleName(), CategoryFilterData.MUSIC_KEY, CategoryFilterData.GAMING_KEY,
             CategoryFilterData.SPORTS_KEY, CategoryFilterData.NEWS_KEY, CategoryFilterData.TECH_KEY
     };

@@ -61,6 +61,12 @@ public final class WebvttCueParser {
   private static final String TIMESTAMP = "(?:\\d+:)?\\d{2}:\\d{2}\\.\\d{3}";
   private static final Pattern TIMESTAMP_PATTERN = Pattern.compile(TIMESTAMP);
   private static final Pattern TIMESTAMP_TAG_PATTERN = Pattern.compile("<(" + TIMESTAMP + ")>");
+  // MOD: a tag of a style: <b>, <i>, <u>, or one with classes, e.g. <c.yellow>, which only a style of the file colors (see the
+  // header styles in WebvttDecoder). Not a <c> of automatic captions.
+  private static final Pattern STYLE_TAG_PATTERN = Pattern.compile("<[biu]>");
+  private static final Pattern CLASS_TAG_PATTERN = Pattern.compile("<[A-Za-z][^>\\s.]*\\.[^>]+>");
+  // MOD: an entity, by its name or number
+  private static final Pattern ENTITY_PATTERN = Pattern.compile("&(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#[xX][0-9A-Fa-f]+);");
 
   private static final char CHAR_LESS_THAN = '<';
   private static final char CHAR_GREATER_THAN = '>';
@@ -166,10 +172,17 @@ public final class WebvttCueParser {
    */
   /* package */ static void parseCueText(String id, String markup, WebvttCue.Builder builder,
       List<WebvttCssStyle> styles) {
-    // MOD: Html.fromHtml drops the timestamp tags as unknown elements. Escaped, they come out of it as text, to be read below.
-    markup = TIMESTAMP_TAG_PATTERN.matcher(markup).replaceAll("&lt;$1&gt;");
-    // MOD: Fix embedded styles by decoding html entities
-    markup = Html.fromHtml(markup).toString();
+    // MOD: a cue with styles (e.g. a color per speaker, italics) keeps its tags and lines, which Html.fromHtml drops and joins: only
+    // its entities are decoded, as they're read below. One without, or of automatic captions (their words' times), is read as it
+    // always was: their lines are told apart by how they're joined (see SubtitleManager#forceCenterAlignment).
+    boolean hasStyles = !TIMESTAMP_TAG_PATTERN.matcher(markup).find() && (STYLE_TAG_PATTERN.matcher(markup).find()
+        || !styles.isEmpty() && CLASS_TAG_PATTERN.matcher(markup).find());
+    if (!hasStyles) {
+      // MOD: Html.fromHtml drops the timestamp tags as unknown elements. Escaped, they come out of it as text, to be read below.
+      markup = TIMESTAMP_TAG_PATTERN.matcher(markup).replaceAll("&lt;$1&gt;");
+      // MOD: Fix embedded styles by decoding html entities
+      markup = Html.fromHtml(markup).toString();
+    }
 
     SpannableStringBuilder spannedText = new SpannableStringBuilder();
     ArrayDeque<StartTag> startTagStack = new ArrayDeque<>();
@@ -225,6 +238,18 @@ public final class WebvttCueParser {
           }
           break;
         case CHAR_AMPERSAND:
+          if (hasStyles) {
+            // MOD: any entity (e.g. &#39;), as Html.fromHtml decodes them for the others. A lone & is itself.
+            Matcher entityMatcher = ENTITY_PATTERN.matcher(markup).region(pos, markup.length());
+            if (entityMatcher.lookingAt()) {
+              spannedText.append(Html.fromHtml(entityMatcher.group()).toString());
+              pos = entityMatcher.end();
+            } else {
+              spannedText.append(curr);
+              pos++;
+            }
+            break;
+          }
           int semiColonEndIndex = markup.indexOf(CHAR_SEMI_COLON, pos + 1);
           int spaceEndIndex = markup.indexOf(CHAR_SPACE, pos + 1);
           int entityEndIndex = semiColonEndIndex == -1 ? spaceEndIndex
