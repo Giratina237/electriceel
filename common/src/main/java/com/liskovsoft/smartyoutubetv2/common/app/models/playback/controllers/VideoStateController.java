@@ -27,10 +27,6 @@ public class VideoStateController extends BasePlayerController {
     private static final String TAG = VideoStateController.class.getSimpleName();
     private static final long MUSIC_VIDEO_MAX_DURATION_MS = 6 * 60 * 1000;
     private static final long RESTORE_LIVE_BUFFER_MS = 60_000;
-    private static final long DEFAULT_LIVE_BUFFER_MS = 60_000; // Minimum issues
-    private static final long OFFICIAL_LIVE_BUFFER_MS = 15_000; // Official app buffer
-    private static final long LIVE_BUFFER_MS = OFFICIAL_LIVE_BUFFER_MS;
-    private static final long SHORT_LIVE_BUFFER_MS = 0; // Note, on buffer lower than the 60sec you'll notice segment skip
     /**
      * Loaded past the position the live one is restored to (see restoreActualLivePosition): the player's buffer after a rebuffer
      * (DefaultLoadControl#bufferForPlaybackAfterRebufferMs), so it plays at once
@@ -828,11 +824,11 @@ public class VideoStateController extends BasePlayerController {
     }
 
     private long getLiveThreshold() {
-        return getLiveBuffer() + 5_000;
+        return LiveEdge.getThresholdMs(getPlayerTweaksData().isBufferOnStreamsDisabled());
     }
 
     private long getLiveBuffer() {
-        return getPlayerTweaksData().isBufferOnStreamsDisabled() ? SHORT_LIVE_BUFFER_MS : LIVE_BUFFER_MS;
+        return LiveEdge.getBufferMs(getPlayerTweaksData().isBufferOnStreamsDisabled());
     }
 
     private boolean isMutedEmbed() {
@@ -882,7 +878,8 @@ public class VideoStateController extends BasePlayerController {
     }
 
     private boolean isBehindActualLive() {
-        return getVideo() != null && getPlayer() != null && getVideo().isLive && (getPlayer().getDurationMs() - getPlayer().getPositionMs() > getLiveThreshold());
+        return getVideo() != null && getPlayer() != null && getVideo().isLive
+                && LiveEdge.isBehind(getPlayer().getDurationMs(), getPlayer().getPositionMs(), getPlayerTweaksData().isBufferOnStreamsDisabled());
     }
 
     private boolean isInsideActualLive() {

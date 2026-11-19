@@ -18,6 +18,7 @@ package com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.playerglue.tweaks;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.util.TypedValue;
 import android.view.KeyEvent;
@@ -27,6 +28,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.ColorInt;
+import androidx.core.content.ContextCompat;
 import androidx.leanback.R;
 import androidx.leanback.widget.AbstractDetailsDescriptionPresenter;
 import androidx.leanback.widget.Action;
@@ -76,6 +78,24 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
     }
 
     /**
+     * Not a live stream: the total time label shows the duration
+     */
+    public static final int LIVE_NONE = 0;
+    /**
+     * A live stream played at its live position: the total time label is the live indicator, with a red dot
+     */
+    public static final int LIVE_AT_EDGE = 1;
+    /**
+     * A live stream played behind its live position: the live indicator with a grey dot
+     */
+    public static final int LIVE_BEHIND = 2;
+    /**
+     * The live indicator's dot and its gap to the text, in the label's text size (the official app's proportions)
+     */
+    private static final float LIVE_DOT_SIZE_EM = 0.85f;
+    private static final float LIVE_DOT_GAP_EM = 0.5f;
+
+    /**
      * A ViewHolder for the PlaybackControlsRow supporting seek UI.
      */
     public class ViewHolder extends PlaybackRowPresenter.ViewHolder implements PlaybackSeekUi {
@@ -89,6 +109,10 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
         final ViewGroup mControlsDock;
         final ViewGroup mSecondaryControlsDock;
         final TextView mTotalTime;
+        /**
+         * The "/" between the current and the total time (classic layout only)
+         */
+        final View mSeparateTime;
         final TextView mCurrentTime;
         final TextView mEndingTime;
         final TextView mQualityInfo;
@@ -105,6 +129,9 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
         long mTotalTimeInMs = Long.MIN_VALUE;
         long mCurrentTimeInMs = Long.MIN_VALUE;
         long mRemainingTimeInMs = Long.MIN_VALUE;
+        int mLiveState = LIVE_NONE;
+        final String mLiveText;
+        GradientDrawable mLiveDot;
         final Runnable mEndingTimeUpdater = () -> onSetEndingTimeLabel(mRemainingTimeInMs);
         boolean mIsPlayerPlaying = true;
         long mSecondaryProgressInMs;
@@ -437,6 +464,8 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
             mDescriptionDock = (ViewGroup) rootView.findViewById(R.id.description_dock);
             mCurrentTime = (TextView) rootView.findViewById(R.id.current_time);
             mTotalTime = (TextView) rootView.findViewById(R.id.total_time);
+            mSeparateTime = rootView.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.separate_time);
+            mLiveText = rootView.getContext().getString(com.liskovsoft.smartyoutubetv2.tv.R.string.badge_live);
             mQualityInfo = (TextView) rootView.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.quality_info);
             mDateTime = (TextView) rootView.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.date_time);
             mEndingTime = (TextView) rootView.findViewById(com.liskovsoft.smartyoutubetv2.tv.R.id.ending_time);
@@ -702,9 +731,57 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
          */
         protected void onSetDurationLabel(long totalTimeMs) {
             if (mTotalTime != null) {
+                if (mLiveState != LIVE_NONE) {
+                    mTotalTime.setText(mLiveText);
+                    return;
+                }
+
                 formatTime(totalTimeMs, mTempBuilder);
                 mTotalTime.setText(mTempBuilder.toString());
             }
+        }
+
+        /**
+         * On a live stream the total time label is the live indicator: its text and size stay the same, only the color of its
+         * dot tells at the live position or behind it. In the classic layout the "/" before it goes too.
+         * @param liveState {@link #LIVE_NONE}, {@link #LIVE_AT_EDGE} or {@link #LIVE_BEHIND}
+         */
+        void setLiveState(int liveState) {
+            if (mLiveState == liveState || mTotalTime == null) {
+                return;
+            }
+
+            boolean wasLive = mLiveState != LIVE_NONE;
+            mLiveState = liveState;
+
+            if (liveState == LIVE_NONE) {
+                mTotalTime.setCompoundDrawables(null, null, null, null);
+                mTotalTime.setCompoundDrawablePadding(0);
+            } else {
+                Context context = mTotalTime.getContext();
+
+                if (mLiveDot == null) {
+                    int size = Math.round(mTotalTime.getTextSize() * LIVE_DOT_SIZE_EM);
+                    mLiveDot = new GradientDrawable();
+                    mLiveDot.setShape(GradientDrawable.OVAL);
+                    mLiveDot.setSize(size, size);
+                    mLiveDot.setBounds(0, 0, size, size);
+                }
+
+                mLiveDot.setColor(ContextCompat.getColor(context, liveState == LIVE_AT_EDGE ?
+                        com.liskovsoft.smartyoutubetv2.tv.R.color.player_live_dot : com.liskovsoft.smartyoutubetv2.tv.R.color.player_live_dot_behind));
+
+                if (!wasLive) {
+                    mTotalTime.setCompoundDrawables(mLiveDot, null, null, null);
+                    mTotalTime.setCompoundDrawablePadding(Math.round(mTotalTime.getTextSize() * LIVE_DOT_GAP_EM));
+                }
+            }
+
+            if (mSeparateTime != null) {
+                mSeparateTime.setVisibility(liveState == LIVE_NONE ? View.VISIBLE : View.GONE);
+            }
+
+            onSetDurationLabel(mTotalTimeInMs);
         }
 
         void setTotalTime(long totalTimeMs) {

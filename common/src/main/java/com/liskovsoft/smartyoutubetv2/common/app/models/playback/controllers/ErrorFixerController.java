@@ -119,6 +119,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * A live stream's metadata is read again at most this often for a video (see checkLiveEnd)
      */
     private static final long LIVE_END_CHECK_MS = 60_000;
+    /**
+     * A live stream's formats aren't fetched again sooner for the video: the ones fetched may be of the stream still live, its segments
+     * still gone (see onLiveSegmentsGone)
+     */
+    private static final long LIVE_REFETCH_MS = 60_000;
     private final BufferingDetector mBufferingDetector = new BufferingDetector(this);
     private VideoLoaderController mVideoLoaderController;
     /**
@@ -190,6 +195,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     private String mStallVideoId;
     private long mStallTimeMs;
+    /**
+     * The live stream whose formats were last fetched again for its segments gone, and when (see onLiveSegmentsGone)
+     */
+    private String mLiveRefetchVideoId;
+    private long mLiveRefetchMs;
     /**
      * Where the playback started (see onPlay)
      */
@@ -332,6 +342,37 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
         failure.action("audio_fallback:" + getFallbackName(fallback)).action("restart_engine");
         mVideoLoaderController.restartEngine(failure.getKind());
+    }
+
+    /**
+     * A live stream's segments answer 404 on both tracks, and none came since, for a while (see LiveSegmentsGone): the stream ended,
+     * or its URLs aren't served anymore. A reload asks for the same URLs, it takes the formats cached (FVNAAYZD: a stream that stopped
+     * at 1:00:01 answered 404 for two minutes, through three stall reloads). Its formats are fetched again instead: of a stream still
+     * live, they have new URLs; of one that ended, they aren't live anymore (see Video#sync(MediaItemFormatInfo)), it plays to its end,
+     * and its metadata then says it ended (see SuggestionsController#onVideoLoaded); of one taken down, its reason shows. Not again for
+     * the video within LIVE_REFETCH_MS.
+     */
+    @Override
+    public void onLiveSegmentsGone(PlayerFailure failure) {
+        Video video = getVideo();
+
+        // Not over a fix already asked for (e.g. a stall's reload): its 404s come again after it, and are told again
+        if (video == null || !video.isLive || mVideoLoaderController.isFixPending()) {
+            return;
+        }
+
+        long nowMs = SystemClock.elapsedRealtime();
+
+        if (Helpers.equals(video.videoId, mLiveRefetchVideoId) && nowMs - mLiveRefetchMs < LIVE_REFETCH_MS) {
+            return;
+        }
+
+        mLiveRefetchVideoId = video.videoId;
+        mLiveRefetchMs = nowMs;
+
+        failure.action("refetch_formats").action("reload_video");
+        YouTubeServiceManager.instance().invalidateFormatCache();
+        mVideoLoaderController.reloadVideo(failure.getKind());
     }
 
     private void runLongBufferingAction(PlayerFailure failure) {

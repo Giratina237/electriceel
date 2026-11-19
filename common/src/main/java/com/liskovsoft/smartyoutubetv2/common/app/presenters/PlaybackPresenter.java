@@ -358,6 +358,11 @@ public class PlaybackPresenter extends BasePresenter<PlaybackView> implements Pl
     }
 
     @Override
+    public void onLiveSegmentsGone(PlayerFailure failure) {
+        process(listener -> listener.onLiveSegmentsGone(failure));
+    }
+
+    @Override
     public void onPlay() {
         process(PlayerEventListener::onPlay);
     }

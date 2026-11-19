@@ -29,6 +29,9 @@
     <color name="icon_background">#4A4F51</color>
     <color name="icon_alt_background">#2A2F51</color>
     <color name="player_background">#FF000000</color>
+    <!-- Dot of the player's live indicator: at the live position and behind it (the official app's colors) -->
+    <color name="player_live_dot">#FF0033</color>
+    <color name="player_live_dot_behind">#AAAAAA</color>
 
     <!-- Dark color scheme -->
     <color name="scheme_grey_background">#181818</color>
