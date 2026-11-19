@@ -11,8 +11,10 @@ import androidx.leanback.widget.PlaybackRowPresenter;
 import androidx.leanback.widget.RowPresenter;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
+import com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers.LiveEdge;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.SeekBarSegment;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.controller.PlayerView;
+import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.playerglue.framedrops.PlaybackBaseControlGlue;
 import com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.playerglue.framedrops.PlaybackTransportControlGlue;
 import com.liskovsoft.smartyoutubetv2.tv.ui.mod.leanback.playerglue.tweaks.PlaybackTransportRowPresenter.TopEdgeFocusListener;
@@ -23,6 +25,8 @@ import java.util.List;
 
 public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
         extends PlaybackTransportControlGlue<T> implements TopEdgeFocusListener, PlayerView {
+    private static final long PAUSED_LIVE_STATE_UPDATE_MS = 1_000;
+    private final Runnable mPausedLiveStateUpdater = this::updatePausedLiveState;
     private String mQualityInfo;
     private Video mVideo;
     private long mFramePositionMs = -1;
@@ -97,6 +101,7 @@ public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
                 viewHolder.setQualityInfo(mQualityInfo);
                 viewHolder.setDateVisibility(isControlsVisible());
                 viewHolder.setPlayerPlaying(isPlaying());
+                viewHolder.setLiveState(getLiveState());
                 // Don't uncomment
                 // Reset to defaults
                 //viewHolder.setSeekPreviewTitle(null);
@@ -134,6 +139,7 @@ public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
     @Override
     public void setVideo(Video video) {
         mVideo = video;
+        updateLiveState();
     }
 
     @Override
@@ -175,6 +181,8 @@ public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
         if (getTransportViewHolder() != null) {
             getTransportViewHolder().setPlayerPlaying(isPlaying());
         }
+
+        updatePausedLiveState();
     }
 
     @Override
@@ -183,7 +191,10 @@ public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
 
         if (isControlsVisible()) {
             updateLiveEndingTime();
+            updateLiveState();
         }
+
+        updatePausedLiveState();
     }
 
     @Override
@@ -192,6 +203,7 @@ public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
 
         if (isControlsVisible()) {
             updateLiveEndingTime();
+            updateLiveState();
         }
     }
 
@@ -234,6 +246,59 @@ public abstract class MaxControlsVideoPlayerGlue<T extends PlayerAdapter>
             controlsRow.setDuration(
                     playerAdapter.isPrepared() ? liveDurationMs : -1);
         }
+    }
+
+    private void updateLiveState() {
+        ViewHolder viewHolder = getTransportViewHolder();
+
+        if (viewHolder != null) {
+            viewHolder.setLiveState(getLiveState());
+        }
+    }
+
+    /**
+     * Paused, a live stream falls behind with no progress updates (they stop with the playback): the live indicator is checked
+     * every second until the playback resumes or the controls leave the screen
+     */
+    private void updatePausedLiveState() {
+        ViewHolder viewHolder = getTransportViewHolder();
+
+        if (viewHolder == null) {
+            return;
+        }
+
+        viewHolder.view.removeCallbacks(mPausedLiveStateUpdater);
+
+        if (isPlaying() || !isControlsVisible() || mVideo == null || !mVideo.isLive || mVideo.isLiveEnd
+                || !viewHolder.view.isAttachedToWindow()) {
+            return;
+        }
+
+        updateLiveEndingTime();
+        updateLiveState();
+
+        viewHolder.view.postDelayed(mPausedLiveStateUpdater, PAUSED_LIVE_STATE_UPDATE_MS);
+    }
+
+    /**
+     * Behind the live position by the duration and position the time labels show (see updateLiveEndingTime): the same as the
+     * player's (see PlaybackFragment#getDurationMs), so behind exactly when Next jumps to the live position
+     */
+    private int getLiveState() {
+        if (mVideo == null || !mVideo.isLive || mVideo.isLiveEnd) {
+            return PlaybackTransportRowPresenter.LIVE_NONE;
+        }
+
+        PlaybackControlsRow controlsRow = getControlsRow();
+
+        if (controlsRow == null) {
+            return PlaybackTransportRowPresenter.LIVE_AT_EDGE;
+        }
+
+        boolean isBehind = LiveEdge.isBehind(controlsRow.getDuration(), controlsRow.getCurrentPosition(),
+                PlayerTweaksData.instance(getContext()).isBufferOnStreamsDisabled());
+
+        return isBehind ? PlaybackTransportRowPresenter.LIVE_BEHIND : PlaybackTransportRowPresenter.LIVE_AT_EDGE;
     }
 
     private ViewHolder getTransportViewHolder() {
