@@ -323,6 +323,20 @@ public class MediaServiceManager implements OnAccountChange {
         return service.getMediaItemService().getFormatInfoObserve(videoId);
     }
 
+    /**
+     * As {@link #getFormatInfoObserve}, for the video the player opens: fetched on a thread of its own, not after the tasks queued in
+     * the pool (see RxHelper#fromCallableNow). Disposed, the fetch gives up once it gets the lock, not fetching (see FormatInfoWrapper).
+     */
+    public static Observable<MediaItemFormatInfo> getFormatInfoObserveNow(String videoId) {
+        ServiceManager service = YouTubeServiceManager.instance();
+        Context context = GlobalPreferences.context();
+
+        service.allowRestrictedVideos(context == null || !GeneralData.instance(context).isChildModeEnabled());
+        MediaItemService itemService = service.getMediaItemService();
+
+        return RxHelper.fromCallableNow(() -> itemService.getFormatInfo(videoId));
+    }
+
     public void loadFormatInfo(Video item, OnFormatInfo onFormatInfo) {
         if (item == null) {
             return;

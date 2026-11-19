@@ -679,8 +679,11 @@ public class VideoLoaderController extends BasePlayerController {
         return prefetched != null ? prefetched.observeOn(AndroidSchedulers.mainThread()) : getFormatInfoObserve(video.videoId);
     }
 
+    /**
+     * The player waits for them: not queued behind the pool's other tasks (see MediaServiceManager#getFormatInfoObserveNow)
+     */
     private static Observable<MediaItemFormatInfo> getFormatInfoObserve(String videoId) {
-        return MediaServiceManager.getFormatInfoObserve(videoId);
+        return MediaServiceManager.getFormatInfoObserveNow(videoId);
     }
 
     private void processFormatInfo(MediaItemFormatInfo formatInfo) {

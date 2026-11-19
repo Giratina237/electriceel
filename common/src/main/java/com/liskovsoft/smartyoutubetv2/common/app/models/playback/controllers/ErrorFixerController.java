@@ -34,14 +34,17 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.AudioOutputProbe;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.Connections;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadHolds;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.DecoderErrorFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.SabrDefaultLoadErrorHandlingPolicy;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil;
@@ -99,6 +102,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * A load failed on its connection this recently: the connection is what fails a start that hangs (see LoadErrors)
      */
     private static final long CONNECTION_ERROR_WINDOW_MS = 30_000;
+    /**
+     * A stall while the player has held its loading back this long has its buffer full: it waits for a renderer that has nothing to
+     * play (see runLongBufferingAction)
+     */
+    private static final long LOAD_HELD_STALL_MS = 5_000;
     private final BufferingDetector mBufferingDetector = new BufferingDetector(this);
     private VideoLoaderController mVideoLoaderController;
     private int mDecoderErrorCount;
@@ -224,6 +232,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         // What the player has past the position, the least of its tracks: where the last segments loaded end (see
         // FormatAttempts#addStallDetails) isn't, a stall with "33 s" of video loaded ahead didn't tell why it waited (J9T6DZWN #2)
         failure.detail("bufferedMs", bufferedPositionMs >= 0 ? bufferedPositionMs - positionMs : null);
+        // Why nothing loads, and what the video decoder was given and showed: a stall with 30-35 s buffered and nothing loaded for 20 s
+        // didn't tell whether the player held its loading back or a decoder had taken it all (96YV3AK4)
+        LoadHolds.addDetails(failure);
+        VideoDecoderState.addDetails(failure);
 
         try {
             runLongBufferingAction(failure);
@@ -237,12 +249,26 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * connection slower than the format plays (J9T6DZWN #3, #4, #6: 4K60, 3 stalls in a minute each time, with no fix), or drops frames
      * at a frame rate no decoder declares for its size (J7VJY9TH #1: 4K60 on a decoder that declares 2160p30, 215 frames dropped).
      * A lower quality, for this video only, as a repeated long stall gets (see runLongBufferingAction). A connection that stops
-     * answering isn't one too slow (see FormatAttempts#isTooSlow): a lower quality stalls the same way.
+     * answering isn't one too slow (see FormatAttempts#isTooSlow): a lower quality stalls the same way. A picture that freezes through a
+     * tunneled decoder plays on without tunneling (see TunnelingFallback).
      */
     @Override
     public void onHealthFailure(String kind, PlayerFailure failure) {
         // Not over a fix already asked for (e.g. a long stall's reload)
         if (!isOfflineVideo() || mVideoLoaderController.isFixPending()) {
+            return;
+        }
+
+        // The picture stands still while the sound plays on, through a tunneled decoder: the setting is the user's (off by default),
+        // and a restart that kept it froze again 13 s later (18CK8PQ0 #2, #3). All 7 freezes of that device were of its tunneled VP9
+        // decoder: after a resume's seek, a switch from AVC, or mid-play. A clock that stands still isn't the decoder's.
+        boolean isClockStill = Boolean.TRUE.equals(failure.getDetail("clockStill"));
+
+        if (PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && !isClockStill && VideoDecoderState.isTunneling()
+                && TunnelingFallback.turnOff()) {
+            failure.action("tunneling_off").action("restart_engine");
+            MessageHelpers.showLongMessage(getContext(), R.string.msg_tunneling_off);
+            mVideoLoaderController.restartEngine(failure.getKind());
             return;
         }
 
@@ -273,6 +299,20 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             failure.action("disable_subtitles").action("reload_video");
             disableSubtitles();
             mVideoLoaderController.reloadVideo(failure.getKind());
+        } else if (isOfflineVideo() && LoadHolds.getHeldMs() >= LOAD_HELD_STALL_MS) {
+            // The player holds its loading back, its buffer full, and waits all the same: what's buffered is past what a renderer has
+            // to play. Not the connection, a wait doesn't help (96YV3AK4: 30-35 s buffered and nothing loaded for 20 s, a network wait
+            // and a reload played 2 s more each time, six times), likely a tunneled decoder given all of it. It's given no more than
+            // 2 s ahead now (see DebugInfoMediaCodecVideoRenderer#shouldFeedInput); should it happen anyway, the engine plays without
+            // tunneling from now on.
+            if (VideoDecoderState.isTunneling() && TunnelingFallback.turnOff()) {
+                failure.action("tunneling_off").action("restart_engine");
+                MessageHelpers.showLongMessage(getContext(), R.string.msg_tunneling_off);
+                mVideoLoaderController.restartEngine(failure.getKind());
+            } else {
+                failure.action("reload_video");
+                mVideoLoaderController.reloadVideo(failure.getKind());
+            }
         } else if (isOfflineVideo() && !mBufferingDetector.isPlayable() && isFirstStuckLoad()) {
             // One track's first segment came and the other's request hangs: the name resolved and the client's formats load, so
             // neither the DNS nor the client is to blame. Reloaded once for the video, then the fixes below.

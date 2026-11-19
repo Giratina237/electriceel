@@ -70,6 +70,12 @@ public final class DeviceCapabilities {
         put(result, "audioOutput", DeviceCapabilities::buildAudioOutput, context);
         put(result, "display", DeviceCapabilities::buildDisplay, context);
         put(result, "memory", DeviceCapabilities::buildMemory, context);
+        // How many tasks run at once: the pool takes as many as 4 (see RxHelper), the player JS is preprocessed on one
+        put(result, "cpu", ctx -> {
+            JSONObject cpu = new JSONObject();
+            cpu.put("cores", Runtime.getRuntime().availableProcessors());
+            return cpu;
+        }, context);
         put(result, "network", ctx -> {
             JSONObject network = new JSONObject();
             network.put("transport", nullable(getNetworkTransport(ctx)));

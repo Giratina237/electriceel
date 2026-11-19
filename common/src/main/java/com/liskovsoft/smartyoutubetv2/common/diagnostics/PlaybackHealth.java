@@ -136,7 +136,7 @@ public final class PlaybackHealth {
      * When it was last sent elsewhere, on the samples' clock (see #onSeek), -1 for not since the format was tried
      */
     private long mSeekMs = -1;
-    private final ArrayDeque<long[]> mFrames = new ArrayDeque<>(); // {time, rendered, dropped}
+    private final ArrayDeque<long[]> mFrames = new ArrayDeque<>(); // {time, rendered, dropped, dropped to a keyframe}
     /**
      * Of the format tried, by the ticks
      */
@@ -511,7 +511,7 @@ public final class PlaybackHealth {
             mCatchUpDropped = sample.droppedFrames;
             mCatchUpEndMs = isDropping ? mCatchUpEndMs : -1;
             mFrames.clear();
-            mFrames.addLast(new long[]{sample.nowMs, sample.renderedFrames, sample.droppedFrames});
+            mFrames.addLast(toFramesRow(sample));
             return;
         }
 
@@ -522,7 +522,7 @@ public final class PlaybackHealth {
             mFrames.clear();
         }
 
-        mFrames.addLast(new long[]{sample.nowMs, sample.renderedFrames, sample.droppedFrames});
+        mFrames.addLast(toFramesRow(sample));
 
         while (mFrames.size() > 1 && sample.nowMs - mFrames.peekFirst()[0] > DROPS_WINDOW_MS) {
             mFrames.removeFirst();
@@ -538,6 +538,10 @@ public final class PlaybackHealth {
         if (!isFrozen && dropped >= DROPS_MIN && dropped >= DROPS_RATIO * (dropped + rendered)) {
             report(result, KIND_FRAME_DROPS);
         }
+    }
+
+    private static long[] toFramesRow(Sample sample) {
+        return new long[]{sample.nowMs, sample.renderedFrames, sample.droppedFrames, sample.droppedToKeyframes};
     }
 
     private boolean isFreezeOfStart(long frozenMs) {
@@ -680,6 +684,32 @@ public final class PlaybackHealth {
      */
     public List<long[]> getStartTrail() {
         return mPlayedMs <= START_MS ? mStartTrail : new ArrayList<>();
+    }
+
+    /**
+     * The samples the frame drops were counted over (see DROPS_WINDOW_MS), oldest first: {ms before now, rendered, dropped, dropped to
+     * a keyframe}
+     */
+    public List<long[]> getDropsWindow(long nowMs) {
+        List<long[]> result = new ArrayList<>();
+
+        for (long[] row : mFrames) {
+            result.add(new long[]{nowMs - row[0], row[1], row[2], row[3]});
+        }
+
+        return result;
+    }
+
+    /**
+     * The frames dropped in the window (see #getDropsWindow) went with one drop up to a keyframe: the renderer was late by more than half
+     * a second once and skipped to the next keyframe (see MediaCodecVideoRenderer#shouldDropBuffersToKeyframe), a jump in the picture,
+     * not drops that go on (PQTQ5DCK: 102 of 5570 frames, one such skip)
+     */
+    public boolean isDropsOneSkip() {
+        long[] first = mFrames.peekFirst();
+        long[] last = mFrames.peekLast();
+
+        return first != null && last != null && first[3] >= 0 && last[3] - first[3] == 1;
     }
 
     /**

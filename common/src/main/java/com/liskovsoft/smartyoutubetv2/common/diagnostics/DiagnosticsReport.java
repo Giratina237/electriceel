@@ -13,11 +13,14 @@ import com.liskovsoft.sharedutils.helpers.AppInfoHelpers;
 import com.liskovsoft.sharedutils.okhttp.OkHttpManager;
 import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.manager.PlayerConstants;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.SubtitleTrack;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.Skins;
 import com.liskovsoft.smartyoutubetv2.common.prefs.DebuggingData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.NetworkData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
@@ -211,6 +214,8 @@ public final class DiagnosticsReport {
         video.put("swDecoderForced", tweaksData.isSWDecoderForced());
         video.put("legacyCodecsForced", playerData.isLegacyCodecsForced());
         video.put("tunneledPlayback", tweaksData.isTunneledPlaybackEnabled());
+        // On, but turned off for the run after it froze the picture or stalled (see TunnelingFallback)
+        video.put("tunneledPlaybackOff", TunnelingFallback.isOff());
         video.put("avcOverVp9", tweaksData.isAvcOverVp9Preferred());
         video.put("amlogicFix", tweaksData.isAmlogicFixEnabled());
         video.put("sonyFrameDropFix", tweaksData.isSonyFrameDropFixEnabled());
@@ -243,6 +248,15 @@ public final class DiagnosticsReport {
         settings.put("playbackMode", getPlaybackModeName(playerData.getPlaybackMode()));
         settings.put("youtubeClientsOrder", new JSONArray(serviceData.getClientOrder()));
         settings.put("currentClient", YouTubeServiceManager.getCurrentClientName());
+
+        // The skin and its card previews: a preview opens the focused card's video, its fetch holds the fetches' lock like a video
+        // opened (CGHFJ3BZ: a start waited behind the fetch of a video no start was recorded for)
+        MainUIData mainUIData = MainUIData.instance(context);
+        JSONObject ui = new JSONObject();
+        ui.put("skin", getSkinName(Skins.getAppliedSkinId()));
+        ui.put("cardPreview", getCardPreviewName(mainUIData.getCardPreviewType()));
+        settings.put("ui", ui);
+
         // The ones YouTube is asked for: chosen in the app, else the system's
         LocaleManager localeManager = LocaleManager.instance();
         settings.put("language", nullable(emptyToNull(localeManager.getLanguage())));
@@ -302,6 +316,7 @@ public final class DiagnosticsReport {
         result.put("dns", getDnsTypeName(tweaksData.getPreferredDnsType()));
         result.put("ipv6Disabled", OkHttpManager.isIpv6Disabled());
         result.put("tunneledPlayback", tweaksData.isTunneledPlaybackEnabled());
+        result.put("tunneledPlaybackOff", TunnelingFallback.isOff());
         result.put("swDecoderForced", tweaksData.isSWDecoderForced());
         result.put("legacyCodecsForced", playerData.isLegacyCodecsForced());
         result.put("avcOverVp9", tweaksData.isAvcOverVp9Preferred());
@@ -350,6 +365,28 @@ public final class DiagnosticsReport {
                 return "highest";
             default:
                 return "medium";
+        }
+    }
+
+    private static String getSkinName(int skinId) {
+        switch (skinId) {
+            case MainUIData.SKIN_MODERN:
+                return "modern";
+            case MainUIData.SKIN_HYBRID:
+                return "hybrid";
+            default:
+                return "classic";
+        }
+    }
+
+    private static String getCardPreviewName(int cardPreviewType) {
+        switch (cardPreviewType) {
+            case MainUIData.CARD_PREVIEW_MUTED:
+                return "muted";
+            case MainUIData.CARD_PREVIEW_FULL:
+                return "full";
+            default:
+                return "off";
         }
     }
 

@@ -86,6 +86,24 @@ public final class LoadHolds {
     }
 
     /**
+     * How long the player has held its loading back so far, -1 when it loads: a stall meanwhile has what it buffered, and waits for a
+     * renderer that has nothing to play (see ErrorFixerController#runLongBufferingAction)
+     */
+    public static synchronized long getHeldMs() {
+        return sOpen != null ? sClock.now() - sOpen.startMs : -1;
+    }
+
+    /**
+     * As a stall's details (see ErrorFixerController#onLongBuffering): loadHeldMs, how long the player has held its loading back so far
+     * (null when it loads), and loadHeldBufferedMs, what it had buffered when it began to (null when not a time, e.g. to the end)
+     */
+    public static synchronized void addDetails(PlayerFailure failure) {
+        boolean isBufferedTime = sOpen != null && sOpen.bufferedMs >= 0 && sOpen.bufferedMs <= MAX_BUFFERED_MS;
+        failure.detail("loadHeldMs", sOpen != null ? sClock.now() - sOpen.startMs : null)
+                .detail("loadHeldBufferedMs", isBufferedTime ? sOpen.bufferedMs : null);
+    }
+
+    /**
      * The ones between the times, cut to them, as stages of a start's buffering (in the clock's time)
      */
     static synchronized List<VideoStart.Stage> take(long fromMs, long toMs) {

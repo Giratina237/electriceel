@@ -45,7 +45,11 @@ public class ExoPlayerInitializer {
         // If ram is too big, bigger then max int value DeviceRam will return a negative number...
         // use 196MB as that can only happens if device has more than 17GB of RAM, so 196 is enough and safe
         // https://github.com/yuliskov/SmartYouTubeTV/issues/532
-        mMaxBufferBytes = deviceRam <= 0 ? 196_000_000 : (int)(deviceRam / 18);
+        long ramBytes = deviceRam <= 0 ? 196_000_000 : deviceRam / 18;
+        // The buffer is allocated on the app's heap, not the device's RAM: a third of it at most. 8 GB of RAM gave 442 MB for a 384 MB
+        // heap, and a 4K60 video ran it out of memory at 383 MB (9E8WV5TE).
+        long heapBytes = Runtime.getRuntime().maxMemory() / 3;
+        mMaxBufferBytes = (int) Math.min(ramBytes, heapBytes);
     }
 
     public SimpleExoPlayer createPlayer(Context context, DefaultRenderersFactory renderersFactory, DefaultTrackSelector trackSelector) {

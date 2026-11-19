@@ -41,6 +41,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.SilenceDetector;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.ExoMediaSourceFactory;
@@ -48,6 +49,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CensoredWords.Range;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.FrameStepper;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.RangeMuter;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.VolumeBooster;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
@@ -313,6 +315,12 @@ public class ExoPlayerController implements Player.EventListener {
                 sample.inputBuffers = counters.inputBufferCount;
             }
 
+            // For the failures recorded elsewhere and the fixes that depend on it (e.g. a long stall's, see ErrorFixerController)
+            DebugInfoMediaCodecVideoRenderer renderer = mVideoRenderer;
+            boolean isTunneling = renderer != null && renderer.isTunneling();
+            VideoDecoderState.onSample(sample.inputBuffers, sample.renderedFrames, isTunneling,
+                    renderer != null ? renderer.getTunneledFrames() : null);
+
             // The renderer goes on with the same video when only the audio is switched: its first frame isn't rendered again.
             // Its counters start over each time it's enabled, so frames rendered are of the format tried.
             if (sample.hasVideo && sample.renderedFrames > 0 && !FormatAttempts.isVideoRendered()) {
@@ -372,7 +380,10 @@ public class ExoPlayerController implements Player.EventListener {
             failure.detail("clockStill", true);
         }
 
-        if (PlaybackHealth.KIND_START_FROZEN.equals(kind) || PlaybackHealth.KIND_FRAME_DROPS.equals(kind) || isClockStuck) {
+        // A frozen picture whose clock moved on has them too: 7 freezes of a tunneled decoder had none, nothing told whether the frames
+        // after a seek or a codec change were ever shown (CGHFJ3BZ, 18CK8PQ0, 0YX6EKC1)
+        if (PlaybackHealth.KIND_START_FROZEN.equals(kind) || PlaybackHealth.KIND_FRAME_DROPS.equals(kind)
+                || PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind)) {
             JSONArray trail = toJson(mHealth.getStartTrail());
 
             if (trail.length() > 0) {
@@ -395,6 +406,16 @@ public class ExoPlayerController implements Player.EventListener {
                 failure.detail("audioLongestHoldMs", mAudioClockInfo.longestHoldMs);
             }
         }
+
+        if (PlaybackHealth.KIND_FRAME_DROPS.equals(kind)) {
+            // The drops' window, and whether they're one skip to a keyframe rather than ones that go on (PQTQ5DCK: 1.8% of the frames,
+            // all of them one skip)
+            failure.detail("oneSkip", mHealth.isDropsOneSkip());
+            failure.detail("dropsWindow", toJson(mHealth.getDropsWindow(sample.nowMs)));
+        }
+
+        // A tunneled decoder shows the frames itself: where it's at against the position (see TunneledFrames)
+        VideoDecoderState.addTunnelingDetails(failure);
 
         // The stream that didn't work: frame drops and stalls play, worse. A clock that stands still isn't the video stream's.
         if (PlaybackHealth.KIND_NO_VIDEO.equals(kind) || PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && !isClockStuck) {
@@ -752,7 +773,9 @@ public class ExoPlayerController implements Player.EventListener {
     public void setTrackSelector(DefaultTrackSelector trackSelector) {
         mTrackSelectorManager.setTrackSelector(trackSelector);
 
-        if (mContext != null && trackSelector != null && PlayerTweaksData.instance(mContext).isTunneledPlaybackEnabled()) {
+        // Not after it froze the picture or stalled the player in this run (see TunnelingFallback)
+        if (mContext != null && trackSelector != null && PlayerTweaksData.instance(mContext).isTunneledPlaybackEnabled()
+                && !TunnelingFallback.isOff()) {
             // Enable tunneling if supported by the current media and device configuration.
             if (VERSION.SDK_INT >= 21) {
                 trackSelector.setParameters(trackSelector.buildUponParameters().setTunnelingAudioSessionId(C.generateAudioSessionIdV21(mContext)));
@@ -1075,6 +1098,7 @@ public class ExoPlayerController implements Player.EventListener {
         LastState.onPlayer(mContext, false, false);
         mFrameStepper.setPlayer(null, null);
         mVideoRenderer = null;
+        VideoDecoderState.reset();
         mRangeMuter.setPlayer(null);
 
         if (mPlayer == null) {

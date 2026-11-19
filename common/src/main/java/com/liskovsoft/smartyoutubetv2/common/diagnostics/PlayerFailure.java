@@ -345,6 +345,14 @@ public final class PlayerFailure {
     }
 
     /**
+     * The detail of the name (see #detail), null when it has none
+     */
+    @Nullable
+    public Object getDetail(String name) {
+        return mDetails != null ? mDetails.opt(name) : null;
+    }
+
+    /**
      * Something done about it, e.g. "reload_video", in the order done
      */
     public PlayerFailure action(String action) {

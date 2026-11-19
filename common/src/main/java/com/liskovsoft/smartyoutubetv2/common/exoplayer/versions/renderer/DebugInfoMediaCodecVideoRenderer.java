@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
@@ -17,6 +18,7 @@ import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
 import com.google.android.exoplayer2.video.MediaCodecVideoRenderer;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.liskovsoft.sharedutils.mylogger.Log;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.TunneledFrames;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.versions.ExoUtils;
 
 import java.nio.ByteBuffer;
@@ -69,12 +71,27 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
      */
     private volatile int mSkippedToPosition;
     private volatile long mSkipStartMs = -1;
-    // Playback thread only
-    private boolean mIsTunneling;
+    /**
+     * Tunneled, how far past the position the decoder is given samples: the rest waits in the renderer's queue (see
+     * {@link #shouldFeedInput})
+     */
+    private static final long TUNNELED_FEED_AHEAD_US = 2_000_000;
+    // Playback thread, read by the main one
+    private volatile boolean mIsTunneling;
     @Nullable
     private String mDecoderName;
     // Read by the main thread
     private volatile boolean mIsRenderedCountKnown = true;
+    /**
+     * In the renderer's time ({@link C#TIME_UNSET} for none): the position it was last rendered at, the last sample given to the decoder
+     * since its codec was flushed, and the last frame a tunneled decoder said it showed since the renderer was enabled, with when it
+     * said so ({@link SystemClock#elapsedRealtime()}, -1 for none). Set on the playback thread, read by the main one too (see
+     * {@link #getTunneledFrames()}).
+     */
+    private volatile long mPositionUs = C.TIME_UNSET;
+    private volatile long mLastQueuedUs = C.TIME_UNSET;
+    private volatile long mLastShownUs = C.TIME_UNSET;
+    private volatile long mLastShownAtMs = -1;
 
     // Exo 2.9
     //public DebugInfoMediaCodecVideoRenderer(Context context, MediaCodecSelector mediaCodecSelector, long allowedJoiningTimeMs,
@@ -162,6 +179,60 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         mIsFrameStepSupported = !mIsTunneling;
         mIsRenderedCountKnown = !mIsTunneling;
         resetSkippedToPosition();
+        mPositionUs = C.TIME_UNSET;
+        mLastQueuedUs = C.TIME_UNSET;
+        mLastShownUs = C.TIME_UNSET;
+        mLastShownAtMs = -1;
+    }
+
+    @Override
+    public void render(long positionUs, long elapsedRealtimeUs) throws ExoPlaybackException {
+        mPositionUs = positionUs;
+        super.render(positionUs, elapsedRealtimeUs);
+    }
+
+    /**
+     * Tunneled, the decoder shows what it's given itself, when the clock gets there, and was given whatever it had room for: one that
+     * frees its input as soon as it takes it would get all that's loaded of a stream of few small frames. The renderer then had no
+     * sample left in its queue and wasn't ready, while the buffer counted as full and nothing more loaded: the player waited for good
+     * (96YV3AK4: 6 fps at 160 kbps, 30-35 s buffered and nothing loaded for 20 s, each reload played 2 s more and stalled again). Given
+     * no more than that past the position, the rest stays in the queue: the renderer is ready as an untunneled one is, and loading goes
+     * on as the position nears what's buffered. At usual frame rates the decoder's own input buffers run out well before.
+     */
+    @Override
+    protected boolean shouldFeedInput(long positionUs) {
+        long queuedUs = mLastQueuedUs;
+
+        return !mIsTunneling || queuedUs == C.TIME_UNSET || queuedUs - positionUs < TUNNELED_FEED_AHEAD_US;
+    }
+
+    @Override
+    protected void onQueueInputBuffer(DecoderInputBuffer buffer) {
+        super.onQueueInputBuffer(buffer);
+
+        if (mIsTunneling) {
+            long queuedUs = mLastQueuedUs;
+            mLastQueuedUs = queuedUs == C.TIME_UNSET ? buffer.timeUs : Math.max(queuedUs, buffer.timeUs);
+        }
+    }
+
+    @Override
+    protected void releaseCodec() {
+        try {
+            super.releaseCodec();
+        } finally {
+            // What it was given went with it
+            mLastQueuedUs = C.TIME_UNSET;
+        }
+    }
+
+    @Override
+    protected boolean flushOrReleaseCodec() {
+        try {
+            return super.flushOrReleaseCodec();
+        } finally {
+            mLastQueuedUs = C.TIME_UNSET;
+        }
     }
 
     @Override
@@ -175,6 +246,8 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
     @Override
     protected void onProcessedTunneledBuffer(long presentationTimeUs) {
         super.onProcessedTunneledBuffer(presentationTimeUs);
+        mLastShownUs = presentationTimeUs;
+        mLastShownAtMs = SystemClock.elapsedRealtime();
 
         // Counted once the decoder has reported a frame past the first: it reports the frames it shows
         if (!mIsRenderedCountKnown && decoderCounters.renderedOutputBufferCount > 1) {
@@ -197,12 +270,16 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         super.onPositionReset(positionUs, joining);
         setPendingFrameSteps(0);
         resetSkippedToPosition();
+        // The codec was flushed: what it was given is gone
+        mLastQueuedUs = C.TIME_UNSET;
     }
 
     @Override
     protected void onDisabled() {
         super.onDisabled();
         setPendingFrameSteps(0);
+        mPositionUs = C.TIME_UNSET;
+        mLastQueuedUs = C.TIME_UNSET;
     }
 
     @Override
@@ -253,6 +330,36 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
      */
     public boolean isRenderedCountKnown() {
         return mIsRenderedCountKnown;
+    }
+
+    /**
+     * The decoder shows the frames itself, in step with the audio (see Configuration#tunnelingAudioSessionId)
+     */
+    public boolean isTunneling() {
+        return mIsTunneling;
+    }
+
+    /**
+     * Where a tunneled decoder is at against the position, null when it isn't tunneled: the frames it shows aren't the renderer's to
+     * see, only what it says it showed (see MediaCodec.OnFrameRenderedListener). A picture that stands still while the position moves
+     * is told apart by it: the frames given ahead and not shown (late, dropped by the decoder), or none given.
+     */
+    @Nullable
+    public TunneledFrames getTunneledFrames() {
+        if (!mIsTunneling) {
+            return null;
+        }
+
+        long positionUs = mPositionUs;
+        long shownUs = mLastShownUs;
+        long shownAtMs = mLastShownAtMs;
+        long queuedUs = mLastQueuedUs;
+        boolean hasPosition = positionUs != C.TIME_UNSET;
+
+        return new TunneledFrames(
+                hasPosition && shownUs != C.TIME_UNSET ? (positionUs - shownUs) / 1_000 : null,
+                shownAtMs >= 0 ? SystemClock.elapsedRealtime() - shownAtMs : null,
+                hasPosition && queuedUs != C.TIME_UNSET ? (queuedUs - positionUs) / 1_000 : null);
     }
 
     /**

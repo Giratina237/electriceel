@@ -751,7 +751,9 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
       TraceUtil.beginSection("drainAndFeed");
       try {
         while (drainOutputBuffer(positionUs, elapsedRealtimeUs)) {}
-        while (feedInputBuffer() && shouldContinueFeeding(drainStartTimeMs)) {}
+        while (shouldFeedInput(positionUs)
+            && feedInputBuffer()
+            && shouldContinueFeeding(drainStartTimeMs)) {}
       } catch (IllegalStateException e) {
         // SmartTube fix: a native MediaCodec error would otherwise propagate as
         // TYPE_UNEXPECTED. Try to recover in place; only surface a (typed) error if that fails.
@@ -1109,6 +1111,17 @@ public abstract class MediaCodecRenderer extends BaseRenderer {
     decoderCounters.decoderInitCount++;
     long elapsed = codecInitializedTimestamp - codecInitializingTimestamp;
     onCodecInitialized(codecName, codecInitializedTimestamp, elapsed);
+  }
+
+  /**
+   * SmartTube fix: whether the codec is given another input buffer now. A subclass holds input back
+   * when the codec has enough to go on (see MediaCodecVideoRenderer's tunneling): what isn't given
+   * stays in the stream, where it keeps the renderer ready. True by default.
+   *
+   * @param positionUs The current playback position, as passed to {@link #render(long, long)}.
+   */
+  protected boolean shouldFeedInput(long positionUs) {
+    return true;
   }
 
   private boolean shouldContinueFeeding(long drainStartTimeMs) {

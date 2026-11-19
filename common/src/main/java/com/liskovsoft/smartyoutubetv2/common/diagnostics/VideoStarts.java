@@ -13,6 +13,7 @@ import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.sabr.parser.SabrStream;
 import com.liskovsoft.sharedutils.mylogger.Log;
+import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.videoinfo.V2.FetchStages;
 import com.liskovsoft.youtubeapi.videoinfo.V2.WarmUps;
@@ -59,6 +60,10 @@ public final class VideoStarts {
     static final String STAGE_ENGINE_RESTART = "engine restart";
     static final String STAGE_FORMATS = "formats";
     static final String STAGE_QUEUE = "queue";
+    /**
+     * A wait this long for the fetch to begin says what the threads were busy with (see #getQueueDetail)
+     */
+    private static final long QUEUE_LOAD_MS = 500;
     static final String STAGE_TO_PLAYER = "to the player";
     static final String STAGE_OPEN = "open";
     /**
@@ -398,6 +403,11 @@ public final class VideoStarts {
         final long sinceProcessStartMs;
         final List<Group> groups = new ArrayList<>();
         long fetchMs = -1;
+        /**
+         * What the threads of the tasks were busy with when the formats were asked for (see RxHelper#describeLoad), null when unknown
+         */
+        @Nullable
+        String fetchLoad;
         int fetches;
         long prepareMs = -1;
         long firstFrameMs = -1;
@@ -658,6 +668,7 @@ public final class VideoStarts {
 
         timer.fetches++;
         timer.fetchMs = now;
+        timer.fetchLoad = RxHelper.describeLoad();
         timer.open(STAGE_FORMATS, timer.fetches > 1 ? DETAIL_RETRY : null, now);
     }
 
@@ -825,7 +836,8 @@ public final class VideoStarts {
         }
 
         if (firstFetchMs > timer.fetchMs) {
-            formats.children.add(new VideoStart.Stage(STAGE_QUEUE, null, 1, timer.fetchMs, firstFetchMs));
+            formats.children.add(new VideoStart.Stage(STAGE_QUEUE, getQueueDetail(timer, firstFetchMs, null), 1, timer.fetchMs,
+                    firstFetchMs));
         }
 
         for (FetchStages.Stage stage : fetched) {
@@ -1460,11 +1472,25 @@ public final class VideoStarts {
             long queueEndMs = fetchStartMs >= 0 ? fetchStartMs : endMs;
 
             if (queueEndMs > timer.fetchMs) {
-                result.add(new VideoStart.Stage(STAGE_QUEUE, fetchStartMs >= 0 ? null : DETAIL_GOING, 1, timer.fetchMs, queueEndMs));
+                result.add(new VideoStart.Stage(STAGE_QUEUE, getQueueDetail(timer, queueEndMs, fetchStartMs >= 0 ? null : DETAIL_GOING), 1,
+                        timer.fetchMs, queueEndMs));
             }
         }
 
         return result;
+    }
+
+    /**
+     * Of a long wait for the fetch to begin, what the threads of the tasks were busy with when the formats were asked for: a video
+     * opened as the app started waited 7.4-13.4 s and nothing told for what (CGHFJ3BZ)
+     */
+    @Nullable
+    private static String getQueueDetail(Timer timer, long queueEndMs, @Nullable String detail) {
+        if (timer.fetchLoad == null || queueEndMs - timer.fetchMs < QUEUE_LOAD_MS) {
+            return detail;
+        }
+
+        return detail != null ? timer.fetchLoad + ", " + detail : timer.fetchLoad;
     }
 
     private static void addToBuffering(Timer timer, String name, @Nullable String detail, long startMs, long endMs) {
