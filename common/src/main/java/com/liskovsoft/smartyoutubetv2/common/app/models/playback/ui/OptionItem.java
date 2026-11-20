@@ -4,6 +4,15 @@ public interface OptionItem {
     int getId();
     CharSequence getTitle();
     CharSequence getDescription();
+    /**
+     * A single button's, while it's shown (e.g. a check's results, as they come): its row shows the new one at once. On the main
+     * thread. A description of several lines shows each of them (two at most otherwise).
+     */
+    void setDescription(CharSequence description);
+    /**
+     * Set by the row that shows the item: called with each new description (see setDescription)
+     */
+    void setOnDescriptionChange(Runnable onChange);
     boolean isSelected();
     void onSelect(boolean isSelected);
     Object getData();
@@ -22,7 +31,8 @@ public interface OptionItem {
     void setEnabled(boolean isEnabled);
     boolean isEnabled();
     /**
-     * Show this item of a checked list as a line of text: no checkbox, can't be focused or selected
+     * Show this item of a checked list as a line of text: no checkbox, can't be focused or selected.<br/>
+     * A single button: its title and description, as a row's, but it can't be focused or pressed.
      */
     void setNote(boolean isNote);
     boolean isNote();

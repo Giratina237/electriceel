@@ -25,6 +25,7 @@ public class UiOptionItem implements OptionItem {
     private OptionItem[] mSelectAllItems;
     private ChatReceiver mChatReceiver;
     private CommentsReceiver mCommentsReceiver;
+    private Runnable mOnDescriptionChange;
 
     public static List<OptionItem> from(List<FormatItem> formats, OptionCallback callback) {
         return from(formats, callback, null);
@@ -136,6 +137,20 @@ public class UiOptionItem implements OptionItem {
     @Override
     public CharSequence getDescription() {
         return mDescription;
+    }
+
+    @Override
+    public void setDescription(CharSequence description) {
+        mDescription = description;
+
+        if (mOnDescriptionChange != null) {
+            mOnDescriptionChange.run();
+        }
+    }
+
+    @Override
+    public void setOnDescriptionChange(Runnable onChange) {
+        mOnDescriptionChange = onChange;
     }
 
     @Override

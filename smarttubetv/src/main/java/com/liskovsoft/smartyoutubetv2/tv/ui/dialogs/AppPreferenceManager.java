@@ -13,6 +13,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.misc.Skins;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.smartyoutubetv2.tv.R;
+import com.liskovsoft.smartyoutubetv2.tv.ui.dialogs.other.ButtonPreference;
 import com.liskovsoft.smartyoutubetv2.tv.ui.dialogs.other.ChatPreference;
 import com.liskovsoft.smartyoutubetv2.tv.ui.dialogs.other.CommentsPreference;
 import com.liskovsoft.smartyoutubetv2.tv.ui.dialogs.other.DependentListPreference;
@@ -255,12 +256,16 @@ public class AppPreferenceManager {
 
         if (category.options.size() == 1) {
             OptionItem item = category.options.get(0);
-            Preference preference = new Preference(mContext);
+            Preference preference = new ButtonPreference(mContext);
             preference.setPersistent(false);
             preference.setTitle(item.getTitle());
             // A second line in a smaller font, e.g. why the button is greyed out
             preference.setSummary(item.getDescription());
+            // Changed while it's shown, e.g. a check's results as they come: the row's bound again, in place
+            item.setOnDescriptionChange(() -> preference.setSummary(item.getDescription()));
             preference.setEnabled(item.isEnabled());
+            // A line of text (e.g. a server's address): in the colours of a row, but it can't be focused or pressed
+            preference.setSelectable(!item.isNote());
             preference.setOnPreferenceClickListener(pref -> {
                 item.onSelect(true);
                 return true;
