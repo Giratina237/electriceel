@@ -933,8 +933,6 @@
   <string name="fullscreen_mode">Modul ecran complet (fără bare de sistem)</string>
   <string name="player_only_mode">Afișați numai playerul dacă videoclipul este deschis în afara aplicației</string>
   <string name="pinned_channel_rows">Afișați canalul fixat ca rânduri</string>
-  <string name="prefer_ipv4">Preferați DNS IPv4</string>
-  <string name="prefer_ipv4_desc">S-ar putea remedia situațiile în care aplicația nu funcționează deloc.\nNotă. Poate provoca blocări și prăbușiri (în special pe dispozitivele Android 8 sau Dune HD)</string>
   <string name="ipv6_test">Test de conectivitate IPv6</string>
   <string name="ipv6_test_desc">O dată la fiecare pornire. Dacă IPv6 eșuează, se folosește doar IPv4 până la repornire, ca încărcarea să nu se blocheze, iar playerul folosește OkHttp.</string>
   <string name="long_press_for_settings">APĂSAȚI LUNG PENTRU SETĂRI</string>
@@ -978,7 +976,6 @@
   <string name="player_quick_skip_chapters">Capitolul următor cu butonul sus</string>
   <string name="shorts_no_more">Nu mai sunt Shorts</string>
   <string name="shorts_not_loaded">Nu s-au putut încărca mai multe Shorts</string>
-  <string name="prefer_google_dns">Preferați Google DNS</string>
   <string name="calm_msg">Remediem problema. Verificați din când în când dacă există actualizări</string>
   <string name="without_picture">Fără imagine</string>
   <string name="video_disabled">Video dezactivat</string>

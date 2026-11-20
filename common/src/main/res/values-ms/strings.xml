@@ -971,9 +971,6 @@
     <string name="fullscreen_mode">Mod skrin penuh (tanpa bar sistem)</string>
     <string name="player_only_mode">Tunjukkan pemain sahaja jika video dibuka di luar aplikasi</string>
     <string name="pinned_channel_rows">Tunjukkan saluran yang disemat sebagai baris</string>
-    <string name="prefer_google_dns">Utamakan Google DNS</string>
-    <string name="prefer_ipv4">Utamakan DNS IPv4</string>
-    <string name="prefer_ipv4_desc">Boleh membetulkan keadaan apabila aplikasi tidak berfungsi langsung.\nNota. Boleh menyebabkan hang dan ranap (terutamanya pada peranti Android 8 atau Dune HD)</string>
     <string name="ipv6_test">Ujian ketersambungan IPv6</string>
     <string name="ipv6_test_desc">Sekali bagi setiap kali apl dijalankan. Jika IPv6 gagal, hanya IPv4 digunakan sehingga dimulakan semula supaya pemuatan tidak tersekat, dan pemain menggunakan OkHttp.</string>
     <string name="long_press_for_settings">TEKAN LAMA UNTUK TETAPAN</string>

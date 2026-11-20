@@ -932,8 +932,6 @@
   <string name="fullscreen_mode">Tryb pełnoekranowy (bez pasków systemowych)</string>
   <string name="player_only_mode">Pokaż jedynie odtwarzacz, jeśli wideo zostało otwarte spoza aplikacji</string>
   <string name="pinned_channel_rows">Wyświetlaj przypięte Kanały jako wiersze</string>
-  <string name="prefer_ipv4">Preferuj DNS IPv4</string>
-  <string name="prefer_ipv4_desc">Może pomóc w sytuacji, gdy aplikacja zupełnie nie działa.\nMoże powodować zawieszanie się lub niespodziewane zakończenie działania (szczególnie na Androidzie 8 lub Dune HD)</string>
   <string name="ipv6_test">Test łączności IPv6</string>
   <string name="ipv6_test_desc">Raz na uruchomienie aplikacji. Gdy IPv6 zawodzi, do restartu używane jest tylko IPv4, by wczytywanie nie stało, a odtwarzacz używa OkHttp.</string>
   <string name="long_press_for_settings">przyciśnij długo, by otworzyć ustawienia</string>
@@ -1012,7 +1010,6 @@
   <string name="player_quick_skip_chapters">Następny rozdział przyciskiem w górę</string>
   <string name="shorts_no_more">Brak kolejnych Shorts</string>
   <string name="shorts_not_loaded">Nie udało się wczytać kolejnych Shorts</string>
-  <string name="prefer_google_dns">Preferuj Google DNS</string>
   <string name="action_debug_info">Informacje debugowania</string>
   <string name="dialog_block_channel">Zablokuj Kanał</string>
   <string name="dialog_unblock_channel">Odblokuj Kanał</string>

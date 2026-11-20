@@ -1019,9 +1019,6 @@
     <string name="fullscreen_mode">Viso ekrano režimas (be sistemos juostų)</string>
     <string name="player_only_mode">Rodyti tik grotuvą, jei vaizdo įrašas atidarytas ne iš programos</string>
     <string name="pinned_channel_rows">Rodyti prisegtą kanalą kaip eilutes</string>
-    <string name="prefer_google_dns">Teikti pirmenybę „Google“ DNS</string>
-    <string name="prefer_ipv4">Teikti pirmenybę IPv4 DNS</string>
-    <string name="prefer_ipv4_desc">Gali išspręsti situacijas, kai programa visiškai neveikia.\nPastaba. Gali sukelti strigimų ir lūžių (ypač „Android 8“ įrenginiuose ar „Dune HD“)</string>
     <string name="ipv6_test">IPv6 ryšio testas</string>
     <string name="ipv6_test_desc">Kartą per programos paleidimą. Jei IPv6 neveikia, iki paleidimo iš naujo naudojamas tik IPv4, kad įkėlimas nestrigtų, o grotuvas naudoja OkHttp.</string>
     <string name="long_press_for_settings">ILGAI SPAUSKITE NUSTATYMAMS</string>

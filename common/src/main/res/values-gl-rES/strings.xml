@@ -931,8 +931,6 @@
   <string name="fullscreen_mode">Modo de pantalla chea (sen barras do sistema)</string>
   <string name="player_only_mode">Amosar só o reprodutor se o vídeo está aberto fóra da aplicación</string>
   <string name="pinned_channel_rows">Amosar a canle fixada como filas</string>
-  <string name="prefer_ipv4">Prefirir DNS IPv4</string>
-  <string name="prefer_ipv4_desc">Poderíase solucionar situacións nas que a aplicación non funciona.\nTen en conta. Pode causar bloqueos e fallos (especialmente en dispositivos Android 8 ou Dune HD)</string>
   <string name="ipv6_test">Proba de conectividade IPv6</string>
   <string name="ipv6_test_desc">Unha vez por inicio da aplicación. Se IPv6 falla, só se usa IPv4 ata reiniciar para que a carga non se atasque, e o reprodutor usa OkHttp.</string>
   <string name="long_press_for_settings">PRESION LONGA PARA AXUSTES</string>
@@ -1011,7 +1009,6 @@
   <string name="player_quick_skip_chapters">Seguinte capítulo co botón arriba</string>
   <string name="shorts_no_more">Non hai máis curtos</string>
   <string name="shorts_not_loaded">Non se puideron cargar máis curtos</string>
-  <string name="prefer_google_dns">Preferir DNS de Google</string>
   <string name="stable_restore">Restaurar a versión estable (perderanse tódolos datos)</string>
   <string name="auto_backup_category">Copia de seguranza automática</string>
   <string name="once_a_day">Unha vez ao día</string>

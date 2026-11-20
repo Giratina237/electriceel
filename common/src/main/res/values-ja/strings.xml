@@ -964,9 +964,6 @@
     <string name="fullscreen_mode">全画面モード (ナビゲーションバーなし)</string>
     <string name="player_only_mode">動画がアプリ外で開かれた場合にプレーヤーのみを表示する</string>
     <string name="pinned_channel_rows">固定されたチャンネルを行として表示</string>
-    <string name="prefer_google_dns">Google DNS を優先する</string>
-    <string name="prefer_ipv4">IPv4 DNS を優先する</string>
-    <string name="prefer_ipv4_desc">アプリが全く動作しない状態を修正できる可能性があります。\n注意: フリーズやクラッシュが発生する可能性があります (特に Android 8 のデバイスまたは Dune HD)</string>
     <string name="ipv6_test">IPv6 接続テスト</string>
     <string name="ipv6_test_desc">アプリの起動ごとに 1 回。IPv6 が使えない場合は読み込みが止まらないよう再起動まで IPv4 のみを使い、プレーヤーは OkHttp を使用します。</string>
     <string name="long_press_for_settings">長押しで設定を開く</string>

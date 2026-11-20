@@ -944,8 +944,6 @@
   <string name="fullscreen_mode">Fuldskærmstilstand (uden systembjælker)</string>
   <string name="player_only_mode">Vis kun afspilleren, hvis videoen åbnes uden for Electric Eel</string>
   <string name="pinned_channel_rows">Vis fastgjorte kanaler som rækker</string>
-  <string name="prefer_ipv4">Foretræk IPv4 DNS</string>
-  <string name="prefer_ipv4_desc">Kan løse problemer, når Electric Eel slet ikke virker.\nBemærk: Kan forårsage frysninger og nedbrud (især på Android 8-enheder eller Dune HD).</string>
   <string name="ipv6_test">Test af IPv6-forbindelse</string>
   <string name="ipv6_test_desc">Én gang pr. appstart. Hvis IPv6 fejler, bruges kun IPv4 indtil genstart, så indlæsningen ikke går i stå, og afspilleren bruger OkHttp.</string>
   <string name="long_press_for_settings">LANGT TRYK FOR INDSTILLINGER</string>
@@ -1010,7 +1008,6 @@
   <string name="player_quick_skip_chapters">Næste kapitel med op-knappen</string>
   <string name="shorts_no_more">Ikke flere Shorts</string>
   <string name="shorts_not_loaded">Kunne ikke indlæse flere Shorts</string>
-  <string name="prefer_google_dns">Foretræk Google DNS</string>
   <string name="suggestions_horizontally_scrolled">Vandret rullende forslag</string>
   <string name="stable_restore">Gendan den stabile version (alle data går tabt)</string>
   <string name="auto_backup_category">Automatisk sikkerhedskopi</string>

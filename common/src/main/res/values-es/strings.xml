@@ -921,8 +921,6 @@
   <string name="old_channel_look">Aspecto antiguo de la página Canal</string>
   <string name="player_only_mode">Mostrar sólo el reproductor si el vídeo se abre fuera de la aplicación</string>
   <string name="pinned_channel_rows">Mostrar el canal fijado como filas</string>
-  <string name="prefer_ipv4">Preferir DNS IPv4</string>
-  <string name="prefer_ipv4_desc">Podría solucionar situaciones en las que la aplicación no funciona en absoluto.\nNota. Puede causar cuelgues y bloqueos (especialmente en dispositivos Android 8 o Dune HD).</string>
   <string name="ipv6_test">Prueba de conectividad IPv6</string>
   <string name="ipv6_test_desc">Una vez por inicio de la app. Si IPv6 falla, solo se usa IPv4 hasta reiniciar para que la carga no se atasque, y el reproductor usa OkHttp.</string>
   <string name="hide_watched_from_notifications">Ocultar vídeos vistos de Notificaciones</string>
@@ -1072,7 +1070,6 @@
   <string name="player_quick_skip_chapters">Siguiente capítulo con el botón arriba</string>
   <string name="shorts_no_more">No hay más Shorts</string>
   <string name="shorts_not_loaded">No se pudieron cargar más Shorts</string>
-  <string name="prefer_google_dns">Preferir DNS de Google</string>
   <string name="stable_restore">Restaurar la versión estable (se perderán todos los datos)</string>
   <string name="auto_backup_category">Copia de seguridad automática</string>
   <string name="once_a_day">Una vez al día</string>

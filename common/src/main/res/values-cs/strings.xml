@@ -970,9 +970,6 @@
     <string name="fullscreen_mode">Režim celé obrazovky (bez systémových lišt)</string>
     <string name="player_only_mode">Zobrazit pouze přehrávač, pokud je video otevřeno mimo aplikaci</string>
     <string name="pinned_channel_rows">Zobrazit připnutý kanál jako řádky</string>
-    <string name="prefer_google_dns">Preferovat DNS od Google</string>
-    <string name="prefer_ipv4">Preferovat IPv4 DNS</string>
-    <string name="prefer_ipv4_desc">Může vyřešit situace, kdy aplikace vůbec nefunguje\nPozn. Může způsobit zamrznutí a pády (především na zařízeních s Android 8 nebo Dune HD)</string>
     <string name="ipv6_test">Test připojení IPv6</string>
     <string name="ipv6_test_desc">Jednou za spuštění aplikace. Když IPv6 selže, do restartu se používá jen IPv4, aby se načítání nezaseklo, a přehrávač používá OkHttp.</string>
     <string name="long_press_for_settings">DLOUZE STISKNĚTE PRO NASTAVENÍ</string>

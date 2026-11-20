@@ -1020,9 +1020,6 @@
     <string name="fullscreen_mode">Celozaslonski način (brez sistemskih vrstic)</string>
     <string name="player_only_mode">Pokaži samo predvajalnik, če je video odprt zunaj aplikacije</string>
     <string name="pinned_channel_rows">Pokaži pripeti kanal kot vrstice</string>
-    <string name="prefer_google_dns">Raje uporabi Google DNS</string>
-    <string name="prefer_ipv4">Raje uporabi IPv4 DNS</string>
-    <string name="prefer_ipv4_desc">Lahko odpravi primere, ko aplikacija sploh ne deluje.\nOpomba. Lahko povzroči zamrznitve in sesutja (zlasti na napravah z Androidom 8 ali Dune HD)</string>
     <string name="ipv6_test">Preizkus povezljivosti IPv6</string>
     <string name="ipv6_test_desc">Enkrat na zagon aplikacije. Če IPv6 ne deluje, se do ponovnega zagona uporablja samo IPv4, da se nalaganje ne zatakne, predvajalnik pa uporablja OkHttp.</string>
     <string name="long_press_for_settings">DOLGO PRITISNITE ZA NASTAVITVE</string>

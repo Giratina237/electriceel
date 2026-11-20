@@ -931,8 +931,6 @@
   <string name="fullscreen_mode">Λειτουργία πλήρους οθόνης (χωρίς γραμμές συστήματος)</string>
   <string name="player_only_mode">Εμφάνιση μόνο του προγράμματος αναπαραγωγής εάν το βίντεο είναι ανοιχτό εκτός της εφαρμογής</string>
   <string name="pinned_channel_rows">Εμφάνιση καρφιτσωμένων καναλιών ως σειρές</string>
-  <string name="prefer_ipv4">Προτίμηση IPv4 DNS</string>
-  <string name="prefer_ipv4_desc">Θα μπορούσε να διορθώσει καταστάσεις όταν η εφαρμογή δεν λειτουργεί καθόλου.\nΣημείωση. Μπορεί να προκαλέσει κολλήματα και σφάλματα (ειδικά σε συσκευές Android 8 ή Dune HD)</string>
   <string name="ipv6_test">Έλεγχος συνδεσιμότητας IPv6</string>
   <string name="ipv6_test_desc">Μία φορά ανά εκκίνηση. Αν το IPv6 αποτύχει, χρησιμοποιείται μόνο IPv4 ως την επανεκκίνηση για να μην κολλά η φόρτωση, και η αναπαραγωγή γίνεται με OkHttp.</string>
   <string name="long_press_for_settings">ΠΑΤΗΣΤΕ ΠΑΡΑΤΕΤΑΜΕΝΑ ΓΙΑ ΡΥΘΜΙΣΕΙΣ</string>
@@ -977,7 +975,6 @@
   <string name="player_quick_skip_chapters">Επόμενο κεφάλαιο με το πάνω κουμπί</string>
   <string name="shorts_no_more">Δεν υπάρχουν άλλα Shorts</string>
   <string name="shorts_not_loaded">Δεν ήταν δυνατή η φόρτωση περισσότερων Shorts</string>
-  <string name="prefer_google_dns">Προτίμηση Google DNS</string>
   <string name="add_to_subscriptions_group">Προσθήκη/Αφαίρεση από ομάδα συνδρομών</string>
   <string name="new_subscriptions_group">Νέα ομάδα</string>
   <string name="subscription_group_channel_not_found">Το κανάλι δεν είναι στις εγγραφές σας</string>

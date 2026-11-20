@@ -920,8 +920,6 @@
   <string name="fullscreen_mode">Mode plein écran (sans barres système)</string>
   <string name="player_only_mode">Afficher uniquement le lecteur si la vidéo est ouverte en dehors de l’application</string>
   <string name="pinned_channel_rows">Afficher la chaîne épinglé sous forme de lignes</string>
-  <string name="prefer_ipv4">Privilégiez le DNS IPv4</string>
-  <string name="prefer_ipv4_desc">Peut résoudre les situations où l’application ne fonctionne pas du tout.\nRemarque. Peut provoquer des blocages et des plantages (en particulier sur les appareils Android 8 ou Dune HD)</string>
   <string name="ipv6_test">Test de connectivité IPv6</string>
   <string name="ipv6_test_desc">Une fois par lancement. Si IPv6 échoue, seul IPv4 sert jusqu\'au redémarrage pour ne pas bloquer le chargement, et le lecteur utilise OkHttp.</string>
   <string name="long_press_for_settings">APPUYEZ LONGUEMENT POUR OUVRIR LES PARAMÈTRES</string>
@@ -1008,7 +1006,6 @@
   <string name="player_quick_skip_chapters">Chapitre suivant avec le bouton haut</string>
   <string name="shorts_no_more">Il n\'y a plus de Shorts</string>
   <string name="shorts_not_loaded">Impossible de charger d\'autres Shorts</string>
-  <string name="prefer_google_dns">Privilégier les DNS Google</string>
   <string name="dialog_block_channel">Mettre sur liste noire</string>
   <string name="dialog_unblock_channel">Retirer de la liste noire</string>
   <string name="confirm_block_channel">Masquer tout le contenu de %s\?</string>

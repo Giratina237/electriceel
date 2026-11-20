@@ -925,8 +925,6 @@
   <string name="fullscreen_mode">전체 화면 모드 (시스템 표시줄 없음)</string>
   <string name="player_only_mode">앱 외부에서 동영상을 연 경우 플레이어만 표시하기</string>
   <string name="pinned_channel_rows">고정된 채널을 행으로 표시</string>
-  <string name="prefer_ipv4">IPv4 DNS 선호</string>
-  <string name="prefer_ipv4_desc">앱이 전혀 작동하지 않는 상황을 고칠 수 있습니다.\n주의. 멈춤 및 충돌이 발생할 수 있습니다 (특히 Android 8 기기 또는 Dune HD에서)</string>
   <string name="ipv6_test">IPv6 연결 테스트</string>
   <string name="ipv6_test_desc">앱을 실행할 때마다 한 번. IPv6가 실패하면 로딩이 멈추지 않도록 다시 시작할 때까지 IPv4만 사용하고, 플레이어는 OkHttp를 사용합니다.</string>
   <string name="long_press_for_settings">길게 눌러서 설정 열기</string>
@@ -1014,7 +1012,6 @@
   <string name="player_quick_skip_chapters">위 버튼으로 다음 챕터</string>
   <string name="shorts_no_more">더 이상 쇼츠가 없습니다</string>
   <string name="shorts_not_loaded">쇼츠를 더 불러올 수 없습니다</string>
-  <string name="prefer_google_dns">Google DNS 우선 사용</string>
   <string name="typing_corrections">텍스트 입력 중 자동 수정 비활성화</string>
   <string name="suggestions_horizontally_scrolled">추천 항목 가로 스크롤</string>
   <string name="stable_restore">안정 버전으로 복원 (모든 데이터가 삭제됩니다)</string>

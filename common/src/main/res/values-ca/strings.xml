@@ -965,9 +965,6 @@
   <string name="fullscreen_mode">Mode de pantalla completa (sense barres del sistema)</string>
   <string name="player_only_mode">Mostra només el reproductor si el vídeo s\'obre des de fora de l\'aplicació</string>
   <string name="pinned_channel_rows">Mostra el canal fixat com a files</string>
-  <string name="prefer_google_dns">Prefereix el DNS de Google</string>
-  <string name="prefer_ipv4">Prefereix el DNS IPv4</string>
-  <string name="prefer_ipv4_desc">Pot solucionar els casos en què l\'aplicació no funciona en absolut.\nNota: pot provocar bloquejos i tancaments inesperats (sobretot en dispositius amb Android 8 o Dune HD)</string>
   <string name="ipv6_test">Prova de connectivitat IPv6</string>
   <string name="ipv6_test_desc">Un cop per inici de l\'aplicació. Si IPv6 falla, només s\'usa IPv4 fins a reiniciar perquè la càrrega no s\'encalli, i el reproductor usa OkHttp.</string>
   <string name="long_press_for_settings">PREMEU LLARGAMENT PER A LA CONFIGURACIÓ</string>

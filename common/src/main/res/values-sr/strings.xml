@@ -953,8 +953,6 @@
     <string name="fullscreen_mode">Режим целог екрана (без системских трака)</string>
     <string name="player_only_mode">Прикажи само плејер ако је видео отворен изван апликације</string>
     <string name="pinned_channel_rows">Прикажи закачене канале као редове</string>
-    <string name="prefer_ipv4">Дај предност ИПв4 ДНС-у</string>
-    <string name="prefer_ipv4_desc">Може средити ситуације када апликација уопште не ради.\nНапомена: Може изазвати заглављивања и падове (посебно на Андроид 8 уређајима или Дуне ХД)</string>
     <string name="ipv6_test">Тест IPv6 повезаности</string>
     <string name="ipv6_test_desc">Једном по покретању апликације. Ако IPv6 не ради, до поновног покретања користи се само IPv4 да учитавање не запне, а плејер користи OkHttp.</string>
     <string name="long_press_for_settings">ЗАДРЖИ ЗА ПОСТАВКЕ</string>
@@ -1013,7 +1011,6 @@
     <string name="player_quick_skip_chapters">Следеће поглавље дугметом горе</string>
     <string name="shorts_no_more">Нема више кратких видеа</string>
     <string name="shorts_not_loaded">Није могуће учитати још кратких видеа</string>
-    <string name="prefer_google_dns">Преферирај Google DNS</string>
     <string name="stable_restore">Врати стабилну верзију (сви подаци ће бити изгубљени)</string>
     <string name="auto_backup_category">Аутоматска резервна копија</string>
     <string name="once_a_day">Једном дневно</string>

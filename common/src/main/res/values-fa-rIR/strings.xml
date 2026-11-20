@@ -937,8 +937,6 @@
   <string name="fullscreen_mode">حالت تمام صفحه (بدون نوارهای سیستم)</string>
   <string name="player_only_mode">نمایش فقط پخش کننده اگر ویدیو خارج از برنامه باز شود</string>
   <string name="pinned_channel_rows">نمایش کانال ثابت شده به عنوان ردیف‌ها</string>
-  <string name="prefer_ipv4">ترجیح DNS IPv4</string>
-  <string name="prefer_ipv4_desc">ممکن است در مواردی که برنامه اصلا کار نمی‌کند، کمک کند.\nتوجه: ممکن است باعث خرابی و خطا شود (به ویژه در دستگاه‌های Android 8 یا Dune HD).</string>
   <string name="ipv6_test">آزمون اتصال IPv6</string>
   <string name="ipv6_test_desc">یک بار در هر اجرای برنامه. اگر IPv6 کار نکند، تا راه‌اندازی دوباره فقط IPv4 به کار می‌رود تا بارگیری گیر نکند، و پخش‌کننده از OkHttp استفاده می‌کند.</string>
   <string name="long_press_for_settings">فشار طولانی برای تنظیمات</string>
@@ -1000,7 +998,6 @@
   <string name="player_quick_skip_chapters">فصل بعدی با دکمه بالا</string>
   <string name="shorts_no_more">کوته ویدیوی دیگری نیست</string>
   <string name="shorts_not_loaded">بارگیری کوته ویدیوهای بیشتر ممکن نشد</string>
-  <string name="prefer_google_dns">ترجیح DNS گوگل</string>
   <string name="you_liked">شما پسندیدید</string>
   <string name="premium_users_only">فقط برای کاربران پرمیوم. رفع مشکل ناقص بودن فهرست قالب‌های ویدیو</string>
   <string name="playback_buffering_fix">رفع مشکل بافر در پخش</string>

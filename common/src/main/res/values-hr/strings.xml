@@ -1022,9 +1022,6 @@
     <string name="fullscreen_mode">Način preko cijelog zaslona (bez sistemskih traka)</string>
     <string name="player_only_mode">Prikaži samo player ako je video otvoren izvan aplikacije</string>
     <string name="pinned_channel_rows">Prikaži prikvačeni kanal kao retke</string>
-    <string name="prefer_google_dns">Preferiraj Google DNS</string>
-    <string name="prefer_ipv4">Preferiraj IPv4 DNS</string>
-    <string name="prefer_ipv4_desc">Može riješiti situacije kada aplikacija uopće ne radi.\nNapomena: može uzrokovati zastoje i rušenja (osobito na uređajima s Androidom 8 ili Dune HD)</string>
     <string name="ipv6_test">Test IPv6 povezivosti</string>
     <string name="ipv6_test_desc">Jednom po pokretanju aplikacije. Ako IPv6 ne radi, do ponovnog pokretanja koristi se samo IPv4 da učitavanje ne zapne, a reproduktor koristi OkHttp.</string>
     <string name="long_press_for_settings">DUGO PRITISNITE ZA POSTAVKE</string>

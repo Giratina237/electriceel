@@ -5,11 +5,13 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.text.Editable;
 import android.text.InputType;
+import android.text.method.DigitsKeyListener;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
+import androidx.annotation.VisibleForTesting;
 import androidx.appcompat.app.AlertDialog;
 import com.liskovsoft.sharedutils.helpers.KeyHelpers;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
@@ -20,6 +22,13 @@ public class SimpleEditDialog {
      * No microphone key on the keyboard: "nm" for the AOSP keyboards, the other for Gboard (Android TV's included)
      */
     private static final String NO_MICROPHONE = "nm,com.google.android.inputmethod.latin.noMicrophoneKey";
+    /**
+     * What an IPv4 address is typed with, on the number pad
+     */
+    @VisibleForTesting
+    static final String IPV4_CHARACTERS = "0123456789.";
+    @VisibleForTesting
+    static final int IPV4_INPUT_TYPE = InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL;
 
     public interface OnChange {
         boolean onChange(String newValue);
@@ -57,26 +66,53 @@ public class SimpleEditDialog {
      * (textUri|textPersonName) adds up to a postal address, which keyboards autocorrect.
      */
     public static void showUrl(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange) {
-        show(context, dialogTitle, dialogHint, defaultValue, onChange, null,
-                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, NO_MICROPHONE);
+        showUrl(context, dialogTitle, dialogHint, defaultValue, onChange, null, false);
+    }
+
+    /**
+     * @param onDismiss once it's closed: by OK, Cancel or Back. Null for nothing.
+     * @param isEmptyAllowed an empty field is a value too (e.g. an optional server cleared), given to onChange as ""
+     */
+    public static void showUrl(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange,
+                               Runnable onDismiss, boolean isEmptyAllowed) {
+        show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss,
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, null, NO_MICROPHONE,
+                isEmptyAllowed);
+    }
+
+    /**
+     * An IPv4 address, e.g. of a DNS server: the keyboard's number pad, with its dot, instead of the letters. Digits and dots only,
+     * any number of dots: the number pad's own filter takes one dot, or the locale's decimal separator in its place (a comma in
+     * German).
+     *
+     * @param onDismiss once it's closed: by OK, Cancel or Back. Null for nothing.
+     * @param isEmptyAllowed an empty field is a value too (e.g. an optional server cleared), given to onChange as ""
+     */
+    public static void showIpv4Address(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange,
+                                       Runnable onDismiss, boolean isEmptyAllowed) {
+        show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss,
+                IPV4_INPUT_TYPE, IPV4_CHARACTERS, NO_MICROPHONE, isEmptyAllowed);
     }
 
     private static void show(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange, Runnable onDismiss, int inputType) {
-        show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss, inputType, null);
+        show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss, inputType, null, null, false);
     }
 
     /**
      * @param inputType the InputType.TYPE_* of the field, or {@link InputType#TYPE_NULL} for the one of the layout
+     * @param characters the only ones the field takes, typed or pasted, null for any. The keyboard is still the inputType's.
      * @param privateImeOptions for the keyboard (see EditorInfo.privateImeOptions), null for none
      */
     private static void show(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange, Runnable onDismiss,
-                             int inputType, String privateImeOptions) {
+                             int inputType, String characters, String privateImeOptions, boolean isEmptyAllowed) {
         AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.AppDialog);
         LayoutInflater inflater = LayoutInflater.from(context);
         View contentView = inflater.inflate(R.layout.simple_edit_dialog, null);
 
         EditText editField = contentView.findViewById(R.id.simple_edit_value);
-        if (inputType != InputType.TYPE_NULL) {
+        if (characters != null) {
+            setCharacters(editField, characters, inputType);
+        } else if (inputType != InputType.TYPE_NULL) {
             editField.setInputType(inputType);
         }
         if (privateImeOptions != null) {
@@ -136,7 +172,7 @@ public class SimpleEditDialog {
         configDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener((view) -> {
             String newValue = editField.getText().toString();
 
-            if (newValue.isEmpty()) {
+            if (newValue.isEmpty() && !isEmptyAllowed) {
                 // Empty fields not allowed
                 editField.setHint(R.string.enter_value);
                 return;
@@ -155,6 +191,16 @@ public class SimpleEditDialog {
         configDialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener((view) -> paste(context, editField));
 
         //editField.setNextFocusDownId(configDialog.getButton(AlertDialog.BUTTON_POSITIVE).getId()); // OK button
+    }
+
+    /**
+     * The field takes these characters only, typed or pasted, and the keyboard is the inputType's: the listener's own type would be
+     * set otherwise. The text the field opens with isn't filtered: a value saved before shows as it is.
+     */
+    @VisibleForTesting
+    static void setCharacters(EditText editField, String characters, int inputType) {
+        editField.setKeyListener(DigitsKeyListener.getInstance(characters));
+        editField.setRawInputType(inputType);
     }
 
     /**

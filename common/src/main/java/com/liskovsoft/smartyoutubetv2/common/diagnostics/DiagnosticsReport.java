@@ -199,6 +199,9 @@ public final class DiagnosticsReport {
 
         JSONObject dns = new JSONObject();
         dns.put("preferredType", getDnsTypeName(tweaksData.getPreferredDnsType()));
+        // Not the custom servers: a personal DNS-over-HTTPS URL names its owner
+        dns.put("protocol", getDnsProtocolName(tweaksData.getPreferredDnsProtocol()));
+        dns.put("fixEnabled", tweaksData.isDnsFixEnabled());
         settings.put("dns", dns);
 
         JSONObject network = new JSONObject();
@@ -317,6 +320,7 @@ public final class DiagnosticsReport {
         JSONObject result = new JSONObject();
 
         result.put("dns", getDnsTypeName(tweaksData.getPreferredDnsType()));
+        result.put("dnsProtocol", getDnsProtocolName(tweaksData.getPreferredDnsProtocol()));
         result.put("ipv6Disabled", OkHttpManager.isIpv6Disabled());
         result.put("tunneledPlayback", tweaksData.isTunneledPlaybackEnabled());
         result.put("tunneledPlaybackOff", TunnelingFallback.isOff());
@@ -399,9 +403,24 @@ public final class DiagnosticsReport {
                 return "ipv4";
             case PlayerTweaksData.DNS_TYPE_GOOGLE:
                 return "google";
+            case PlayerTweaksData.DNS_TYPE_CLOUDFLARE:
+                return "cloudflare";
+            case PlayerTweaksData.DNS_TYPE_QUAD9:
+                return "quad9";
+            case PlayerTweaksData.DNS_TYPE_ADGUARD:
+                return "adguard";
+            case PlayerTweaksData.DNS_TYPE_CUSTOM:
+                return "custom";
             default:
                 return "system";
         }
+    }
+
+    /**
+     * How the public DNS servers are asked: not the system's DNS's (e.g. Android's Private DNS)
+     */
+    private static String getDnsProtocolName(int protocol) {
+        return protocol == PlayerTweaksData.DNS_PROTOCOL_DOH ? "doh" : "plain";
     }
 
     @Nullable

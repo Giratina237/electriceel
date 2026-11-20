@@ -27,6 +27,9 @@
     <color name="grey">#282828</color>
     <color name="dimming">#D0000000</color>
     <color name="green">#00FF00</color>
+    <!-- The DNS check's marks: readable on a row, focused or not -->
+    <color name="dns_check_works">#43A047</color>
+    <color name="dns_check_fails">#E53935</color>
     <color name="cyan">#00FFFF</color>
     <color name="blue">#0000FF</color>
     <color name="yellow">#FFFF00</color>

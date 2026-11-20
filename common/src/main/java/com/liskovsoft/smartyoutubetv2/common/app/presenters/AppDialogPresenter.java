@@ -5,6 +5,8 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 
+import androidx.annotation.VisibleForTesting;
+
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionCategory;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
@@ -196,6 +198,14 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
      */
     public boolean isReplaceEnabled() {
         return mBackupIsReplace;
+    }
+
+    /**
+     * Of the dialog shown: its rows
+     */
+    @VisibleForTesting
+    public List<OptionCategory> getCategories() {
+        return mBackupCategories;
     }
 
     /**

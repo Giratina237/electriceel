@@ -927,8 +927,6 @@
   <string name="fullscreen_mode">Mënyra e ekranit të plotë (pa shirita të sistemit)</string>
   <string name="player_only_mode">Shfaq vetëm luajtësin nëse videoja hapet jashtë aplikacionit</string>
   <string name="pinned_channel_rows">Paraqit kanalet e gozhduara si rreshta</string>
-  <string name="prefer_ipv4">Parapëlqe DNS IPv4</string>
-  <string name="prefer_ipv4_desc">Mund të zgjidhë situatat kur aplikacioni nuk punon fare.\nShënim: Mund të shkaktojë ngrirje dhe rënie (veçanërisht në pajisjet Android 8 ose Dune HD)</string>
   <string name="ipv6_test">Testi i lidhjes IPv6</string>
   <string name="ipv6_test_desc">Një herë për çdo nisje. Nëse IPv6 dështon, deri në rinisje përdoret vetëm IPv4 që ngarkimi të mos ngecë, dhe luajtësi përdor OkHttp.</string>
   <string name="long_press_for_settings">MBAJ SHTYPUR PËR CILËSIMET</string>
@@ -1011,7 +1009,6 @@
   <string name="player_quick_skip_chapters">Kapitulli tjetër me butonin lart</string>
   <string name="shorts_no_more">Nuk ka më video të shkurtra</string>
   <string name="shorts_not_loaded">Nuk u ngarkuan dot më shumë video të shkurtra</string>
-  <string name="prefer_google_dns">Preferoje DNS-in e Google</string>
   <string name="stable_restore">Rikthe versionin e qëndrueshëm (të gjitha të dhënat do të humbasin)</string>
   <string name="auto_backup_category">Kopje rezervë automatike</string>
   <string name="once_a_day">Një herë në ditë</string>

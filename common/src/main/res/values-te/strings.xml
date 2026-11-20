@@ -1019,9 +1019,6 @@
     <string name="fullscreen_mode">పూర్తి స్క్రీన్ మోడ్ (సిస్టమ్ బార్‌లు లేకుండా)</string>
     <string name="player_only_mode">వీడియో యాప్ వెలుపల తెరిస్తే ప్లేయర్‌ను మాత్రమే చూపండి</string>
     <string name="pinned_channel_rows">పిన్ చేసిన ఛానెల్‌ను వరుసలుగా చూపండి</string>
-    <string name="prefer_google_dns">Google DNS కు ప్రాధాన్యత ఇవ్వండి</string>
-    <string name="prefer_ipv4">IPv4 DNS కు ప్రాధాన్యత ఇవ్వండి</string>
-    <string name="prefer_ipv4_desc">యాప్ అస్సలు పని చేయని సందర్భాలను పరిష్కరించవచ్చు.\nగమనిక. హ్యాంగ్‌లు మరియు క్రాష్‌లకు కారణం కావచ్చు (ముఖ్యంగా Android 8 పరికరాలు లేదా Dune HD లో)</string>
     <string name="ipv6_test">IPv6 కనెక్టివిటీ పరీక్ష</string>
     <string name="ipv6_test_desc">ప్రతి యాప్ రన్‌కు ఒకసారి. IPv6 విఫలమైతే, లోడింగ్ ఆగకుండా పునఃప్రారంభం వరకు IPv4 మాత్రమే వాడబడుతుంది, మరియు ప్లేయర్ OkHttpను వాడుతుంది.</string>
     <string name="long_press_for_settings">సెట్టింగ్‌ల కోసం ఎక్కువసేపు నొక్కండి</string>

@@ -941,7 +941,6 @@
   <string name="fullscreen_mode">Volledig scherm (zonder systeembalken)</string>
   <string name="player_only_mode">Alleen de speler weergeven als de video buiten de app wordt geopend</string>
   <string name="pinned_channel_rows">Toon vastgezette kanalen als rijen</string>
-  <string name="prefer_ipv4">Geef de voorkeur aan IPv4 DNS</string>
   <string name="long_press_for_settings">LANG INDRUKKEN VOOR INSTELLINGEN</string>
   <string name="long_press_for_options">LANG DRUKKEN VOOR OPTIES</string>
   <string name="device_specific_backup">Alleen back-up voor dit apparaat</string>
@@ -965,7 +964,6 @@
   <string name="screen_dimming_timeout">Time-out voor schermdimmen</string>
   <string name="playlists_rows">Sectie Afspeellijsten weergeven als rijen</string>
   <string name="unlock_all_formats_desc">Op sommige apparaten meldt de firmware ten onrechte dat bepaalde formaten niet worden ondersteund, ook al zijn ze dat wel.\n(Bijvoorbeeld: 1080p smart-tv\'s melden 4k vaak als niet ondersteund.)</string>
-  <string name="prefer_ipv4_desc">Kan situaties oplossen waarin de app helemaal niet werkt.\nLet op. Kan vastlopen en crashen veroorzaken (vooral op Android 8-apparaten of Dune HD)</string>
   <string name="ipv6_test">IPv6-verbindingstest</string>
   <string name="ipv6_test_desc">Eén keer per app-start. Als IPv6 faalt, wordt tot de herstart alleen IPv4 gebruikt zodat laden niet hapert, en gebruikt de speler OkHttp.</string>
   <string name="player_loop_shorts">Short herhaald afspelen ipv doorlopend</string>
@@ -1031,7 +1029,6 @@
   <string name="player_quick_skip_chapters">Volgend hoofdstuk met de omhoogknop</string>
   <string name="shorts_no_more">Geen Shorts meer</string>
   <string name="shorts_not_loaded">Kan geen Shorts meer laden</string>
-  <string name="prefer_google_dns">Google DNS verkiezen</string>
   <string name="rounded_card_corners">Afgeronde kaarthoeken</string>
   <string name="app_restore_desc">OPMERKING: De back-up-zip moet handmatig of via bestandsbeheer naar deze map worden gekopieerd, gebruik \'Openen met\'</string>
   <string name="app_backup_desc">OPMERKING: De back-up wordt in zipformaat gemaakt</string>

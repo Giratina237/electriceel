@@ -966,9 +966,6 @@
     <string name="fullscreen_mode">Modalità a schermo intero (senza barre di sistema)</string>
     <string name="player_only_mode">Mostra solo il lettore se il video viene aperto all\'esterno dell\'app</string>
     <string name="pinned_channel_rows">Mostra il canale bloccato come righe</string>
-    <string name="prefer_google_dns">Preferisci DNS di Google</string>
-    <string name="prefer_ipv4">Preferisci DNS IPv4</string>
-    <string name="prefer_ipv4_desc">Potrebbe risolvere situazioni in cui l\'app non funziona affatto.\nNota: potrebbe causare blocchi e arresti anomali (specialmente su dispositivi Android 8 o Dune HD)</string>
     <string name="ipv6_test">Test di connettività IPv6</string>
     <string name="ipv6_test_desc">Una volta per avvio dell\'app. Se IPv6 non va, si usa solo IPv4 fino al riavvio così il caricamento non si blocca, e il lettore usa OkHttp.</string>
     <string name="long_press_for_settings">PREMI A LUNGO PER LE IMPOSTAZIONI</string>

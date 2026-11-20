@@ -946,8 +946,6 @@
   <string name="fullscreen_mode">وضع ملء الشاشة (بدون أشرطة النظام)</string>
   <string name="player_only_mode">عرض المشغل فقط إذا تم فتح الفيديو خارج التطبيق</string>
   <string name="pinned_channel_rows">عرض القناة المثبتة في شكل صفوف</string>
-  <string name="prefer_ipv4">تفضيل IPv4 DNS</string>
-  <string name="prefer_ipv4_desc">قد يعمل على إصلاح المواقف التي لا يعمل فيها التطبيق على الإطلاق.\nملاحظة: قد يتسبب في حدوث تعطلات وأخطاء (خاصة على أجهزة Android 8 أو Dune HD)</string>
   <string name="ipv6_test">اختبار اتصال IPv6</string>
   <string name="ipv6_test_desc">مرة في كل تشغيل للتطبيق. إذا فشل IPv6 يُستخدم IPv4 فقط حتى إعادة التشغيل كي لا يتعطل التحميل، ويستخدم المشغل OkHttp.</string>
   <string name="long_press_for_settings">اضغط ضغطة طويلة للوصول إلى الإعدادات</string>
@@ -1016,7 +1014,6 @@
   <string name="player_quick_skip_chapters">الفصل التالي باستخدام الزر الأعلى</string>
   <string name="shorts_no_more">لا توجد Shorts أخرى</string>
   <string name="shorts_not_loaded">تعذّر تحميل المزيد من Shorts</string>
-  <string name="prefer_google_dns">تفضيل Google DNS</string>
   <string name="action_debug_info">معلومات تصحيح الأخطاء</string>
   <string name="dialog_block_channel">حظر القناة</string>
   <string name="dialog_unblock_channel">إلغاء حظر القناة</string>

@@ -49,6 +49,8 @@ public class DiagnosticsReportTest {
     private static final long NOW = 1_792_000_000_000L;
     private int mSavedEngine;
     private int mSavedDns;
+    private int mSavedDnsProtocol;
+    private boolean mSavedDnsFix;
     private boolean mSavedIpv6Test;
     private boolean mSavedProxy;
     private boolean mSavedConscrypt;
@@ -70,6 +72,8 @@ public class DiagnosticsReportTest {
         PlayerTweaksData tweaks = getTweaks();
         mSavedEngine = tweaks.getPlayerDataSource();
         mSavedDns = tweaks.getPreferredDnsType();
+        mSavedDnsProtocol = tweaks.getPreferredDnsProtocol();
+        mSavedDnsFix = tweaks.isDnsFixEnabled();
         mSavedIpv6Test = tweaks.isIpv6TestEnabled();
         mSavedProxy = GeneralData.instance(getContext()).isProxyEnabled();
         mSavedConscrypt = NetworkData.instance(getContext()).isConscryptEnabled();
@@ -92,6 +96,8 @@ public class DiagnosticsReportTest {
         PlayerTweaksData tweaks = getTweaks();
         tweaks.setPlayerDataSource(mSavedEngine);
         tweaks.setPreferredDnsType(mSavedDns);
+        tweaks.setPreferredDnsProtocol(mSavedDnsProtocol);
+        tweaks.setDnsFixEnabled(mSavedDnsFix);
         tweaks.setIpv6TestEnabled(mSavedIpv6Test);
         GeneralData.instance(getContext()).setProxyEnabled(mSavedProxy);
         NetworkData.instance(getContext()).setConscryptEnabled(mSavedConscrypt);
@@ -145,10 +151,34 @@ public class DiagnosticsReportTest {
         }
     }
 
+    /**
+     * Each DNS has its name in a failure's settings: the providers added for #93 read "system" otherwise
+     */
+    @Test
+    public void aFailureNamesTheDnsAndItsProtocol() throws Exception {
+        PlayerTweaksData tweaks = getTweaks();
+        int[] types = {PlayerTweaksData.DNS_TYPE_SYSTEM, PlayerTweaksData.DNS_TYPE_IPV4, PlayerTweaksData.DNS_TYPE_GOOGLE,
+                PlayerTweaksData.DNS_TYPE_CLOUDFLARE, PlayerTweaksData.DNS_TYPE_QUAD9, PlayerTweaksData.DNS_TYPE_ADGUARD,
+                PlayerTweaksData.DNS_TYPE_CUSTOM};
+        String[] names = {"system", "ipv4", "google", "cloudflare", "quad9", "adguard", "custom"};
+
+        for (int i = 0; i < types.length; i++) {
+            tweaks.setPreferredDnsType(types[i]);
+            assertEquals(names[i], DiagnosticsReport.buildPlaybackSettings(getContext()).getString("dns"));
+        }
+
+        tweaks.setPreferredDnsProtocol(PlayerTweaksData.DNS_PROTOCOL_PLAIN);
+        assertEquals("plain", DiagnosticsReport.buildPlaybackSettings(getContext()).getString("dnsProtocol"));
+        tweaks.setPreferredDnsProtocol(PlayerTweaksData.DNS_PROTOCOL_DOH);
+        assertEquals("doh", DiagnosticsReport.buildPlaybackSettings(getContext()).getString("dnsProtocol"));
+    }
+
     @Test
     public void readsTheSettingsAndTheDevice() throws Exception {
         PlayerTweaksData tweaks = getTweaks();
         tweaks.setPreferredDnsType(PlayerTweaksData.DNS_TYPE_IPV4);
+        tweaks.setPreferredDnsProtocol(PlayerTweaksData.DNS_PROTOCOL_DOH);
+        tweaks.setDnsFixEnabled(false);
         tweaks.setIpv6TestEnabled(false);
         GeneralData.instance(getContext()).setProxyEnabled(true);
         NetworkData.instance(getContext()).setConscryptEnabled(true);
@@ -168,7 +198,12 @@ public class DiagnosticsReportTest {
         JSONObject settings = app.getJSONObject("settings");
         assertEquals("okhttp", settings.getJSONObject("networkEngine").getString("selected"));
         assertEquals(Utils.getEffectiveNetworkEngine(getContext()), settings.getJSONObject("networkEngine").getString("effective"));
-        assertEquals("ipv4", settings.getJSONObject("dns").getString("preferredType"));
+        JSONObject dns = settings.getJSONObject("dns");
+        assertEquals("ipv4", dns.getString("preferredType"));
+        assertEquals("doh", dns.getString("protocol"));
+        assertFalse(dns.getBoolean("fixEnabled"));
+        // A custom DNS-over-HTTPS URL may name its owner (e.g. NextDNS's): no server is sent
+        assertEquals(3, dns.length());
 
         JSONObject network = settings.getJSONObject("network");
         assertTrue(network.getBoolean("webProxyEnabled"));

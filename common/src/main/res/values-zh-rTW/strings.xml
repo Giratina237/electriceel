@@ -958,8 +958,6 @@
   <string name="player_quick_skip_videos">使用向左 / 向右按鈕跳過一般影片</string>
   <string name="player_quick_shorts_skip">使用向左 / 向右按鈕跳過 Shorts</string>
   <string name="playlists_rows">將「播放清單」區塊顯示為列</string>
-  <string name="prefer_ipv4">偏好使用 IPv4 DNS</string>
-  <string name="prefer_ipv4_desc">可能可以修正應用程式完全無法運作的情況。\n注意：可能會導致當機或發生錯誤（尤其是在 Android 8 裝置或 Dune HD 上）</string>
   <string name="ipv6_test">IPv6 連線測試</string>
   <string name="ipv6_test_desc">每次執行應用程式時檢查一次。IPv6 不通時，重新啟動前只用 IPv4，以免載入卡住，且播放器會使用 OkHttp。</string>
   <string name="premium_users_only">僅限 Premium 會員。修正不完整的影片格式清單</string>
@@ -1001,7 +999,6 @@
   <string name="player_quick_skip_chapters">使用向上按鈕跳到下一個章節</string>
   <string name="shorts_no_more">沒有更多 Shorts 了</string>
   <string name="shorts_not_loaded">無法載入更多 Shorts</string>
-  <string name="prefer_google_dns">偏好使用 Google DNS</string>
   <string name="auto_backup_category">自動備份</string>
   <string name="once_a_day">一天一次</string>
   <string name="once_a_week">一週一次</string>

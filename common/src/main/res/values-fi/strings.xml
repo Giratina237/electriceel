@@ -931,8 +931,6 @@
   <string name="fullscreen_mode">Koko näytön tila (ilman järjestelmäpalkkeja)</string>
   <string name="player_only_mode">Näytä vain soitin, jos video avataan sovelluksen ulkopuolella</string>
   <string name="pinned_channel_rows">Näytä kiinnitetty kanava riveinä</string>
-  <string name="prefer_ipv4">Suosi IPv4 DNS:ää</string>
-  <string name="prefer_ipv4_desc">Voi korjata tilanteet, joissa sovellus ei toimi.\nHuom. Saattaa aiheuttaa kaatumisia (erityisesti Android 8 -laitteissa tai Dune HD:ssa)</string>
   <string name="ipv6_test">IPv6-yhteystesti</string>
   <string name="ipv6_test_desc">Kerran käynnistystä kohden. Jos IPv6 ei toimi, käytetään vain IPv4:ää uudelleenkäynnistykseen asti, ettei lataus jumitu, ja soitin käyttää OkHttp:tä.</string>
   <string name="long_press_for_settings">Pitkä painallus -&gt; asetuksiin</string>
@@ -1025,7 +1023,6 @@
   <string name="player_unexpected_error">Odottamaton toistovirhe</string>
   <string name="color_scheme_dark_blue_oled">Tummansininen OLED</string>
   <string name="color_scheme_electric_blue">Sähkönsininen</string>
-  <string name="prefer_google_dns">Suosi Googlen DNS:ää</string>
   <string name="sidebar_notification">Näytä ilmoitus sivupalkissa</string>
   <string name="player_chapter_notification2">Siirry seuraavaan lukuun napsauttamalla ilmoitusta</string>
   <string name="app_restore_desc">Varmuuskopiotiedosto zip tulee kopioida tähän kansioon manuaalisesti tai tiedostonhallinnassa käyttämällä \'Avaa sovelluksella\' -toimintoa.</string>

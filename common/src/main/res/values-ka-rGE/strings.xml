@@ -963,9 +963,6 @@
   <string name="fullscreen_mode">მთელეკრანიანი რეჟიმი (სისტემური პანელების გარეშე)</string>
   <string name="player_only_mode">მხოლოდ პლეერის ჩვენება, თუ ვიდეო აპლიკაციის გარეთ არის გახსნილი</string>
   <string name="pinned_channel_rows">ჩამაგრებული არხის ჩვენება რიგების სახით</string>
-  <string name="prefer_google_dns">Google DNS-ის პრეფერენცია</string>
-  <string name="prefer_ipv4">IPv4 DNS-ის პრეფერენცია</string>
-  <string name="prefer_ipv4_desc">შესაძლოა გამოსწორდეს სიტუაციები, როდესაც აპლიკაცია საერთოდ არ მუშაობს.\nშენიშვნა. შეიძლება გამოიწვიოს გაჭედვები და ავარიები (განსაკუთრებით Android 8 მოწყობილობებზე ან Dune HD-ზე)</string>
   <string name="ipv6_test">IPv6 კავშირის ტესტი</string>
   <string name="ipv6_test_desc">აპის ყოველ გაშვებაზე ერთხელ. თუ IPv6 არ მუშაობს, გადატვირთვამდე მხოლოდ IPv4 გამოიყენება, რომ ჩატვირთვა არ შეფერხდეს, და ფლეიერი OkHttp-ს იყენებს.</string>
   <string name="long_press_for_settings">ხანგრძლივი დაჭერა პარამეტრებისთვის</string>

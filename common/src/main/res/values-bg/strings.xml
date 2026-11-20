@@ -966,9 +966,6 @@
   <string name="fullscreen_mode">Цял екран (без системни ленти)</string>
   <string name="player_only_mode">Показване само на плейъра, ако видеото е отворено извън приложението</string>
   <string name="pinned_channel_rows">Показване на закачения канал като редове</string>
-  <string name="prefer_google_dns">Предпочитане на Google DNS</string>
-  <string name="prefer_ipv4">Предпочитане на IPv4 DNS</string>
-  <string name="prefer_ipv4_desc">Може да реши случаите, когато приложението не работи изобщо.\nЗабележка: може да причини забавяния и сривове (особено на устройства с Android 8 или Dune HD)</string>
   <string name="ipv6_test">Тест за IPv6 свързаност</string>
   <string name="ipv6_test_desc">Веднъж при всяко стартиране. Ако IPv6 не работи, до рестарт се ползва само IPv4, за да не засича зареждането, а плейърът използва OkHttp.</string>
   <string name="long_press_for_settings">ДЪЛГО НАТИСКАНЕ ЗА НАСТРОЙКИ</string>
