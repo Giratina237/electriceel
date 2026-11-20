@@ -72,6 +72,11 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
     private volatile int mSkippedToPosition;
     private volatile long mSkipStartMs = -1;
     /**
+     * A frame at or past the position came out of the decoder since the renderer was enabled or its position reset: it got there (see
+     * #hasReachedPosition). Read by the main thread.
+     */
+    private volatile boolean mHasReachedPosition;
+    /**
      * Tunneled, how far past the position the decoder is given samples: the rest waits in the renderer's queue (see
      * {@link #shouldFeedInput})
      */
@@ -300,6 +305,8 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
             }
 
             mSkippedToPosition++;
+        } else if (!isDecodeOnlyBuffer) {
+            mHasReachedPosition = true;
         }
 
         if (super.processOutputBuffer(positionUs, elapsedRealtimeUs, codec, buffer, bufferIndex, bufferFlags, bufferPresentationTimeUs,
@@ -384,9 +391,19 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         return mSkipStartMs;
     }
 
+    /**
+     * The decoder got to the position it was sent to (e.g. a resume's): a frame there came out of it, and is shown as the playback
+     * reaches it, at once for the first one. Going back to the keyframe before it then (see ExoPlayerController#setResumePositionMs)
+     * saves nothing.
+     */
+    public boolean hasReachedPosition() {
+        return mHasReachedPosition;
+    }
+
     private void resetSkippedToPosition() {
         mSkipStartMs = -1;
         mSkippedToPosition = 0;
+        mHasReachedPosition = false;
     }
 
     public boolean hasPendingFrameSteps() {

@@ -40,6 +40,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.RendererWaits;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.SilenceDetector;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
@@ -49,6 +50,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.LiveSegmentsGone;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CensoredWords.Range;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.FrameStepper;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.KeyframeResume;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.RangeMuter;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.VolumeBooster;
@@ -114,10 +116,6 @@ public class ExoPlayerController implements Player.EventListener {
      */
     @Nullable
     private DebugInfoMediaCodecVideoRenderer mVideoRenderer;
-    /**
-     * A keyframe closer than this to a resume's position isn't gone back to: its frames are decoded quickly
-     */
-    private static final long MIN_RESUME_KEYFRAME_GAP_MS = 500;
     /**
      * Of the resume going on (see #setResumePositionMs), till it goes back to its keyframe or another seek is made: -1 for none.
      * Main thread only.
@@ -615,9 +613,12 @@ public class ExoPlayerController implements Player.EventListener {
         Video video = getVideo();
         // Each controller's part, of those that take long (see PlaybackPresenter#onSourceChanged)
         VideoStarts.timeOpenStep(VideoStarts.STAGE_SOURCE_CHANGED, null, () -> mEventListener.onSourceChanged(video));
-        VideoStarts.onPrepare();
+        // The engine its factory was built with: the settings may give another by now (see ExoMediaSourceFactory#getBuiltEngine)
+        VideoStarts.onPrepare(mMediaSourceFactory.getBuiltEngine());
         FormatAttempts.onPrepare();
-        LoadErrors.onPrepare();
+        // The same video again (a reload) goes on with the loads that failed before it
+        LoadErrors.onPrepare(video != null ? video.videoId : null);
+        RendererWaits.onPrepare();
         Connections.onPrepare();
         mHealth.onPrepare();
         mHasPlayedSource = false;
@@ -657,7 +658,8 @@ public class ExoPlayerController implements Player.EventListener {
      * A resume (see VideoStateController): played from the keyframe before the position, once it's known (see #onDecodedFromKeyframe).
      * Before, every frame from that keyframe to the position was decoded unseen first (AWHPECZK zTkEMVxv6F8: 1661 ms for 210 frames
      * of a 4K stream on a Shield). Its keyframes aren't known before the seek (SABR has no segment index, DASH loads it later), so
-     * SeekParameters.PREVIOUS_SYNC can't do it, and a global one would make SponsorBlock skip again and again.
+     * SeekParameters.PREVIOUS_SYNC can't do it, and a global one would make SponsorBlock skip again and again. Only when the decoder
+     * would take longer to get to the position than going back costs (see #maybeResumeFromKeyframe).
      */
     public void setResumePositionMs(long positionMs) {
         mIsAudioLoadedSinceResume = false;
@@ -692,7 +694,27 @@ public class ExoPlayerController implements Player.EventListener {
         // At or just past it, in ms: a seek before it would find no keyframe in the buffer, and load the segment again
         long keyframeMs = (keyframeUs + 999) / 1_000;
 
-        if (mPlayer == null || keyframeUs < 0 || resumeMs - keyframeMs < MIN_RESUME_KEYFRAME_GAP_MS) {
+        if (mPlayer == null || keyframeUs < 0 || resumeMs <= keyframeMs) {
+            return;
+        }
+
+        DebugInfoMediaCodecVideoRenderer renderer = mVideoRenderer;
+
+        // This runs after the main thread's other work, and the decoder went on meanwhile: 292 ms later, the 58 frames to the position
+        // were decoded and its frame shown. Going back then threw it away, showed 1:19 after 1:20, and played 282 ms later (6EZTNXBF).
+        if (renderer != null && renderer.hasReachedPosition()) {
+            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms: the decoder is there", resumeMs, keyframeMs);
+            return;
+        }
+
+        Format format = mPlayer.getVideoFormat();
+        long skipStartMs = renderer != null ? renderer.getSkipStartMs() : -1;
+
+        // A keyframe the decoder gets to the position from sooner than going back costs isn't gone back to (see KeyframeResume)
+        if (!KeyframeResume.isWorthIt(resumeMs - keyframeMs, format != null ? format.frameRate : Format.NO_VALUE,
+                format != null ? format.height : Format.NO_VALUE, renderer != null ? renderer.getSkippedToPosition() : 0,
+                skipStartMs >= 0 ? SystemClock.elapsedRealtime() - skipStartMs : 0)) {
+            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms: the decoder gets there sooner", resumeMs, keyframeMs);
             return;
         }
 

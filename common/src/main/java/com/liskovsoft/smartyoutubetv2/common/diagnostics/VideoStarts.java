@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.RendererReadiness;
 import com.google.android.exoplayer2.source.sabr.parser.SabrStream;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.rx.RxHelper;
@@ -139,6 +140,26 @@ public final class VideoStarts {
      * no init segment (e.g. the server held the stream, KKSJMSQX: 0 KB, then seconds with no row), or the format changed.
      */
     private static final String[] INIT_AGAIN_STAGES = {STAGE_VIDEO_INIT_AGAIN, STAGE_AUDIO_INIT_AGAIN};
+    static final String STAGE_MORE_VIDEO_CHUNKS = "more video chunks";
+    static final String STAGE_MORE_AUDIO_CHUNKS = "more audio chunks";
+    /**
+     * The media segments loaded after the first one, by track (as CHUNK_STAGES' last two), as one row: from the first of them to the
+     * end of the last, its detail how many and their bytes, e.g. "5, 12.3 MB". Of a start that didn't play at its first frame (see
+     * AFTER_FRAME_MIN_MS): what the player went on loading while it waited, e.g. the audio asked for again after a seek back.
+     */
+    private static final String[] MORE_CHUNK_STAGES = {STAGE_MORE_VIDEO_CHUNKS, STAGE_MORE_AUDIO_CHUNKS};
+    /**
+     * A renderer that couldn't play from where it was after the start's first frame, till it could (see RendererWaits): the player is
+     * ready only once the video's and the audio's both can
+     */
+    static final String STAGE_VIDEO_NOT_READY = "video not ready";
+    static final String STAGE_AUDIO_NOT_READY = "audio not ready";
+    /**
+     * Played this long after its first frame, a start has rows for what it waited on meanwhile (see MORE_CHUNK_STAGES and
+     * STAGE_AUDIO_NOT_READY). The frame was shown at 1226 ms and it played at 2882 ms, with 30.8 s buffered and no row between
+     * (6EZTNXBF): sooner, the two are one moment.
+     */
+    static final long AFTER_FRAME_MIN_MS = 200;
     static final String STAGE_VIDEO_DECODER = "video decoder";
     /**
      * The frames decoded only to reach where the video starts (e.g. a resume's position), from the keyframe before it, till its first
@@ -218,6 +239,8 @@ public final class VideoStarts {
     static ProtectionSource sProtection = ProtectionStatuses::take;
     @VisibleForTesting
     static LoadHoldSource sLoadErrors = LoadErrors::take;
+    @VisibleForTesting
+    static LoadHoldSource sRendererWaits = RendererWaits::take;
     @VisibleForTesting
     static Recorder sRecorder = VideoStarts::save;
     @VisibleForTesting
@@ -438,6 +461,14 @@ public final class VideoStarts {
         final long[] initAgainBytes = new long[INIT_AGAIN_STAGES.length];
         final long[] initAgainStartMs = new long[INIT_AGAIN_STAGES.length];
         final long[] initAgainEndMs = new long[INIT_AGAIN_STAGES.length];
+        /**
+         * Of the media segments' loads after the first one, by track (see MORE_CHUNK_STAGES): how many, their bytes, and from the
+         * start of the first to the end of the last
+         */
+        final int[] moreChunkLoads = new int[MORE_CHUNK_STAGES.length];
+        final long[] moreChunkBytes = new long[MORE_CHUNK_STAGES.length];
+        final long[] moreChunkStartMs = new long[MORE_CHUNK_STAGES.length];
+        final long[] moreChunkEndMs = new long[MORE_CHUNK_STAGES.length];
         boolean hasVideoDecoder;
         int seeks;
         boolean isCached;
@@ -540,6 +571,8 @@ public final class VideoStarts {
 
         SabrStream.setBackoffListener(ServerBackoffs::onBackoff);
         SabrStream.setProtectionStatusListener(ProtectionStatuses::onStatus);
+        RendererReadiness.setListener(RendererWaits::onReadiness);
+        Plays.init(context);
     }
 
     public static void setListener(@Nullable Listener listener) {
@@ -870,6 +903,14 @@ public final class VideoStarts {
      * The player buffers the formats
      */
     public static void onPrepare() {
+        onPrepare(null);
+    }
+
+    /**
+     * @param engine the network engine the source's requests go over (see ExoMediaSourceFactory#getBuiltEngine), null when not known:
+     *               the one the settings give then
+     */
+    public static void onPrepare(@Nullable String engine) {
         Arrays.fill(sIsChunkStarted, false);
         Arrays.fill(sIsChunkDone, false);
         sPreparedMs = sClock.now();
@@ -879,7 +920,7 @@ public final class VideoStarts {
             return;
         }
 
-        timer.engine = sEngine.get();
+        timer.engine = engine != null ? engine : sEngine.get();
         long now = sClock.now();
         timer.close(STAGE_OPEN, now);
         Group replaced = timer.findOpen(STAGE_BUFFERING);
@@ -903,6 +944,8 @@ public final class VideoStarts {
         Arrays.fill(timer.chunkLoadMs, -1);
         Arrays.fill(timer.initAgainLoads, 0);
         Arrays.fill(timer.initAgainBytes, 0);
+        Arrays.fill(timer.moreChunkLoads, 0);
+        Arrays.fill(timer.moreChunkBytes, 0);
         timer.hasVideoDecoder = false;
     }
 
@@ -948,6 +991,9 @@ public final class VideoStarts {
         if (timer.isChunkLoaded[chunk]) {
             if (isInit) {
                 addInitAgain(timer, chunk, startMs, endMs, bytes);
+            } else {
+                // After the init segments in CHUNK_STAGES: the video's, then the audio's
+                addMoreChunk(timer, chunk - INIT_AGAIN_STAGES.length, startMs, endMs, bytes);
             }
 
             return;
@@ -955,6 +1001,23 @@ public final class VideoStarts {
 
         timer.isChunkLoaded[chunk] = true;
         addToBuffering(timer, CHUNK_STAGES[chunk], formatBytes(bytes), startMs, endMs);
+    }
+
+    /**
+     * A media segment's load after the first one of its track (see MORE_CHUNK_STAGES)
+     *
+     * @param track of the segment, in MORE_CHUNK_STAGES
+     */
+    private static void addMoreChunk(Timer timer, int track, long startMs, long endMs, long bytes) {
+        if (timer.moreChunkLoads[track]++ == 0) {
+            timer.moreChunkStartMs[track] = startMs;
+            timer.moreChunkEndMs[track] = endMs;
+        } else {
+            timer.moreChunkStartMs[track] = Math.min(timer.moreChunkStartMs[track], startMs);
+            timer.moreChunkEndMs[track] = Math.max(timer.moreChunkEndMs[track], endMs);
+        }
+
+        timer.moreChunkBytes[track] += Math.max(bytes, 0);
     }
 
     /**
@@ -1253,6 +1316,8 @@ public final class VideoStarts {
             oldest.remove();
         }
         record(build(timer, endMs, outcome));
+        // After it's recorded: how its play goes on from here is added to it (see Plays)
+        Plays.onStarted(timer.videoId, timer.ts, VideoStart.OUTCOME_PLAYED.equals(outcome));
     }
 
     private static void record(VideoStart start) {
@@ -1443,6 +1508,21 @@ public final class VideoStarts {
             result.addAll(sLoadErrors.take(timer.prepareMs, endMs));
         }
 
+        // Its first frame was shown and it didn't play: what it waited on from there
+        if (timer.firstFrameMs >= 0 && endMs - timer.firstFrameMs >= AFTER_FRAME_MIN_MS) {
+            for (int track = 0; track < MORE_CHUNK_STAGES.length; track++) {
+                if (timer.moreChunkLoads[track] > 0 && timer.moreChunkStartMs[track] < endMs) {
+                    String detail = String.format(Locale.US, "%d, %s", timer.moreChunkLoads[track],
+                            formatBytes(timer.moreChunkBytes[track]));
+                    result.add(new VideoStart.Stage(MORE_CHUNK_STAGES[track], detail, 1, timer.moreChunkStartMs[track],
+                            Math.min(timer.moreChunkEndMs[track], endMs)));
+                }
+            }
+
+            // The renderer that couldn't play from where it was: the player is ready only once both can
+            result.addAll(sRendererWaits.take(timer.firstFrameMs, endMs));
+        }
+
         return result;
     }
 
@@ -1583,6 +1663,7 @@ public final class VideoStarts {
         sTimer = null;
         sOpenStepDepth = 0;
         sPlayed.clear();
+        Plays.resetForTesting();
         sReloadableId = null;
         Arrays.fill(sIsChunkStarted, false);
         Arrays.fill(sIsChunkDone, false);
@@ -1610,6 +1691,7 @@ public final class VideoStarts {
         sBackoffs = ServerBackoffs::take;
         sProtection = ProtectionStatuses::take;
         sLoadErrors = LoadErrors::take;
+        sRendererWaits = RendererWaits::take;
         sRecorder = VideoStarts::save;
         sFramesRecorder = VideoStarts::saveFrames;
         sWarmUps = WarmUps::snapshot;

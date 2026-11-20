@@ -260,6 +260,26 @@ public class DiagnosticsReportTest {
         }
     }
 
+    /**
+     * QYZPW0FN: pauses came through the media session, and nothing said whether the player had one (Disable playback notifications
+     * turns it off)
+     */
+    @Test
+    public void theMediaSessionIsSaidOnOrOff() throws Exception {
+        PlayerTweaksData tweaksData = PlayerTweaksData.instance(getContext());
+        boolean savedDisabled = tweaksData.isPlaybackNotificationsDisabled();
+
+        try {
+            tweaksData.setPlaybackNotificationsDisabled(false);
+            assertTrue(build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings").getBoolean("mediaSession"));
+
+            tweaksData.setPlaybackNotificationsDisabled(true);
+            assertFalse(build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings").getBoolean("mediaSession"));
+        } finally {
+            tweaksData.setPlaybackNotificationsDisabled(savedDisabled);
+        }
+    }
+
     @Test
     public void theCurrentClientIsNamed() throws Exception {
         JSONObject settings = build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings");

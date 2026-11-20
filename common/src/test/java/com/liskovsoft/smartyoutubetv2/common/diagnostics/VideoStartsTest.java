@@ -52,6 +52,88 @@ public class VideoStartsTest {
     }
 
     /**
+     * 6EZTNXBF: a start whose requests went over Cronet said okhttp_no_ipv6, what the settings and the IPv6 test gave when the player
+     * was prepared. Told the engine its source was built with, that's the one it has.
+     */
+    @Test
+    public void aStartHasTheEngineItsSourceWasBuiltWith() {
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(500);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+        VideoStarts.onPrepare("cronet");
+        mFixture.at(900);
+        VideoStarts.onFirstFrame();
+        VideoStarts.onPlaying(true);
+
+        assertEquals("cronet", last().engine);
+    }
+
+    /**
+     * 6EZTNXBF: the first frame at 1226 ms, playing at 2882 ms with 30.8 s buffered, and no row between the two. What the player
+     * went on loading, and the renderer that couldn't play from its first frame on, are rows of the buffering.
+     */
+    @Test
+    public void aStartThatPlaysLongAfterItsFirstFrameSaysWhatItWaitedFor() {
+        VideoStarts.sRendererWaits = (fromMs, toMs) -> Collections.singletonList(
+                new VideoStart.Stage(VideoStarts.STAGE_AUDIO_NOT_READY, null, 1, fromMs, toMs - 2));
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(250);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+        VideoStarts.onPrepare();
+        VideoStarts.onLoad(false, false, true, T0 + 400, T0 + 560, 160_000);
+        VideoStarts.onLoad(false, true, false, T0 + 590, T0 + 1_350, 2_900_000);
+        mFixture.at(1_226);
+        VideoStarts.onFirstFrame();
+        // After the first of each track: the audio's twice, the video's once
+        VideoStarts.onLoad(false, false, true, T0 + 1_030, T0 + 1_900, 160_000);
+        VideoStarts.onLoad(false, false, true, T0 + 1_900, T0 + 2_400, 320_000);
+        VideoStarts.onLoad(false, true, false, T0 + 1_360, T0 + 2_000, 3_000_000);
+        mFixture.at(2_882);
+        VideoStarts.onPlaying(true);
+
+        VideoStart start = last();
+
+        assertEquals(2_882, start.totalMs);
+        assertStage(find(start, VideoStarts.STAGE_AUDIO_NOT_READY), VideoStarts.STAGE_AUDIO_NOT_READY, null, 1, 1_226, 2_880);
+        assertStage(find(start, VideoStarts.STAGE_MORE_AUDIO_CHUNKS), VideoStarts.STAGE_MORE_AUDIO_CHUNKS, "2, 480 KB", 1, 1_030, 2_400);
+        assertStage(find(start, VideoStarts.STAGE_MORE_VIDEO_CHUNKS), VideoStarts.STAGE_MORE_VIDEO_CHUNKS, "1, 3.0 MB", 1, 1_360, 2_000);
+        assertEquals(VideoStart.Category.WAIT, find(start, VideoStarts.STAGE_AUDIO_NOT_READY).getCategory());
+        assertEquals(VideoStart.Category.BUFFER, find(start, VideoStarts.STAGE_MORE_AUDIO_CHUNKS).getCategory());
+        // The first of each is its own row, as before
+        assertStage(find(start, VideoStarts.STAGE_FIRST_AUDIO_CHUNK), VideoStarts.STAGE_FIRST_AUDIO_CHUNK, "160 KB", 1, 400, 560);
+    }
+
+    /**
+     * Played at its first frame, there was no wait to tell of: no rows for one, whatever it loaded by then
+     */
+    @Test
+    public void aStartThatPlaysAtItsFirstFrameHasNoRowsForAWait() {
+        VideoStarts.sRendererWaits = (fromMs, toMs) -> Collections.singletonList(
+                new VideoStart.Stage(VideoStarts.STAGE_AUDIO_NOT_READY, null, 1, fromMs, toMs));
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(250);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+        VideoStarts.onPrepare();
+        VideoStarts.onLoad(false, true, false, T0 + 300, T0 + 700, 2_900_000);
+        VideoStarts.onLoad(false, true, false, T0 + 700, T0 + 900, 2_900_000);
+        mFixture.at(1_000);
+        VideoStarts.onFirstFrame();
+        mFixture.at(1_000 + VideoStarts.AFTER_FRAME_MIN_MS - 1);
+        VideoStarts.onPlaying(true);
+
+        VideoStart start = last();
+
+        assertNull(find(start, VideoStarts.STAGE_AUDIO_NOT_READY));
+        assertNull(find(start, VideoStarts.STAGE_MORE_VIDEO_CHUNKS));
+    }
+
+    /**
      * AWHPECZK NWQCGxvVVeo: open took 1374 ms on the first start after a launch, with nothing to say where the main thread went. Its
      * steps are its stages: the controllers' handling of the formats, the build of the media source, the source change, and in it each
      * controller that takes long.

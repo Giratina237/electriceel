@@ -246,6 +246,9 @@ public final class DiagnosticsReport {
 
         settings.put("subtitles", buildSubtitleSettings(playerData));
         settings.put("playbackMode", getPlaybackModeName(playerData.getPlaybackMode()));
+        // The player has an active media session (off with Disable playback notifications): what tells it to pause from outside
+        // the app, e.g. HDMI-CEC or a Bluetooth device (QYZPW0FN: six pauses came through it)
+        settings.put("mediaSession", !tweaksData.isPlaybackNotificationsDisabled());
         settings.put("youtubeClientsOrder", new JSONArray(serviceData.getClientOrder()));
         settings.put("currentClient", YouTubeServiceManager.getCurrentClientName());
 
