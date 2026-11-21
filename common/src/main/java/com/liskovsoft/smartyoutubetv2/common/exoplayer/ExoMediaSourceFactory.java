@@ -5,6 +5,7 @@ import android.content.Context;
 import android.net.Uri;
 import android.text.TextUtils;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ext.cronet.CronetDataSourceFactory;
 import com.google.android.exoplayer2.ext.cronet.CronetEngineWrapper;
@@ -90,6 +91,12 @@ public class ExoMediaSourceFactory {
      * one OkHttp a video's SABR response asked for, see NetworkEngineFallback, and the chosen one for the next video)
      */
     private int mBuiltDataSource = -1;
+    /**
+     * The engine the factories above were built with (see Utils#NETWORK_ENGINE_OKHTTP), null before the first: not always the one
+     * chosen, nor the one that would be built now (see #getBuiltEngine)
+     */
+    @Nullable
+    private String mBuiltEngine;
 
     /**
      * At the process start, before any video's formats are fetched: a live stream whose formats have no URLs is asked its head over
@@ -194,9 +201,32 @@ public class ExoMediaSourceFactory {
         int source = getDataSource();
         mBuiltDataSource = source;
         DefaultBandwidthMeter bandwidthMeter = useBandwidthMeter ? BANDWIDTH_METER : null;
-        return source == PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP ? buildOkHttpDataSourceFactory(bandwidthMeter, readTimeoutMs) :
-                        source == PlayerTweaksData.PLAYER_DATA_SOURCE_CRONET && CronetManager.getEngine(mContext) != null ? buildCronetDataSourceFactory(bandwidthMeter, readTimeoutMs) :
-                                buildDefaultHttpDataSourceFactory(bandwidthMeter, readTimeoutMs);
+
+        if (source == PlayerTweaksData.PLAYER_DATA_SOURCE_OKHTTP) {
+            mBuiltEngine = Utils.NETWORK_ENGINE_OKHTTP;
+            return buildOkHttpDataSourceFactory(bandwidthMeter, readTimeoutMs);
+        }
+
+        if (source == PlayerTweaksData.PLAYER_DATA_SOURCE_CRONET && CronetManager.getEngine(mContext) != null) {
+            mBuiltEngine = Utils.NETWORK_ENGINE_CRONET;
+            return buildCronetDataSourceFactory(bandwidthMeter, readTimeoutMs);
+        }
+
+        mBuiltEngine = Utils.NETWORK_ENGINE_DEFAULT;
+        return buildDefaultHttpDataSourceFactory(bandwidthMeter, readTimeoutMs);
+    }
+
+    /**
+     * The engine the sources made go over, for a start's record (see VideoStarts#onPrepare): the one their factories were built with,
+     * null when none is built. Read from the settings and the IPv6 test as they are when the player is prepared, it named OkHttp for
+     * a start whose requests went over Cronet: IPv6 was found not to connect between the two (6EZTNXBF: "opening" rows, which only
+     * the other engines have, and 833 ms to build the media source, under okhttp_no_ipv6). OkHttp without IPv6 is OkHttp built
+     * either way: its lookups leave IPv6 out from then on (see Ipv6CheckDns in SharedModules).
+     */
+    @Nullable
+    public String getBuiltEngine() {
+        return Utils.NETWORK_ENGINE_OKHTTP.equals(mBuiltEngine) && OkHttpManager.isIpv6Disabled() ? Utils.NETWORK_ENGINE_OKHTTP_NO_IPV6
+                : mBuiltEngine;
     }
 
     @SuppressWarnings("deprecation")
@@ -455,6 +485,7 @@ public class ExoMediaSourceFactory {
         mSabrMediaDataSourceFactory = null;
         mDashMediaDataSourceFactory = null;
         mBuiltDataSource = -1;
+        mBuiltEngine = null;
     }
 
     @NonNull

@@ -135,6 +135,9 @@ public class DiagnosticsContractTest {
         assertTrue(hasProtection);
         // What the player was told and did, why an attempt began, the playback mode and where the sound goes: checked too
         assertTrue(failures.toString().contains("\"commands\""));
+        // What told the media session, in a command and in a start's play, and whether the player has one
+        assertTrue(failures.toString().contains("\"sender\":\"com.android.bluetooth\""));
+        assertTrue(report.getJSONObject("app").getJSONObject("settings").has("mediaSession"));
         assertTrue(failures.toString().contains("\"embed\":true"));
         assertTrue(failures.toString().contains("\"" + FormatAttempts.REASON_AFTER_FAILURE + "\""));
         assertTrue(failures.toString().contains("\"playbackMode\""));
@@ -159,6 +162,12 @@ public class DiagnosticsContractTest {
         assertTrue(starts.contains("\"warmUps\""));
         assertTrue(starts.contains("\"availMemMb\""));
         assertTrue(starts.contains("\"" + VideoStart.OUTCOME_PAUSED + "\""));
+        // How a start's play went on: its pauses and how it ended
+        assertTrue(starts.contains("\"play\""));
+        assertTrue(starts.contains("\"pauseCounts\""));
+        assertTrue(starts.contains("\"sender\":\"android KEYCODE_MEDIA_PAUSE\""));
+        assertTrue(starts.contains("\"resumedBy\""));
+        assertTrue(starts.contains("\"end\":\"" + Plays.END_REPLACED + "\""));
         // A load's track by its type, its server's domain, and the subtitles' settings
         assertTrue(failures.toString().contains("\"" + PlayerFailure.TRACK_TEXT + "\""));
         assertTrue(failures.toString().contains("\"host\""));
@@ -246,6 +255,8 @@ public class DiagnosticsContractTest {
             mVideoStarts.record(start);
         };
         VideoStarts.sFramesRecorder = mVideoStarts::addFrames;
+        // How a start's play went on, added to it as its frames are
+        Plays.sWriter = mVideoStarts::addPlay;
         // What the server made of the poToken, in the buffering
         VideoStarts.sProtection = (videoId, fromMs, toMs) -> Collections.singletonList(
                 new VideoStart.Stage(VideoStarts.STAGE_PROTECTION, PoTokenStatus.OK.name(), 1, fromMs + 400, fromMs + 400));
@@ -261,6 +272,9 @@ public class DiagnosticsContractTest {
         VideoStarts.sProtection = (videoId, fromMs, toMs) -> Collections.emptyList();
         VideoStarts.onFrames(new PlaybackHealth.StartFrames(VideoStartFixture.VIDEO_ID, 10_000, 40, 120, 1, 4_500,
                 new PlaybackHealth.StartAudioClock(1, 1, 0, 1, 480)));
+        // Its play: paused by the media session, played on by the user, till the next video's start plays
+        PlayerCommands.onPlayWhenReady(false, PlayerCommands.SOURCE_MEDIA_SESSION, "android KEYCODE_MEDIA_PAUSE", 29_234);
+        PlayerCommands.onPlayWhenReady(true, PlayerCommands.SOURCE_APP, 29_240);
 
         fixture.at(20_000);
         VideoStarts.start("bare", VideoStart.TRIGGER_REMOTE);
@@ -347,7 +361,7 @@ public class DiagnosticsContractTest {
         PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, 211_000);
         PlayerCommands.onState(com.google.android.exoplayer2.Player.STATE_BUFFERING, 211_000);
         PlayerCommands.onState(com.google.android.exoplayer2.Player.STATE_ENDED, 212_000);
-        PlayerCommands.onPlayWhenReady(true, PlayerCommands.SOURCE_MEDIA_SESSION, 212_000);
+        PlayerCommands.onPlayWhenReady(true, PlayerCommands.SOURCE_MEDIA_SESSION, "com.android.bluetooth", 212_000);
         // Streamed by SABR: the server took the poToken, then wanted it again
         ProtectionStatuses.onStatus("video", PoTokenStatus.OK);
         ProtectionStatuses.onStatus("video", PoTokenStatus.PENDING);

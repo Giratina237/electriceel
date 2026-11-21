@@ -40,11 +40,17 @@ public final class PlayerCommands {
         final long time = SystemClock.elapsedRealtime();
         final String event;
         final String source;
+        /**
+         * Of the media session's: the app that told it (see #onPlayWhenReady), null when not known, and for the other sources
+         */
+        @Nullable
+        final String sender;
         final long positionMs;
 
-        Command(String event, String source, long positionMs) {
+        Command(String event, String source, @Nullable String sender, long positionMs) {
             this.event = event;
             this.source = source;
+            this.sender = sender;
             this.positionMs = positionMs;
         }
     }
@@ -69,14 +75,28 @@ public final class PlayerCommands {
      * Told to play or pause
      */
     public static void onPlayWhenReady(boolean playWhenReady, String source, long positionMs) {
-        add(playWhenReady ? "play" : "pause", source, positionMs);
+        onPlayWhenReady(playWhenReady, source, null, positionMs);
+    }
+
+    /**
+     * Told to play or pause. Kept with the video's play too, failure or not (see Plays): pauses nobody at the remote asked for are
+     * what a video "stopping at random" is.
+     *
+     * @param sender of the media session's: the package of the app that told it (see MediaSessionCompat#getCurrentControllerInfo),
+     *               e.g. "android" for the system (HDMI-CEC, a media key it dispatched) or "com.android.bluetooth"; null when not
+     *               known, and for the other sources. Six pauses came from the media session about every 64.5 s with nothing to
+     *               say from what (QYZPW0FN).
+     */
+    public static void onPlayWhenReady(boolean playWhenReady, String source, @Nullable String sender, long positionMs) {
+        add(playWhenReady ? "play" : "pause", source, sender, positionMs);
+        Plays.onCommand(playWhenReady, source, sender, positionMs);
     }
 
     /**
      * Told to go to a position (e.g. a stopped video left at its end)
      */
     public static void onSeek(String source, long positionMs) {
-        add("seek", source, positionMs);
+        add("seek", source, null, positionMs);
     }
 
     /**
@@ -105,7 +125,7 @@ public final class PlayerCommands {
         }
 
         sLastState = playbackState;
-        add(getStateName(playbackState), SOURCE_PLAYER, positionMs);
+        add(getStateName(playbackState), SOURCE_PLAYER, null, positionMs);
     }
 
     /**
@@ -126,6 +146,11 @@ public final class PlayerCommands {
                 item.put("msAgo", now - command.time);
                 item.put("event", command.event);
                 item.put("source", command.source);
+
+                if (command.sender != null) {
+                    item.put("sender", command.sender);
+                }
+
                 item.put("positionMs", command.positionMs);
                 result.put(item);
             }
@@ -142,12 +167,12 @@ public final class PlayerCommands {
         sLastState = -1;
     }
 
-    private static synchronized void add(String event, String source, long positionMs) {
+    private static synchronized void add(String event, String source, @Nullable String sender, long positionMs) {
         if (sCommands.size() >= MAX_COMMANDS) {
             sCommands.removeFirst();
         }
 
-        sCommands.addLast(new Command(event, source, positionMs));
+        sCommands.addLast(new Command(event, source, sender, positionMs));
     }
 
     private static String getStateName(int playbackState) {

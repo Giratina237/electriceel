@@ -135,6 +135,46 @@ public class LoadErrorsTest {
         assertFalse(LoadErrors.hasConnectionErrorWithin(4_000));
     }
 
+    /**
+     * The same video prepared again (a reload, e.g. the error fixer's after a stall): the loads that failed before it are its
+     * connection's still. Another video's start over.
+     */
+    @Test
+    public void aReloadOfTheVideoGoesOnWithTheErrorsBeforeIt() {
+        mNow.set(90_000);
+        LoadErrors.onPrepare("video");
+        LoadErrors.onLoadError(95_000, 99_000, C.DATA_TYPE_MEDIA, C.TRACK_TYPE_VIDEO, new SocketTimeoutException());
+        mNow.set(101_000);
+        LoadErrors.onPrepare("video");
+
+        assertTrue(LoadErrors.hasConnectionErrorWithin(30_000));
+
+        LoadErrors.onPrepare("other");
+
+        assertFalse(LoadErrors.hasConnectionErrorWithin(30_000));
+    }
+
+    /**
+     * Prepared with a video not known: another one's, as before
+     */
+    @Test
+    public void aPrepareWithNoVideoStartsOver() {
+        mNow.set(90_000);
+        LoadErrors.onPrepare("video");
+        LoadErrors.onLoadError(95_000, 99_000, C.DATA_TYPE_MEDIA, C.TRACK_TYPE_VIDEO, new SocketTimeoutException());
+        mNow.set(101_000);
+        LoadErrors.onPrepare();
+
+        assertFalse(LoadErrors.hasConnectionErrorWithin(30_000));
+
+        // And the one after it isn't the same video again
+        LoadErrors.onLoadError(101_500, 102_000, C.DATA_TYPE_MEDIA, C.TRACK_TYPE_VIDEO, new SocketTimeoutException());
+        mNow.set(103_000);
+        LoadErrors.onPrepare("video");
+
+        assertFalse(LoadErrors.hasConnectionErrorWithin(30_000));
+    }
+
     private static DataSpec dataSpec() {
         return new DataSpec(Uri.parse("https://rr1---sn-test.googlevideo.com/videoplayback"));
     }

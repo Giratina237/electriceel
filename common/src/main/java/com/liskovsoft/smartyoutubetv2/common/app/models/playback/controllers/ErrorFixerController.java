@@ -39,6 +39,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadHolds;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.Plays;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
@@ -252,6 +253,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mBufferingDetector.reset();
         Utils.removeCallbacks(mCheckAudioPlayed);
         FormatAttempts.onPlaying(false);
+        Plays.onPlaying(false, getPositionMs());
         markFailedStream(type, rendererIndex, error);
 
         try {
@@ -464,9 +466,13 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 String stuckConnection = Connections.getStuckConnection(STUCK_CONNECTION_MS);
                 failure.detail("stuckConnection", stuckConnection);
 
-                if (LoadErrors.hasConnectionErrorWithin(CONNECTION_ERROR_WINDOW_MS) || stuckConnection != null) {
+                if (lookup == Connections.Lookup.FAILING || LoadErrors.hasConnectionErrorWithin(CONNECTION_ERROR_WINDOW_MS)
+                        || stuckConnection != null) {
                     // A load's connection failed (it didn't connect, or no answer came): every client streams from the same servers,
-                    // another one wouldn't help (FARAJV5R #46, S4PGCB6X #10, #11, #15). Tried again later each time.
+                    // another one wouldn't help (FARAJV5R #46, S4PGCB6X #10, #11, #15). Tried again later each time. Lookups that
+                    // fail are the connection's too, before a load has failed on them: a reload's were still going 9.7 s in, and
+                    // the stall after the next reload had no load error to go by while the network was down (QYZPW0FN #3: the
+                    // client was switched, and the videos opened half an hour later still came from it).
                     failure.action("network_wait");
                     undoStallClientSwitch(failure);
                     delayMs = mStallRetries.next(getVideo().videoId);
@@ -516,6 +522,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     public void onBuffering() {
         mBufferingDetector.onStartBuffering();
         FormatAttempts.onBuffering();
+        Plays.onPlaying(false, getPositionMs());
     }
 
     @Override
@@ -553,6 +560,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         // It came: stuck again another time (e.g. opened again), it's reloaded again
         mStuckLoadVideoId = null;
         FormatAttempts.onPlaying(true);
+        Plays.onPlaying(true, getPositionMs());
 
         if (getPlayer() != null) {
             mPlayStartPositionMs = getPlayer().getPositionMs();
@@ -566,6 +574,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mBufferingDetector.onStopBuffering();
         Utils.removeCallbacks(mCheckAudioPlayed);
         FormatAttempts.onPlaying(false);
+        Plays.onPlaying(false, getPositionMs());
     }
 
     /**
@@ -582,6 +591,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mBufferingDetector.start();
         FormatAttempts.onNewVideo(getContext(), item != null ? item.videoId : null);
         PlayerCommands.onNewVideo(item != null ? item.videoId : null);
+        Plays.onNewVideo(item != null ? item.videoId : null);
         // OkHttp was for the video it was asked for: the chosen engine again for another one
         NetworkEngineFallback.onNewVideo(item != null ? item.videoId : null);
 
@@ -602,6 +612,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mBufferingDetector.reset();
         Utils.removeCallbacks(mCheckAudioPlayed);
         FormatAttempts.end(getContext());
+        Plays.onFinish(getPositionMs());
     }
 
     /**
@@ -610,6 +621,19 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     @Override
     public void onViewPaused() {
         flushDiagnostics();
+        Plays.onViewPaused(getPositionMs());
+    }
+
+    @Override
+    public void onViewResumed() {
+        Plays.onViewResumed();
+    }
+
+    /**
+     * Where the video is, -1 when not known (e.g. the player is gone)
+     */
+    private long getPositionMs() {
+        return getPlayer() != null ? getPlayer().getPositionMs() : -1;
     }
 
     private void flushDiagnostics() {
@@ -650,6 +674,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mBufferingDetector.reset();
         Utils.removeCallbacks(mCheckAudioPlayed);
         FormatAttempts.onPlaying(false);
+        // Still there: where the video was when its player went (see PlaybackFragment#releasePlayer)
+        Plays.onPlaying(false, getPositionMs());
     }
 
     /**

@@ -29,10 +29,15 @@ public final class LoadErrors {
     @VisibleForTesting
     static VideoStarts.Clock sClock = SystemClock::elapsedRealtime;
     /**
-     * When the player was last prepared with a source, in the clock's time, -1 for not yet: one failed before is of the source before
-     * (e.g. the video before's)
+     * When the player was first prepared with a source of the video it has, in the clock's time, -1 for not yet: one failed before is
+     * of the video before's source. Not when it was prepared again with the same video (see #onPrepare).
      */
     private static long sPreparedMs = -1;
+    /**
+     * Of the source the player was last prepared with, null for none or one not known
+     */
+    @Nullable
+    private static String sVideoId;
 
     private static final class LoadError {
         final long startMs;
@@ -69,14 +74,29 @@ public final class LoadErrors {
     }
 
     /**
-     * The player was prepared with a source (e.g. another video, or the same one again by a reload)
+     * The player was prepared with a source of a video not known: another one's
      */
     public static synchronized void onPrepare() {
-        sPreparedMs = sClock.now();
+        onPrepare(null);
     }
 
     /**
-     * A load of the source the player has failed on its connection this recently: it didn't connect, its name didn't resolve, or its
+     * The player was prepared with a source of the video. The same one again (a reload, the engine restarted, e.g. by the error fixer
+     * after a stall) goes on with the loads that failed before it: they're the same video's, on the same connection, and a hang right
+     * after the reload had none of its own to go by (see #hasConnectionErrorWithin).
+     *
+     * @param videoId null when not known: another video's
+     */
+    public static synchronized void onPrepare(@Nullable String videoId) {
+        if (videoId == null || !videoId.equals(sVideoId)) {
+            sPreparedMs = sClock.now();
+        }
+
+        sVideoId = videoId;
+    }
+
+    /**
+     * A load of the video the player has failed on its connection this recently: it didn't connect, its name didn't resolve, or its
      * answer didn't come
      */
     public static synchronized boolean hasConnectionErrorWithin(long windowMs) {
@@ -195,6 +215,7 @@ public final class LoadErrors {
     static synchronized void resetForTesting(@Nullable VideoStarts.Clock clock) {
         sErrors.clear();
         sPreparedMs = -1;
+        sVideoId = null;
         sClock = clock != null ? clock : SystemClock::elapsedRealtime;
     }
 }

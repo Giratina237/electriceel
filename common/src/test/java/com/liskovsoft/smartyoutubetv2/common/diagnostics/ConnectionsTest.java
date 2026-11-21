@@ -566,6 +566,41 @@ public class ConnectionsTest {
     }
 
     /**
+     * QYZPW0FN: a reload's connections were at "DNS, still going" for 9.7 s, and the stall after it went by "unknown" and switched
+     * the client on a network that was down. A lookup that has gone on as long as an address that doesn't answer is one that fails.
+     */
+    @Test
+    public void aLookupThatGoesOnIsAFailingOne() {
+        Connections.onPrepare();
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.dnsStart(mCall, HOST);
+        mNow.set(1_000 + Connections.LOOKUP_STUCK_MS - 1);
+
+        assertEquals(Connections.Lookup.UNKNOWN, Connections.getLookup());
+
+        mNow.set(1_000 + Connections.LOOKUP_STUCK_MS);
+
+        assertEquals(Connections.Lookup.FAILING, Connections.getLookup());
+    }
+
+    /**
+     * Its lookup answered, and it connects still: the address may be slow, the name resolved
+     */
+    @Test
+    public void aConnectThatGoesOnTellsNothing() {
+        Connections.onPrepare();
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.dnsStart(mCall, HOST);
+        listener.dnsEnd(mCall, HOST, Collections.singletonList(IPV4));
+        listener.connectStart(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY);
+        mNow.set(1_000 + 2 * Connections.LOOKUP_STUCK_MS);
+
+        assertEquals(Connections.Lookup.UNKNOWN, Connections.getLookup());
+    }
+
+    /**
      * Made before the player was prepared again, they're of the source before
      */
     @Test

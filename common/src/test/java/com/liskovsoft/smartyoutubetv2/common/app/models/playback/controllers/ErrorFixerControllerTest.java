@@ -574,8 +574,8 @@ public class ErrorFixerControllerTest {
     }
 
     /**
-     * The DNS fix turned off in the DNS settings: the DNS chosen stays though the lookups fail (#93). The client is switched, as
-     * for a hang the DNS isn't told to cause.
+     * The DNS fix turned off in the DNS settings: the DNS chosen stays though the lookups fail (#93). The lookups that fail are the
+     * network's, waited for: another client would look the same names up (QYZPW0FN #3).
      */
     @Test
     public void aDnsFixTurnedOffKeepsTheDnsChosen() throws Exception {
@@ -587,7 +587,7 @@ public class ErrorFixerControllerTest {
         controller.onLongBuffering();
 
         JSONObject event = mLog.readAll().get(0);
-        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(event));
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(event));
         assertEquals("failing", event.getJSONObject("details").getString("lookup"));
         assertEquals(PlayerTweaksData.DNS_TYPE_CLOUDFLARE, getTweaks().getPreferredDnsType());
     }
@@ -1325,7 +1325,7 @@ public class ErrorFixerControllerTest {
 
     /**
      * The lookups fail the same way with Google's DNS: it didn't help (S4PGCB6X #7–#19, and 500 ms more a lookup since). It's put
-     * back, and the next fix is tried.
+     * back, and the same client is tried again later: lookups that fail are the connection's, another client's servers are the same.
      */
     @Test
     public void theDnsFixIsUndoneWhenTheLookupsFailWithItToo() throws Exception {
@@ -1341,7 +1341,7 @@ public class ErrorFixerControllerTest {
 
         List<JSONObject> events = mLog.readAll();
         assertEquals(Arrays.asList("dns_google", "restart_engine"), getActions(events.get(0)));
-        assertEquals(Arrays.asList("dns_revert", "switch_next_client_now", "reload_video"), getActions(events.get(1)));
+        assertEquals(Arrays.asList("dns_revert", "network_wait", "reload_video"), getActions(events.get(1)));
         assertEquals(PlayerTweaksData.DNS_TYPE_SYSTEM, getTweaks().getPreferredDnsType());
     }
 
@@ -1397,12 +1397,13 @@ public class ErrorFixerControllerTest {
         controller.onLongBuffering();
 
         List<JSONObject> events = mLog.readAll();
-        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(events.get(events.size() - 1)));
+        // The second wait for the network, with the DNS as it was
+        assertEquals(Arrays.asList("network_wait", "reload_video_2s"), getActions(events.get(events.size() - 1)));
         assertEquals(PlayerTweaksData.DNS_TYPE_SYSTEM, getTweaks().getPreferredDnsType());
     }
 
     /**
-     * A video played after it: the DNS fix stays, and the next start that hangs gets the next fix
+     * A video played after it: the DNS fix stays, and the next start whose lookups fail waits for the network
      */
     @Test
     public void aDnsFixThatPlayedStays() throws Exception {
@@ -1417,8 +1418,43 @@ public class ErrorFixerControllerTest {
         lookupFails();
         controller.onLongBuffering();
 
-        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(1)));
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(mLog.readAll().get(1)));
         assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * QYZPW0FN #3: the network was down and a reload's lookups were still going with no load error yet, so the stall into it had
+     * nothing to go by: the client was switched, and the videos opened half an hour later still came from it. A lookup that goes on
+     * is one that fails: the same client again, later.
+     */
+    @Test
+    public void aStartWhoseLookupsHangWaitsWithTheSameClient() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_GOOGLE);
+        TestController controller = new TestController(video("HWYxNVugkCA"), null, playerStub(null, null, 297_302));
+        lookupHangs();
+
+        controller.onLongBuffering();
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(event));
+        assertEquals("failing", event.getJSONObject("details").getString("lookup"));
+        assertEquals(PlayerTweaksData.DNS_TYPE_GOOGLE, getTweaks().getPreferredDnsType());
+    }
+
+    /**
+     * With another DNS than Google's, lookups that hang get the DNS fix first, as ones that failed do
+     */
+    @Test
+    public void aStartWhoseLookupsHangSwitchesTheDnsFirst() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_SYSTEM);
+        TestController controller = new TestController(video("p5miU3x4Sr8"));
+        lookupHangs();
+
+        controller.onLongBuffering();
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Arrays.asList("dns_google", "restart_engine"), getActions(event));
+        assertEquals("failing", event.getJSONObject("details").getString("lookup"));
     }
 
     /**
@@ -1560,6 +1596,17 @@ public class ErrorFixerControllerTest {
         EventListener listener = Connections.LISTENER.create(call);
         listener.dnsStart(call, HOST);
         listener.callFailed(call, new UnknownHostException(HOST));
+    }
+
+    /**
+     * A connection of the player whose lookup has gone on past the time one answers in (see Connections#LOOKUP_STUCK_MS)
+     */
+    private static void lookupHangs() {
+        Call call = newCall();
+        EventListener listener = Connections.LISTENER.create(call);
+        listener.dnsStart(call, HOST);
+        // Robolectric's clock moves on with the main looper
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(6));
     }
 
     /**

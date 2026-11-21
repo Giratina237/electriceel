@@ -67,6 +67,11 @@ public final class Connections {
      */
     static final String FAILURE_CANCELLED = "cancelled";
     /**
+     * A lookup still going this long is one that fails (see isLookupStuck): as long as an address that doesn't answer is given (the
+     * connect timeout, see OkHttpCommons)
+     */
+    static final long LOOKUP_STUCK_MS = 5_000;
+    /**
      * Of a load (see describeLoad): the format's header, after its track, e.g. "video init chunk"
      */
     static final String LOAD_INIT_CHUNK = "init chunk";
@@ -119,8 +124,8 @@ public final class Connections {
          */
         WORKING,
         /**
-         * Each one that ended failed in its lookup, or at every address it gave: the DNS can be what fails (or the network: told by
-         * the formats' fetch, which connected)
+         * Each one that ended failed in its lookup, or at every address it gave, or one's lookup has gone on with no answer (see
+         * LOOKUP_STUCK_MS): the DNS can be what fails (or the network: told by the formats' fetch, which connected)
          */
         FAILING
     }
@@ -436,6 +441,7 @@ public final class Connections {
      */
     public static synchronized Lookup getLookup() {
         boolean isFailing = false;
+        long nowMs = sClock.now();
 
         for (Connection connection : sConnections) {
             if (connection.startMs < sPreparedMs) {
@@ -446,7 +452,7 @@ public final class Connections {
                 return Lookup.WORKING;
             }
 
-            isFailing |= isLookupFailed(connection) || isEveryAddressFailed(connection);
+            isFailing |= isLookupFailed(connection) || isEveryAddressFailed(connection) || isLookupStuck(connection, nowMs);
         }
 
         return isFailing ? Lookup.FAILING : Lookup.UNKNOWN;
@@ -497,6 +503,16 @@ public final class Connections {
      */
     private static boolean isLookupFailed(Connection connection) {
         return connection.endMs >= 0 && !connection.isCancelled && connection.isDnsStarted && connection.dnsEndMs < 0;
+    }
+
+    /**
+     * Its lookup has gone on this long with no answer: the name doesn't resolve, and the resolver hasn't said so yet. Going on, it told
+     * nothing (QYZPW0FN: a reload's connections were at "DNS, still going" for 9.7 s when it was given up; the stall 26 s later, #3,
+     * went by "unknown" and switched the client on a network that was down, and www.youtube.com didn't resolve 21 s after that).
+     */
+    private static boolean isLookupStuck(Connection connection, long nowMs) {
+        return connection.endMs < 0 && connection.isDnsStarted && connection.dnsEndMs < 0
+                && nowMs - connection.startMs >= LOOKUP_STUCK_MS;
     }
 
     /**
