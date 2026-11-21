@@ -68,6 +68,10 @@ public class PlayerUIController extends BasePlayerController {
     private boolean mEngineReady;
     private boolean mDebugViewEnabled;
     private boolean mIsMetadataLoaded;
+    private int mRatingCount; // the like and dislike presses
+    private int mFailedRating; // the latest of the presses that failed
+    private MediaItemMetadata mMetadata; // the player video's
+    private int mConfirmedLikeStatus = -1; // the last rating YouTube took since the metadata came, -1 none
     private long mOverlayHideTimeMs;
     private final Runnable mSuggestionsResetHandler = () -> {
         if (getPlayer() == null) {
@@ -412,8 +416,9 @@ public class PlayerUIController extends BasePlayerController {
         if (getPlayerData().getSeekPreviewMode() != PlayerData.SEEK_PREVIEW_NONE) {
             getPlayer().loadStoryboard();
         }
-        getPlayer().setButtonState(R.id.action_thumbs_up, metadata.getLikeStatus() == MediaItemMetadata.LIKE_STATUS_LIKE ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
-        getPlayer().setButtonState(R.id.action_thumbs_down, metadata.getLikeStatus() == MediaItemMetadata.LIKE_STATUS_DISLIKE ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
+        mMetadata = metadata;
+        mConfirmedLikeStatus = -1;
+        setLikeButtons(metadata.getLikeStatus());
         if (getPlayerTweaksData().isRealChannelIconEnabled()) {
             getPlayer().setChannelIcon(metadata.getAuthorImageUrl());
         }
@@ -482,9 +487,9 @@ public class PlayerUIController extends BasePlayerController {
         }
 
         if (!dislike) {
-            callMediaItemObservable(mMediaItemService::setDislikeObserve);
+            rate(mMediaItemService::setDislikeObserve, MediaItemMetadata.LIKE_STATUS_DISLIKE);
         } else {
-            callMediaItemObservable(mMediaItemService::removeDislikeObserve);
+            rate(mMediaItemService::removeDislikeObserve, MediaItemMetadata.LIKE_STATUS_INDIFFERENT);
         }
     }
 
@@ -509,10 +514,72 @@ public class PlayerUIController extends BasePlayerController {
         }
 
         if (!like) {
-            callMediaItemObservable(mMediaItemService::setLikeObserve);
+            rate(mMediaItemService::setLikeObserve, MediaItemMetadata.LIKE_STATUS_LIKE);
         } else {
-            callMediaItemObservable(mMediaItemService::removeLikeObserve);
+            rate(mMediaItemService::removeLikeObserve, MediaItemMetadata.LIKE_STATUS_INDIFFERENT);
         }
+    }
+
+    /**
+     * Sends the rating the buttons show now (likeStatus). Once the last press failed, the buttons show the rating YouTube has, as
+     * each press still sent is answered. Not after another video came.
+     */
+    private void rate(MediaItemObservable request, int likeStatus) {
+        Video video = getVideo();
+
+        if (video == null) {
+            Log.e(TAG, "Seems that video isn't initialized yet. Cancelling...");
+            return;
+        }
+
+        int rating = ++mRatingCount;
+        String videoId = video.videoId;
+
+        RxHelper.execute(request.call(video.mediaItem != null ? video.mediaItem : video.toMediaItem()), error -> {
+            Log.e(TAG, "Can't rate the video: %s", error.getMessage());
+
+            if (isPlayerVideo(videoId)) {
+                mFailedRating = Math.max(mFailedRating, rating);
+
+                if (mFailedRating == mRatingCount) {
+                    setYouTubeLikeButtons(videoId);
+                }
+            }
+
+            MessageHelpers.showLongMessage(getContext(), error.getMessage());
+        }, () -> {
+            if (!isPlayerVideo(videoId)) {
+                return;
+            }
+
+            mConfirmedLikeStatus = likeStatus;
+
+            // The last press failed before this one was answered
+            if (mFailedRating == mRatingCount) {
+                setYouTubeLikeButtons(videoId);
+            }
+        });
+    }
+
+    /**
+     * The rating YouTube has: the last one it took since the metadata came, otherwise the metadata's. That one has the ratings
+     * still sent and none that failed (see MediaItemMetadataImpl of MediaServiceCore), even when it came while one was sent.
+     */
+    private void setYouTubeLikeButtons(String videoId) {
+        if (mConfirmedLikeStatus != -1) {
+            setLikeButtons(mConfirmedLikeStatus);
+        } else if (mMetadata != null && Helpers.equals(mMetadata.getVideoId(), videoId)) {
+            setLikeButtons(mMetadata.getLikeStatus());
+        }
+    }
+
+    private boolean isPlayerVideo(String videoId) {
+        return getPlayer() != null && getVideo() != null && Helpers.equals(getVideo().videoId, videoId);
+    }
+
+    private void setLikeButtons(int likeStatus) {
+        getPlayer().setButtonState(R.id.action_thumbs_up, likeStatus == MediaItemMetadata.LIKE_STATUS_LIKE ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
+        getPlayer().setButtonState(R.id.action_thumbs_down, likeStatus == MediaItemMetadata.LIKE_STATUS_DISLIKE ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
     }
 
     private void onSeekInterval() {
