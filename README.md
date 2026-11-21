@@ -88,6 +88,7 @@ The recommend method of installation the first time is to use [LocalSend](https:
 
 ### Downloader codes
 <a href="https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en_US"><picture><source height="72px" media="(prefers-color-scheme: dark)" srcset="/assets/icons/Downloader.png" /><img height="72px" src="/assets/icons/Downloader.png" /></picture></a>
+
 **8248268** `ElectricEel_stable_arm64-v8a.apk`
 
 **5531853** `ElectricEel_stable_armeabi-v7a.apk`
