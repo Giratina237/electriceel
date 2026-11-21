@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
+import android.text.TextUtils;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -56,6 +57,14 @@ public final class VideoStarts {
      */
     static final long MAX_COLD_START_MS = 30_000;
     static final String STAGE_APP_START = "app start";
+    /**
+     * A moment at the start of a reload that played after one gave up (see onReload): how many reloads it took, and since when
+     */
+    static final String STAGE_RECOVERY = "recovery";
+    /**
+     * A reload this long after a start that gave up isn't its recovery any more
+     */
+    static final long MAX_RECOVERY_MS = 10 * 60 * 1_000;
     static final String STAGE_PLAYER_SCREEN = "player screen";
     static final String STAGE_ENGINE_RESTART = "engine restart";
     static final String STAGE_FORMATS = "formats";
@@ -156,6 +165,18 @@ public final class VideoStarts {
      */
     static final int MAX_SEEKS = 10;
     /**
+     * How a mode switch the playback waited for ended (see onModeSwitchEnd)
+     */
+    public static final String MODE_SWITCH_REPORTED = "reported";
+    public static final String MODE_SWITCH_TIMED_OUT = "timed out";
+    private static final int MAX_MODE_REPORTS = 3;
+    private static final String APP_PACKAGE = "com.liskovsoft.smartyoutubetv2.";
+    /**
+     * The methods that pass a seek on to the player (see describeSeekCaller): not what made it
+     */
+    private static final java.util.Set<String> SEEK_PASS_THROUGHS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "setPositionMs", "setResumePositionMs", "seekTo", "onSeek", "run", "handleMessage", "dispatchMessage"));
+    /**
      * The whole of a fetch (see FetchStages#open): its stages are shown, not it
      */
     private static final String FETCH = "fetch";
@@ -253,6 +274,14 @@ public final class VideoStarts {
      */
     @Nullable
     private static String sReloadableId;
+    /**
+     * The video whose start gave up (see #abandon), and when that start began: its reloads are timed, only the one that plays recorded,
+     * with how many it took (QYZPW0FN: four reloads in an outage left no start, the recovery's time not known). -1 for none.
+     */
+    @Nullable
+    private static String sRecoveryId;
+    private static long sRecoveryFromMs = -1;
+    private static int sRecoveryReloads;
     /**
      * Of each kind of first segment (see CHUNK_STAGES) since the player was prepared, timed or not (a start is given up after 15 s):
      * it started to load, and it loaded (see #isOneTrackStuck)
@@ -418,6 +447,12 @@ public final class VideoStarts {
         long pausedMs = -1;
         long modeSwitchMs = -1;
         /**
+         * Of the mode switch going on: the mode asked for, and the ones the display reported (see onDisplayModeReported)
+         */
+        @Nullable
+        String modeSwitchMode;
+        final List<String> modeReports = new ArrayList<>(2);
+        /**
          * Of its first frame (see FirstFrame)
          */
         long positionMs = -1;
@@ -454,6 +489,10 @@ public final class VideoStarts {
          */
         @Nullable
         String reason;
+        /**
+         * A reload after a start that gave up (see sRecoveryId): recorded only if it plays
+         */
+        boolean isRecovery;
 
         Timer(String videoId, String trigger, long t0, long ts, boolean isFirstOfRun, long sinceProcessStartMs) {
             Arrays.fill(chunkLoadMs, -1);
@@ -558,6 +597,10 @@ public final class VideoStarts {
             return;
         }
 
+        if (sRecoveryId != null && !sRecoveryId.equals(videoId)) {
+            sRecoveryId = null; // another video: that one's reloads are over
+        }
+
         long now = sClock.now();
         boolean isFirstOfRun = !sHasStarted;
         sHasStarted = true;
@@ -602,7 +645,14 @@ public final class VideoStarts {
      * @param reason why it's loaded again, e.g. the kind of failure the error fixer acted on (see VideoStart#reason), null when not known
      */
     public static void onReload(@Nullable String videoId, @Nullable String reason) {
-        if (videoId == null || !videoId.equals(sReloadableId) || getTimer(videoId) != null) {
+        if (videoId == null || getTimer(videoId) != null) {
+            return;
+        }
+
+        boolean isRecovery = !videoId.equals(sReloadableId) && videoId.equals(sRecoveryId)
+                && sClock.now() - sRecoveryFromMs <= MAX_RECOVERY_MS;
+
+        if (!videoId.equals(sReloadableId) && !isRecovery) {
             return;
         }
 
@@ -611,6 +661,11 @@ public final class VideoStarts {
 
         if (sTimer != null) {
             sTimer.reason = reason;
+            sTimer.isRecovery = isRecovery;
+        }
+
+        if (isRecovery) {
+            sRecoveryReloads++;
         }
     }
 
@@ -1028,18 +1083,66 @@ public final class VideoStarts {
 
         if (timer != null && timer.modeSwitchMs < 0) {
             timer.modeSwitchMs = sClock.now();
+            timer.modeSwitchMode = null;
+            timer.modeReports.clear();
         }
     }
 
-    public static void onModeSwitchEnd() {
+    /**
+     * The mode the display is asked for, e.g. "3840x2160@48.0"
+     */
+    public static void onModeSwitchRequested(@Nullable String mode) {
+        Timer timer = getTimer();
+
+        if (timer != null && timer.modeSwitchMs >= 0) {
+            timer.modeSwitchMode = mode;
+        }
+    }
+
+    /**
+     * The display told of a change, e.g. "3840x2160@48.0 id 7" (see UhdHelper): the one asked for or not. A switch only ended by its
+     * timeout said nothing of why (DBRPJG76: 12 holds of 5.5 s).
+     */
+    public static void onDisplayModeReported(String mode, boolean isExpected) {
+        Timer timer = getTimer();
+
+        if (timer != null && timer.modeSwitchMs >= 0 && timer.modeReports.size() < MAX_MODE_REPORTS) {
+            timer.modeReports.add("display said " + mode + (isExpected ? "" : ", not it"));
+        }
+    }
+
+    /**
+     * @param how e.g. MODE_SWITCH_REPORTED, MODE_SWITCH_TIMED_OUT
+     */
+    public static void onModeSwitchEnd(@Nullable String how) {
         Timer timer = getTimer();
 
         if (timer == null || timer.modeSwitchMs < 0) {
             return;
         }
 
-        addToBuffering(timer, STAGE_MODE_SWITCH, null, timer.modeSwitchMs, sClock.now());
+        addToBuffering(timer, STAGE_MODE_SWITCH, describeModeSwitch(timer, how), timer.modeSwitchMs, sClock.now());
         timer.modeSwitchMs = -1;
+    }
+
+    /**
+     * E.g. "to 3840x2160@48.0, timed out, display said 3840x2160@48.0 id 9, not it", null for nothing known
+     */
+    @Nullable
+    private static String describeModeSwitch(Timer timer, @Nullable String how) {
+        List<String> parts = new ArrayList<>(timer.modeReports.size() + 2);
+
+        if (timer.modeSwitchMode != null) {
+            parts.add("to " + timer.modeSwitchMode);
+        }
+
+        if (how != null) {
+            parts.add(how);
+        }
+
+        parts.addAll(timer.modeReports);
+
+        return parts.isEmpty() ? null : TextUtils.join(", ", parts);
     }
 
     /**
@@ -1055,7 +1158,47 @@ public final class VideoStarts {
 
         long now = sClock.now();
         timer.seeks++;
-        addToBuffering(timer, STAGE_SEEK, "to " + VideoStart.formatPosition(positionMs), now, now);
+        // What sent it there (0J159Z0Z: the tunneled resumes that froze had one seek, the ones that played two, made by what wasn't known)
+        String caller = describeSeekCaller(Thread.currentThread().getStackTrace());
+        String detail = "to " + VideoStart.formatPosition(positionMs);
+        addToBuffering(timer, STAGE_SEEK, caller != null ? detail + ", " + caller : detail, now, now);
+    }
+
+    /**
+     * Of a start's seek, the app's code that made it: the first of the app's frames past the ones that pass it on (e.g.
+     * "VideoStateController.restoreState, resume", "ExoPlayerController.maybeResumeFromKeyframe"), null when none is the app's (e.g. a
+     * test's)
+     */
+    @Nullable
+    @VisibleForTesting
+    static String describeSeekCaller(StackTraceElement[] stack) {
+        boolean isResume = false;
+
+        for (StackTraceElement frame : stack) {
+            String className = frame.getClassName();
+            String method = frame.getMethodName();
+
+            if (!className.startsWith(APP_PACKAGE) || className.startsWith(VideoStarts.class.getName())) {
+                continue;
+            }
+
+            String simpleName = className.substring(className.lastIndexOf('.') + 1);
+            int inner = simpleName.indexOf('$');
+            simpleName = inner > 0 ? simpleName.substring(0, inner) : simpleName;
+
+            if (simpleName.endsWith("Test")) {
+                return null;
+            }
+
+            if (SEEK_PASS_THROUGHS.contains(method) || method.startsWith("lambda$")) {
+                isResume |= "setResumePositionMs".equals(method);
+                continue;
+            }
+
+            return simpleName + "." + method + (isResume ? ", resume" : "");
+        }
+
+        return isResume ? "resume" : null;
     }
 
     public static void onFirstFrame() {
@@ -1190,6 +1333,12 @@ public final class VideoStarts {
         sScheduler.cancel(sGiveUp);
         long now = sClock.now();
 
+        // A reload after a start that gave up, that didn't play either: counted, not recorded (see #onReload)
+        if (timer.isRecovery) {
+            Log.d(TAG, "Recovery reload %s after %d ms: %s", outcome, now - timer.t0, timer.videoId);
+            return;
+        }
+
         // Unplayable is the app's own outcome, not the user skipping it
         if (now - timer.t0 < MIN_ABANDONED_MS && !VideoStart.OUTCOME_UNPLAYABLE.equals(outcome)) {
             Log.d(TAG, "Video start %s after %d ms: %s", outcome, now - timer.t0, timer.videoId);
@@ -1197,6 +1346,13 @@ public final class VideoStarts {
         }
 
         record(build(timer, now, outcome));
+
+        if (VideoStart.OUTCOME_GAVE_UP.equals(outcome)) {
+            // Its reloads are timed till one plays (see #onReload)
+            sRecoveryId = timer.videoId;
+            sRecoveryFromMs = timer.t0;
+            sRecoveryReloads = 0;
+        }
     }
 
     /**
@@ -1244,6 +1400,16 @@ public final class VideoStarts {
         sTimer = null;
         sScheduler.cancel(sGiveUp);
         sReloadableId = timer.videoId;
+
+        if (timer.isRecovery) {
+            // E.g. "reload 4 since a start gave up 67 s before it"
+            timer.open(STAGE_RECOVERY, "reload " + sRecoveryReloads + " since a start gave up " + (timer.t0 - sRecoveryFromMs) / 1_000
+                    + " s before it", timer.t0).endMs = timer.t0;
+        }
+
+        if (timer.videoId.equals(sRecoveryId)) {
+            sRecoveryId = null;
+        }
         // The same video again: its new start
         sPlayed.remove(timer.videoId);
         sPlayed.put(timer.videoId, timer.ts);
@@ -1462,7 +1628,9 @@ public final class VideoStarts {
             if (stage.depth == 0 && FETCH.equals(stage.name)) {
                 fetchStartMs = fetchStartMs < 0 ? stage.startMs : Math.min(fetchStartMs, stage.startMs);
             } else if (stage.isOpen()) {
-                result.add(new VideoStart.Stage(stage.name, DETAIL_GOING, Math.max(1, stage.depth), stage.startMs, endMs));
+                // What it's at too, e.g. the lock wait's holder, the warm-up's stage it waits through (C4JB8CZX)
+                String detail = stage.detail != null ? stage.detail + ", " + DETAIL_GOING : DETAIL_GOING;
+                result.add(new VideoStart.Stage(stage.name, detail, Math.max(1, stage.depth), stage.startMs, endMs));
             } else {
                 result.add(new VideoStart.Stage(stage.name, stage.detail, Math.max(1, stage.depth), stage.startMs, stage.endMs));
             }
@@ -1584,6 +1752,9 @@ public final class VideoStarts {
         sOpenStepDepth = 0;
         sPlayed.clear();
         sReloadableId = null;
+        sRecoveryId = null;
+        sRecoveryFromMs = -1;
+        sRecoveryReloads = 0;
         Arrays.fill(sIsChunkStarted, false);
         Arrays.fill(sIsChunkDone, false);
         sPreparedMs = -1;

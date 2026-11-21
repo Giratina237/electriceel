@@ -21,6 +21,11 @@ APKS=(
   "${APK_DIR}/ElectricEel_stable_${VERSION_NAME}_armeabi-v7a.apk"
 )
 
+# The same two APKs are also copied, under names without the version, onto the release tagged
+# "latest", so a link or Downloader code always gets the current build, e.g.
+#   https://github.com/cygnusx-1-org/electriceel/releases/download/latest/ElectricEel_stable_arm64-v8a.apk
+LATEST_TAG="latest"
+
 # electriceel and the sibling repos its build reads (settings.gradle), all tagged by
 # scripts/release-builds.sh
 RELEASE_REPOS=("." "../MediaServiceCore" "../SharedModules")
@@ -77,9 +82,40 @@ for APK in "${APKS[@]}"; do
   fi
 done
 
+# Create the "latest" release the first time, before this version's. Discoverium picks the newest
+# release by publish date, and replacing assets doesn't change that date, so "latest" stays older
+# than every versioned release only if it is published first. --latest=false keeps GitHub's
+# "Latest" badge on the versioned releases.
+if ! gh release view "${LATEST_TAG}" --repo "${GITHUB_REPO}" > /dev/null 2>&1; then
+  gh release create "${LATEST_TAG}" \
+    --repo "${GITHUB_REPO}" \
+    --target master \
+    --latest=false \
+    --title "Latest release" \
+    --notes "The newest APKs under names without the version, for links and Downloader codes that always get the current build. The release notes are on the versioned releases." || exit 1
+fi
+
+# A release asset is named after the file it was uploaded from, so the APKs are copied to their
+# names without the version first. --clobber deletes the old asset before uploading the new one,
+# so each link 404s for the seconds its upload takes. This goes before this version's release:
+# uploading again is harmless, while creating that release twice fails, so a failure anywhere here
+# is fixed by running the script again.
+LATEST_DIR=$(mktemp -d) || exit 1
+trap 'rm -rf "${LATEST_DIR}"' EXIT
+
+for APK in "${APKS[@]}"; do
+  APK_NAME=$(basename "${APK}")
+  cp "${APK}" "${LATEST_DIR}/${APK_NAME/"_${VERSION_NAME}_"/_}" || exit 1
+done
+
+if ! gh release upload "${LATEST_TAG}" "${LATEST_DIR}"/*.apk --repo "${GITHUB_REPO}" --clobber; then
+  echo "Error: could not upload the APKs to the ${LATEST_TAG} release."
+  exit 1
+fi
+
 # --verify-tag: the tag must already be on GitHub, or gh would create it from master instead
 gh release create "${VERSION_NAME}" "${APKS[@]}" \
   --repo "${GITHUB_REPO}" \
   --verify-tag \
   --title "${VERSION_NAME}" \
-  --notes "${RELEASE_NOTES}"
+  --notes "${RELEASE_NOTES}" || exit 1

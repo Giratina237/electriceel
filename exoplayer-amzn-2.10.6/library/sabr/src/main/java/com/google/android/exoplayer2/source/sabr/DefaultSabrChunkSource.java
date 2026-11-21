@@ -599,6 +599,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             return true;
         }
 
+        if (cause instanceof SabrProtocolError) {
+            // What was refused, and whether with a session just fetched again: the error is parsed from the response alone
+            ((SabrProtocolError) cause).setRequest(manifest.getLastRequest(trackType), manifest.getSessionAgeMs());
+        }
+
         // A reload request is not a transport failure. Handing it back as "handled" would
         // retry the very same request at full speed. Let it fall through to the
         // LoadErrorHandlingPolicy, which fails the load: the app reloads the video with the token.

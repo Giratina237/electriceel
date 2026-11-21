@@ -80,6 +80,23 @@ public final class PlayerCommands {
     }
 
     /**
+     * How long ago the video was last told to go to a position, -1 for not since it opened: a broken SABR response came 52-786 ms after
+     * a seek in 15 of the 16 whose commands were known (V9H5DRS0, AYTTSQJK, FVNAAYZD, RF6HBNNH, F8DMFX2M, 2Q5RK79E, DMQEWB9B,
+     * T33S5T0B, CX17FXZW), on Cronet and OkHttp alike
+     */
+    public static synchronized long getMsSinceSeek() {
+        Command last = null;
+
+        for (Command command : sCommands) {
+            if ("seek".equals(command.event)) {
+                last = command;
+            }
+        }
+
+        return last != null ? SystemClock.elapsedRealtime() - last.time : -1;
+    }
+
+    /**
      * Its state, when it changes (see Player#STATE_IDLE)
      */
     public static synchronized void onState(int playbackState, long positionMs) {

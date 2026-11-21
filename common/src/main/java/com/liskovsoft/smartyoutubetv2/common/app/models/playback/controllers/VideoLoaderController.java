@@ -32,13 +32,16 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.MusicAutoplayManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.VideoCategoryManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.VideoClientPicks;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
+import com.liskovsoft.youtubeapi.service.internal.MediaServiceData;
 import com.liskovsoft.youtubeapi.videoinfo.V2.ClientAttempts;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import io.reactivex.Observable;
@@ -148,6 +151,11 @@ public class VideoLoaderController extends BasePlayerController {
      */
     private String mPickedClient;
     private String mPickedClientVideoId;
+    /**
+     * The video the client it was moved to before was picked for again (see applyKnownClientPick): once per opening, not on its reloads,
+     * where the error fixer may have switched past it
+     */
+    private String mKnownPickVideoId;
     /**
      * The formats came from another client than the one picked, said once (see showPickedClientFallback)
      */
@@ -621,6 +629,7 @@ public class VideoLoaderController extends BasePlayerController {
 
         resetPickedClient(video);
         resetLiveClientSwitch(video);
+        applyKnownClientPick(video);
         // Fix no progress on next video (the engine may still buffering a bit)
         //getPlayer().showProgressBar(true);
         Utils.post(mShowProgressBar);
@@ -652,6 +661,7 @@ public class VideoLoaderController extends BasePlayerController {
 
         resetPickedClient(video);
         resetLiveClientSwitch(video);
+        applyKnownClientPick(video);
 
         // Its WebView runs on the main thread mostly: the player screen comes up first, the load of the video fetches them
         if (YouTubeServiceManager.instance().isPoTokenToMake()) {
@@ -939,6 +949,59 @@ public class VideoLoaderController extends BasePlayerController {
         mIsPickedClientFallbackShown = false;
         YouTubeServiceManager.instance().pickClient(video.videoId, client);
         reloadVideo(0, VideoStart.REASON_PICK_CLIENT);
+    }
+
+    /**
+     * The video playing is refused by the client its formats came from (e.g. TV's SABR, see ErrorFixerController): its formats are
+     * asked of the client the order has after that one, for this video only, and remembered for when it's opened again (see
+     * VideoClientPicks). The other videos play on the order's first client. The caller reloads it.
+     *
+     * @return the client picked, null with no other one to pick (e.g. the order has one client)
+     */
+    @Nullable
+    public String pickNextClientForVideo() {
+        Video video = getVideo();
+
+        if (video == null || video.videoId == null) {
+            return null;
+        }
+
+        List<String> order = MediaServiceData.instance().getClientOrder();
+        int index = order.indexOf(getFormatClient());
+
+        if (order.size() < 2 || index < 0) {
+            return null;
+        }
+
+        String next = order.get((index + 1) % order.size());
+        VideoClientPicks.remember(getContext(), video.videoId, next);
+        YouTubeServiceManager.instance().pickClient(video.videoId, next);
+        mKnownPickVideoId = video.videoId;
+
+        return next;
+    }
+
+    /**
+     * Opened again, a video moved to another client before (see pickNextClientForVideo): asked of that one first, without a refusal
+     * first. Not over the client the user picked for it, nor on its reloads (the error fixer may have switched past it since).
+     */
+    private void applyKnownClientPick(Video video) {
+        if (video.videoId == null || video.videoId.equals(mKnownPickVideoId)) {
+            return;
+        }
+
+        mKnownPickVideoId = video.videoId;
+
+        if (video.videoId.equals(mPickedClientVideoId)) {
+            return;
+        }
+
+        String client = VideoClientPicks.get(getContext(), video.videoId);
+
+        if (client != null && MediaServiceData.instance().getClientOrder().contains(client)) {
+            Log.d(TAG, "%s was moved to %s before: asked of it first", video.videoId, client);
+            YouTubeServiceManager.instance().pickClient(video.videoId, client);
+        }
     }
 
     /**

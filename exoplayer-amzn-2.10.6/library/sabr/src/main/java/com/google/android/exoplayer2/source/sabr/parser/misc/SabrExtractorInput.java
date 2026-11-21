@@ -71,8 +71,13 @@ public final class SabrExtractorInput implements ExtractorInput {
         }
 
         if (this.input != null) {
-            //throw new IllegalStateException("The input should be disposed before initializing");
-            Log.e(TAG, "User doing seek? The input should be disposed before initializing");
+            // A seek cancelled the chunk before: its load ended without the input disposed (see ContainerMediaChunk#load). Its segment
+            // reads the response it came from, through the chunk source's one data source, which now reads this one: read on, it
+            // swallowed this response's first bytes, and its next part was read out of step ("Unknown part encountered" 95-786 ms after
+            // a seek, V9H5DRS0, AYTTSQJK, FVNAAYZD). This response is read from its own start.
+            Log.w(TAG, "A new response before the last was disposed (a seek?): the last one's segment is dropped");
+            data = null;
+            sabrStream.onNewResponse();
         }
 
         this.input = input;

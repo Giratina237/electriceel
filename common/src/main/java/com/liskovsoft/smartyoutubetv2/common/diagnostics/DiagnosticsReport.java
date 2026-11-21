@@ -217,8 +217,9 @@ public final class DiagnosticsReport {
         video.put("swDecoderForced", tweaksData.isSWDecoderForced());
         video.put("legacyCodecsForced", playerData.isLegacyCodecsForced());
         video.put("tunneledPlayback", tweaksData.isTunneledPlaybackEnabled());
-        // On, but turned off for the run after it froze the picture or stalled (see TunnelingFallback)
-        video.put("tunneledPlaybackOff", TunnelingFallback.isOff());
+        // On, but turned off for the run after it froze the picture or stalled, or for good after it did in two runs (see
+        // TunnelingFallback)
+        video.put("tunneledPlaybackOff", TunnelingFallback.isOff(context));
         video.put("avcOverVp9", tweaksData.isAvcOverVp9Preferred());
         video.put("amlogicFix", tweaksData.isAmlogicFixEnabled());
         video.put("sonyFrameDropFix", tweaksData.isSonyFrameDropFixEnabled());
@@ -320,7 +321,7 @@ public final class DiagnosticsReport {
         result.put("dnsProtocol", getDnsProtocolName(tweaksData.getPreferredDnsProtocol()));
         result.put("ipv6Disabled", OkHttpManager.isIpv6Disabled());
         result.put("tunneledPlayback", tweaksData.isTunneledPlaybackEnabled());
-        result.put("tunneledPlaybackOff", TunnelingFallback.isOff());
+        result.put("tunneledPlaybackOff", TunnelingFallback.isOff(context));
         result.put("swDecoderForced", tweaksData.isSWDecoderForced());
         result.put("legacyCodecsForced", playerData.isLegacyCodecsForced());
         result.put("avcOverVp9", tweaksData.isAvcOverVp9Preferred());

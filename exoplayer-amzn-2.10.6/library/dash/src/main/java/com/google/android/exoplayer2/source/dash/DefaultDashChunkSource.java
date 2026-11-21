@@ -508,8 +508,9 @@ public class DefaultDashChunkSource implements DashChunkSource {
     } else {
       requestUri = indexUri;
     }
+    // Flagged: a start waits for it, the source may ask for it again elsewhere if it doesn't answer soon
     DataSpec dataSpec = new DataSpec(requestUri.resolveUri(baseUrl), requestUri.start,
-        requestUri.length, representationHolder.representation.getCacheKey());
+        requestUri.length, representationHolder.representation.getCacheKey(), DataSpec.FLAG_INITIALIZATION);
     return new InitializationChunk(dataSource, dataSpec, trackFormat,
         trackSelectionReason, trackSelectionData, representationHolder.extractorWrapper);
   }

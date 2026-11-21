@@ -1224,6 +1224,113 @@ public class VideoStartsTest {
         assertNull(VideoStarts.snapshot());
     }
 
+    /**
+     * A start that gave up, a reload that didn't play either, then one that did (QYZPW0FN: four reloads in an outage, none recorded): the
+     * one that played is recorded, with how many reloads it took and since when. The one that didn't isn't.
+     */
+    @Test
+    public void theReloadThatRecoversAStartThatGaveUp_isRecordedWithItsCount() {
+        start(VIDEO_ID);
+        mFixture.at(VideoStarts.MAX_START_MS);
+        mFixture.fireGiveUp();
+        int recorded = mFixture.recorded.size();
+
+        mFixture.at(20_000);
+        VideoStarts.onReload(VIDEO_ID, "stall");
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(35_000);
+        mFixture.fireGiveUp();
+        assertEquals(recorded, mFixture.recorded.size());
+
+        mFixture.at(41_000);
+        VideoStarts.onReload(VIDEO_ID, "format_error");
+        VideoStarts.onFetch(VIDEO_ID);
+        playOn(42_000);
+
+        assertEquals(recorded + 1, mFixture.recorded.size());
+        VideoStart start = last();
+        assertEquals(VideoStart.TRIGGER_RELOAD, start.trigger);
+        assertEquals(VideoStart.OUTCOME_PLAYED, start.outcome);
+        VideoStart.Stage recovery = null;
+
+        for (VideoStart.Stage stage : start.stages) {
+            if (VideoStarts.STAGE_RECOVERY.equals(stage.name)) {
+                recovery = stage;
+            }
+        }
+
+        assertEquals("reload 2 since a start gave up 41 s before it", recovery.detail);
+    }
+
+    /**
+     * Another video opened after the start that gave up: the first one's reloads are over
+     */
+    @Test
+    public void anotherVideoEndsTheRecovery() {
+        start(VIDEO_ID);
+        mFixture.at(VideoStarts.MAX_START_MS);
+        mFixture.fireGiveUp();
+        mFixture.at(20_000);
+        VideoStarts.start("otherVideoId", VideoStart.TRIGGER_OPEN);
+        VideoStarts.abandon(VideoStart.OUTCOME_LEFT);
+
+        VideoStarts.onReload(VIDEO_ID, "stall");
+
+        assertNull(VideoStarts.snapshot());
+    }
+
+    /**
+     * A mode switch the playback waited for says what was asked, how it ended, and what the display said (DBRPJG76: 12 holds of 5.5 s
+     * that said nothing of why)
+     */
+    @Test
+    public void aModeSwitchSaysWhatWasAskedHowItEndedAndWhatTheDisplaySaid() {
+        start(VIDEO_ID);
+        mFixture.at(200);
+        VideoStarts.onModeSwitchStart();
+        VideoStarts.onModeSwitchRequested("3840x2160@48.0");
+        VideoStarts.onDisplayModeReported("3840x2160@48.0 id 9", false);
+        mFixture.at(5_700);
+        VideoStarts.onModeSwitchEnd(VideoStarts.MODE_SWITCH_TIMED_OUT);
+        playOn(6_000);
+
+        String detail = null;
+
+        for (VideoStart.Stage stage : last().stages) {
+            if (VideoStarts.STAGE_MODE_SWITCH.equals(stage.name)) {
+                detail = stage.detail;
+            }
+        }
+
+        assertEquals("to 3840x2160@48.0, timed out, display said 3840x2160@48.0 id 9, not it", detail);
+    }
+
+    /**
+     * A start's seek names the app's code that made it, past the methods that pass it on (0J159Z0Z: the freezes were the resumes with
+     * one seek, what made the second one in the others wasn't known)
+     */
+    @Test
+    public void aSeekNamesWhatMadeIt() {
+        assertEquals("VideoStateController.restoreState, resume", VideoStarts.describeSeekCaller(new StackTraceElement[]{
+                frame("diagnostics.VideoStarts", "onSeek"),
+                frame("exoplayer.controller.ExoPlayerController", "setPositionMs"),
+                frame("exoplayer.controller.ExoPlayerController", "setResumePositionMs"),
+                new StackTraceElement("com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackFragment", "setResumePositionMs", null, 1),
+                frame("app.models.playback.controllers.VideoStateController", "restoreState"),
+                new StackTraceElement("android.os.Handler", "dispatchMessage", null, 1)}));
+        assertEquals("ExoPlayerController.maybeResumeFromKeyframe", VideoStarts.describeSeekCaller(new StackTraceElement[]{
+                frame("diagnostics.VideoStarts", "onSeek"),
+                frame("exoplayer.controller.ExoPlayerController", "maybeResumeFromKeyframe"),
+                frame("exoplayer.controller.ExoPlayerController", "lambda$onDecodedFromKeyframe$3")}));
+        // None of the app's
+        assertNull(VideoStarts.describeSeekCaller(new StackTraceElement[]{
+                new StackTraceElement("android.os.Handler", "dispatchMessage", null, 1)}));
+    }
+
+    private static StackTraceElement frame(String className, String method) {
+        return new StackTraceElement("com.liskovsoft.smartyoutubetv2.common." + className, method, null, 1);
+    }
+
     private void start(String videoId) {
         mFixture.at(0);
         VideoStarts.start(videoId, VideoStart.TRIGGER_OPEN);

@@ -128,6 +128,12 @@ public class ExoPlayerController implements Player.EventListener {
      */
     private boolean mIsAudioLoadedSinceResume;
     /**
+     * The keyframe a resume didn't go back to while its audio loaded (see #maybeResumeFromKeyframe), and the resume's position: gone
+     * back to once the audio is in, if the decoder is still short of the position. -1 for none. Main thread only.
+     */
+    private long mPendingKeyframeMs = -1;
+    private long mPendingKeyframeResumeMs = -1;
+    /**
      * A live stream's segments answer 404 on both tracks, none loaded since (see #onHttpError). Main thread only.
      */
     private final LiveSegmentsGone mLiveSegmentsGone = new LiveSegmentsGone();
@@ -146,6 +152,14 @@ public class ExoPlayerController implements Player.EventListener {
         public void onSurfaceSizeChanged(EventTime eventTime, int width, int height) {
             // 0x0 is none. A surface of a size not known yet is -1x-1.
             mHasSurface = width != 0 || height != 0;
+        }
+
+        @Override
+        public void onDecoderInputFormatChanged(EventTime eventTime, int trackType, Format format) {
+            // What the decoder plays, when the tracks didn't tell it (see FormatAttempts#onTracks)
+            if (trackType == C.TRACK_TYPE_VIDEO) {
+                FormatAttempts.onVideoFormat(format);
+            }
         }
 
         @Override
@@ -180,6 +194,7 @@ public class ExoPlayerController implements Player.EventListener {
             if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
                     && (mediaLoadData.trackType == C.TRACK_TYPE_AUDIO || mediaLoadData.trackType == C.TRACK_TYPE_DEFAULT)) {
                 mIsAudioLoadedSinceResume = true;
+                maybeResumeFromPendingKeyframe();
             }
 
             if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA) {
@@ -604,6 +619,7 @@ public class ExoPlayerController implements Player.EventListener {
 
     private void openMediaSource(MediaSource mediaSource) {
         mResumePositionMs = -1; // the previous source's
+        mPendingKeyframeMs = -1;
         mFrameStepper.reset();
         mRangeMuter.reset();
         resetPlayerState(); // fixes occasional video artifacts and problems with quality switching
@@ -644,6 +660,7 @@ public class ExoPlayerController implements Player.EventListener {
      */
     public void setPositionMs(long positionMs) {
         mResumePositionMs = -1; // another seek: the resume's is done with
+        mPendingKeyframeMs = -1;
 
         // Url list videos at load stage has undefined (-1) length. So, we need to remove length check.
         if (canSeekTo(positionMs)) {
@@ -700,11 +717,36 @@ public class ExoPlayerController implements Player.EventListener {
         // for it, the start took 4.6 s, where the other resumes played 54-116 ms after their seek). The decoder goes on to the position.
         // A segment's times don't tell where the audio starts: SABR's are of the segment before, or none, till one comes.
         if (!mIsAudioLoadedSinceResume) {
-            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms: its audio is still loading", resumeMs, keyframeMs);
+            // Gone back to once it's in, if the decoder hasn't reached the position by then (V9H5DRS0 20:21:31: the audio came 333 ms
+            // later, then 1.9 s more went to 228 4K frames; F0SVV9N8 18:32:49: 4 ms later, then 1.5 s)
+            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms yet: its audio is still loading", resumeMs, keyframeMs);
+            mPendingKeyframeMs = keyframeMs;
+            mPendingKeyframeResumeMs = resumeMs;
             return;
         }
 
         Log.d(TAG, "Resume from the keyframe at %s ms, not %s ms", keyframeMs, resumeMs);
+        PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, keyframeMs);
+        VideoStarts.onSeek(keyframeMs);
+        mPlayer.seekTo(keyframeMs);
+    }
+
+    /**
+     * The audio of a resume came in after its keyframe was known (see #maybeResumeFromKeyframe): back to the keyframe, if the decoder is
+     * still on its way to the position. Not once the player is ready there: its first frame is up.
+     */
+    private void maybeResumeFromPendingKeyframe() {
+        long keyframeMs = mPendingKeyframeMs;
+        long resumeMs = mPendingKeyframeResumeMs;
+        mPendingKeyframeMs = -1;
+        mPendingKeyframeResumeMs = -1;
+
+        if (mPlayer == null || keyframeMs < 0 || mPlayer.getPlaybackState() == Player.STATE_READY
+                || Math.abs(mPlayer.getCurrentPosition() - resumeMs) > 1) {
+            return;
+        }
+
+        Log.d(TAG, "Resume from the keyframe at %s ms, not %s ms, its audio in", keyframeMs, resumeMs);
         PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, keyframeMs);
         VideoStarts.onSeek(keyframeMs);
         mPlayer.seekTo(keyframeMs);
@@ -834,7 +876,7 @@ public class ExoPlayerController implements Player.EventListener {
 
         // Not after it froze the picture or stalled the player in this run (see TunnelingFallback)
         if (mContext != null && trackSelector != null && PlayerTweaksData.instance(mContext).isTunneledPlaybackEnabled()
-                && !TunnelingFallback.isOff()) {
+                && !TunnelingFallback.isOff(mContext)) {
             // Enable tunneling if supported by the current media and device configuration.
             if (VERSION.SDK_INT >= 21) {
                 trackSelector.setParameters(trackSelector.buildUponParameters().setTunnelingAudioSessionId(C.generateAudioSessionIdV21(mContext)));

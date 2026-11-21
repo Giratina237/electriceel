@@ -461,6 +461,57 @@ public class ConnectionsTest {
         assertEquals(Connections.Lookup.UNKNOWN, Connections.getLookup());
     }
 
+    /**
+     * A lookup that hangs past the connect timeout (QYZPW0FN #3: lookups still going after 20 s, no load error yet): the stall is
+     * the network's
+     */
+    @Test
+    public void aLookupStillGoingIsAStuckConnection() {
+        mNow.set(1_000);
+        Connections.onPrepare();
+        EventListener listener = Connections.LISTENER.create(mCall);
+        listener.dnsStart(mCall, HOST);
+
+        mNow.set(1_000 + 4_999);
+        assertNull(Connections.getStuckConnection(5_000));
+
+        mNow.set(1_000 + 9_752);
+        assertEquals("DNS 9752 ms", Connections.getStuckConnection(5_000));
+    }
+
+    @Test
+    public void anAddressStillConnectingIsAStuckConnection() {
+        mNow.set(1_000);
+        Connections.onPrepare();
+        EventListener listener = Connections.LISTENER.create(mCall);
+        listener.dnsStart(mCall, HOST);
+        listener.dnsEnd(mCall, HOST, Collections.singletonList(IPV4));
+        listener.connectStart(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY);
+
+        mNow.set(7_000);
+
+        assertEquals("connect 6000 ms", Connections.getStuckConnection(5_000));
+    }
+
+    /**
+     * One that ended (e.g. a name that didn't resolve) is told by its failure, not as stuck; one of the source before isn't this one's
+     */
+    @Test
+    public void anEndedOrEarlierConnectionIsntStuck() {
+        mNow.set(1_000);
+        EventListener before = Connections.LISTENER.create(mCall);
+        before.dnsStart(mCall, HOST);
+        mNow.set(2_000);
+        Connections.onPrepare();
+        EventListener ended = Connections.LISTENER.create(mCall);
+        ended.dnsStart(mCall, HOST);
+        ended.callFailed(mCall, new UnknownHostException(HOST));
+
+        mNow.set(20_000);
+
+        assertNull(Connections.getStuckConnection(5_000));
+    }
+
     @Test
     public void aNameThatDidntResolveIsAFailingLookup() {
         Connections.onPrepare();

@@ -98,6 +98,21 @@ public class SabrExtractorInputTest {
     }
 
     /**
+     * A seek cancels a chunk partway through a segment, leaving the input undisposed (see ContainerMediaChunk#load), and the next
+     * chunk's response is read with it: from its own start, not through the cancelled response's segment. In the app the old segment
+     * read the new response through the chunk source's one data source, swallowing its first bytes, and its next part was read out of
+     * step: "Unknown part encountered" 95-786 ms after a seek in 15 of 16 cases (V9H5DRS0, AYTTSQJK, FVNAAYZD, RF6HBNNH, F8DMFX2M…).
+     */
+    @Test
+    public void aResponseAfterACancelledOneIsReadFromItsStart() throws Exception {
+        SabrExtractorInput input = new SabrExtractorInput(newStream(PO_TOKEN));
+        input.init(new FakeExtractorInput.Builder().setData(mediaResponse(Status.OK)).build());
+        input.read(new byte[2], 0, 2); // into the init segment, then cancelled
+
+        assertArrayEquals(INIT_AND_MEDIA_DATA, readResponse(input, mediaResponse(Status.OK)));
+    }
+
+    /**
      * An init segment isn't the media: the server sends it past the grace period too (51AQC7FS: both tracks' to the reload at 0:59)
      */
     @Test

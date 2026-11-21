@@ -26,6 +26,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
@@ -346,6 +347,139 @@ public class ErrorFixerControllerTest {
                 new UnexpectedLoaderException(new SabrProtocolError("sabr.malformed_config", 2, SabrProtocolError.UNSET)));
 
         assertEquals(Arrays.asList("refetch_player", "reload_video"), getActions(mLog.readAll().get(1)));
+    }
+
+    /**
+     * Paused while it buffered (QYZPW0FN #2: by the remote's media key, 1 s into a restart's buffering): ExoPlayer tells no pause in
+     * that state, so the timer ran on. Not a stall, and nothing plays it again.
+     */
+    @Test
+    public void aLongBufferingWhilePausedIsntAStall() throws Exception {
+        TestController controller = new TestController(video("p5miU3x4Sr8"), null, playerStub(false));
+
+        controller.onLongBuffering();
+
+        assertEquals(0, mLog.readAll().size());
+        assertEquals(0, controller.mReloads.size());
+    }
+
+    /**
+     * The new source's lookups still going 6 s on, no load error yet (QYZPW0FN #3: 20 s, and the client was switched on a network that
+     * was down): the network's, waited for
+     */
+    @Test
+    public void aStartStuckInItsLookupWaitsForTheNetwork() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_GOOGLE);
+        TestController controller = new TestController(video("p5miU3x4Sr8"));
+        Call call = newCall();
+        Connections.LISTENER.create(call).dnsStart(call, HOST);
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofSeconds(6));
+
+        controller.onLongBuffering();
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(event));
+        assertEquals("DNS 6000 ms", event.getJSONObject("details").getString("stuckConnection"));
+    }
+
+    /**
+     * A stall switched the client as one that hangs, then the video's formats didn't come for the network (QYZPW0FN #3, #4): the
+     * switch was the outage's, the first client again
+     */
+    @Test
+    public void aStallsClientSwitchIsUndoneWhenTheNetworkIsDown() throws Exception {
+        getTweaks().setPreferredDnsType(PlayerTweaksData.DNS_TYPE_GOOGLE);
+        TestController controller = new TestController(video("g_jLBnnQuwE"));
+        VideoStarts.onLoadStarted(true, true, false, SystemClock.elapsedRealtime());
+        VideoStarts.onLoadStarted(true, false, true, SystemClock.elapsedRealtime());
+        controller.onLongBuffering();
+
+        controller.runFormatErrorAction(new UnknownHostException("Unable to resolve host \"www.youtube.com\": No address associated with hostname"));
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(events.get(0)));
+        assertEquals(Arrays.asList("network_wait", "reset_client", "reload_video"), getActions(events.get(1)));
+    }
+
+    /**
+     * The network down without a switch before: nothing to undo
+     */
+    @Test
+    public void aNetworkFailureWithNoSwitchBeforeResetsNothing() throws Exception {
+        TestController controller = new TestController(video("g_jLBnnQuwE"));
+
+        controller.runFormatErrorAction(new UnknownHostException("Unable to resolve host \"www.youtube.com\": No address associated with hostname"));
+
+        assertEquals(Arrays.asList("network_wait", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * Refused with the player response the stream had just fetched again (89HAAW4J: the server asked for it, the new one was refused):
+     * fetched once more, it's refused the same. The next client at once, for this video only, and what was refused is recorded.
+     */
+    @Test
+    public void aSabrErrorWithAFreshSessionMovesTheVideoToTheNextClientAtOnce() throws Exception {
+        TestController controller = new TestController(video("t4P-Axqv6GA"), "TV");
+        controller.mNextClient = "TV_SAMSUNG";
+        SabrProtocolError error = new SabrProtocolError("sabr.no_video_selected", 2, SabrProtocolError.UNSET);
+        error.setRequest("init, video 248, audio 140, selected none, session 1", 400);
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(error));
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Arrays.asList("client_for_video:TV_SAMSUNG", "reload_video"), getActions(event));
+        assertEquals("init, video 248, audio 140, selected none, session 1", event.getJSONObject("details").getString("sabrRequest"));
+        assertEquals(400, event.getJSONObject("details").getLong("sabrSessionAgeMs"));
+    }
+
+    /**
+     * The session the stream started with, refused: its player response may be stale, fetched again first as before
+     */
+    @Test
+    public void aSabrErrorWithTheFirstSessionFetchesThePlayerResponseAgain() throws Exception {
+        TestController controller = new TestController(video("t4P-Axqv6GA"), "TV");
+        controller.mNextClient = "TV_SAMSUNG";
+        SabrProtocolError error = new SabrProtocolError("sabr.malformed_config", 2, SabrProtocolError.UNSET);
+        error.setRequest("media, video 248, audio 140, selected 248 140, session 0", SabrProtocolError.UNSET);
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(error));
+
+        assertEquals(Arrays.asList("refetch_player", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * Refused again soon after: the video moves to the next client, the order isn't switched for the others
+     */
+    @Test
+    public void aRepeatedSabrErrorMovesTheVideoToTheNextClient() throws Exception {
+        TestController controller = new TestController(video("t4P-Axqv6GA"), "TV");
+        controller.mNextClient = "TV_SAMSUNG";
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new SabrProtocolError("sabr.no_video_selected", 2, SabrProtocolError.UNSET)));
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new SabrProtocolError("sabr.no_video_selected", 2, SabrProtocolError.UNSET)));
+
+        assertEquals(Arrays.asList("client_for_video:TV_SAMSUNG", "reload_video"), getActions(mLog.readAll().get(1)));
+    }
+
+    /**
+     * A broken SABR response says how long after a seek it came (15 of 16 came 52-786 ms after one)
+     */
+    @Test
+    public void aBrokenSabrResponseSaysHowLongAfterASeekItCame() throws Exception {
+        TestController controller = new TestController(video("-GLlqOV-qm0"));
+        controller.onPlay();
+        PlayerCommands.onNewVideo("-GLlqOV-qm0");
+        PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, 14_352);
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofMillis(171));
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new UnknownPartError("Unknown part encountered: id=401141735, size=21, position=6")));
+
+        assertEquals(171, mLog.readAll().get(0).getJSONObject("details").getLong("msSinceSeek"));
     }
 
     /**
@@ -1574,6 +1708,9 @@ public class ErrorFixerControllerTest {
 
                     if ("getPositionMs".equals(method.getName())) {
                         return positionMs;
+                    } else if ("getPlayWhenReady".equals(method.getName())) {
+                        // It plays, as a stalled player does (see onLongBuffering): a paused one is asked for by the test
+                        return true;
                     } else if ("getVideoFormats".equals(method.getName())) {
                         return videoFormats;
                     } else if ("getVideoFormat".equals(method.getName())) {
@@ -1619,6 +1756,10 @@ public class ErrorFixerControllerTest {
          * Of the video's formats (see PlayerFailure.PROTOCOL_ constants), null when it has none
          */
         private String mProtocol;
+        /**
+         * The client the loader picks for the video when asked to (see VideoLoaderController#pickNextClientForVideo), null for none
+         */
+        private String mNextClient;
 
         private TestController(Video video) throws Exception {
             this(video, (String) null);
@@ -1667,6 +1808,11 @@ public class ErrorFixerControllerTest {
                 @Override
                 void cancelPendingFixes() {
                     mCancels++;
+                }
+
+                @Override
+                public String pickNextClientForVideo() {
+                    return mNextClient;
                 }
             });
         }

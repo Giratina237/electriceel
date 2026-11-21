@@ -325,6 +325,14 @@ public class SabrStream {
     }
 
     /**
+     * Another response is read before the last one was read to its end (a seek cancelled its chunk, see SabrExtractorInput#init): the
+     * parts parsed from the last one and not taken yet aren't this one's
+     */
+    public void onNewResponse() {
+        multiResult = null;
+    }
+
+    /**
      * A live stream's media headers have no duration: it's estimated from the target duration (see SabrProcessor#processMediaHeader).
      * Known from the format info before the first response, whose live metadata says it too.
      */

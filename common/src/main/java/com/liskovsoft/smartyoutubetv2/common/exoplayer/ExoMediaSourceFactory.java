@@ -514,13 +514,15 @@ public class ExoMediaSourceFactory {
     }
 
     /**
-     * A host that doesn't answer is left for the ones the YouTube app falls back to (see GoogleVideoFallback)
+     * A host that doesn't answer is left for the ones the YouTube app falls back to (see GoogleVideoFallback). An init chunk that hasn't
+     * answered in a while is asked for again on another connection (see HedgedDataSource).
      */
     private DataSource.Factory getDashMediaDataSourceFactory() {
         releaseIfEngineChanged();
 
         if (mDashMediaDataSourceFactory == null) {
-            mDashMediaDataSourceFactory = GoogleVideoFallbackDataSource.wrap(buildDataSourceFactory(USE_BANDWIDTH_METER, DASH_READ_TIMEOUT_MS));
+            mDashMediaDataSourceFactory = HedgedDataSource.wrap(
+                    GoogleVideoFallbackDataSource.wrap(buildDataSourceFactory(USE_BANDWIDTH_METER, DASH_READ_TIMEOUT_MS)));
         }
 
         return mDashMediaDataSourceFactory;

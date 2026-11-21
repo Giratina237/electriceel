@@ -452,6 +452,36 @@ public final class Connections {
         return isFailing ? Lookup.FAILING : Lookup.UNKNOWN;
     }
 
+    /**
+     * Of the player's new connections since it was prepared, the oldest one still in its name's lookup or still connecting after
+     * minMs, e.g. "DNS 9752 ms", "connect 5003 ms": null for none. A stall whose loads hang there is the network's, not the client's
+     * (QYZPW0FN #3: lookups still going after 20 s, no load error yet, and the stall switched the client). Only OkHttp's are told.
+     */
+    @Nullable
+    public static synchronized String getStuckConnection(long minMs) {
+        long now = sClock.now();
+        Connection stuck = null;
+
+        for (Connection connection : sConnections) {
+            if (connection.startMs < sPreparedMs || connection.endMs >= 0 || connection.isCancelled || isConnected(connection)
+                    || now - connection.startMs < minMs) {
+                continue;
+            }
+
+            if (stuck == null || connection.startMs < stuck.startMs) {
+                stuck = connection;
+            }
+        }
+
+        if (stuck == null) {
+            return null;
+        }
+
+        boolean isInLookup = stuck.isDnsStarted && stuck.dnsEndMs < 0;
+
+        return (isInLookup ? "DNS " : "connect ") + (now - stuck.startMs) + " ms";
+    }
+
     private static boolean isConnected(Connection connection) {
         for (Attempt attempt : connection.attempts) {
             if (attempt.endMs >= 0 && attempt.failure == null) {

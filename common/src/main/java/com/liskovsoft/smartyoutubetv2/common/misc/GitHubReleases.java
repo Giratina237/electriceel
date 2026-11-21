@@ -39,6 +39,11 @@ public final class GitHubReleases {
      * Back and forth between the list and the notes doesn't ask again: the API allows 60 requests an hour without an account
      */
     private static final long CACHE_MS = 10 * 60 * 1_000;
+    /**
+     * Of the release that holds the newest APKs under names without the version (scripts/release-github.sh), for
+     * links that always get the current build. It has no notes of its own.
+     */
+    private static final String LATEST_TAG = "latest";
     private static volatile Cached sCached;
 
     public static final class Release {
@@ -121,7 +126,8 @@ public final class GitHubReleases {
     }
 
     /**
-     * The drafts are left out: only an account that can edit the repo sees them
+     * The drafts are left out: only an account that can edit the repo sees them. So is the "latest" release: it isn't
+     * a version.
      */
     static List<Release> parse(String json) throws IOException {
         try {
@@ -137,7 +143,7 @@ public final class GitHubReleases {
 
                 String version = getString(item, "tag_name");
 
-                if (version.isEmpty()) {
+                if (version.isEmpty() || LATEST_TAG.equals(version)) {
                     continue;
                 }
 

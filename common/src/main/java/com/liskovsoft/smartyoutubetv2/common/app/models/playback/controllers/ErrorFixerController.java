@@ -111,6 +111,16 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     private static final long LOAD_HELD_STALL_MS = 5_000;
     /**
+     * A new connection of the player still in its lookup or connecting after this long (the connect timeout): the network's (see
+     * Connections#getStuckConnection)
+     */
+    private static final long STUCK_CONNECTION_MS = 5_000;
+    /**
+     * A SABR refusal this soon after the stream fetched the player response again (see SabrProtocolError#getSessionAgeMs): the fresh
+     * one was refused, another fetch gets the same
+     */
+    private static final long FRESH_SABR_SESSION_MS = 60_000;
+    /**
      * An audio track of fewer bits a second than this carries no sound (see applySilentAudioFallback): the lowest an audio format
      * offers is about 48 kbps
      */
@@ -191,6 +201,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     private String mStuckLoadVideoId;
     /**
+     * The video a stall switched the client for, as a client that hangs at start (see runLongBufferingAction): undone if its next
+     * failure is the network's (see undoStallClientSwitch)
+     */
+    private String mStallSwitchVideoId;
+    /**
      * The last long stall (see isRepeatedStall)
      */
     private String mStallVideoId;
@@ -252,6 +267,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return;
         }
 
+        // Paused while it buffered (e.g. by the remote's media key): ExoPlayer tells no pause in its buffering state, so the timer ran
+        // on. The user's wait, not a stall, and a reload would play it again (QYZPW0FN #2: 19 s after a pause, its reload unpaused
+        // the video). Played again, its buffering is timed anew (see onBuffering).
+        if (!getPlayer().getPlayWhenReady()) {
+            Log.d(TAG, "Long buffering while paused: not a stall");
+            return;
+        }
+
         PlayerFailure failure = newFailure(PlayerFailure.KIND_STALL);
         long positionMs = getPlayer().getPositionMs();
         long bufferedPositionMs = getPlayer().getBufferedPositionMs();
@@ -292,10 +315,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         boolean isClockStill = Boolean.TRUE.equals(failure.getDetail("clockStill"));
 
         if (PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && !isClockStill && VideoDecoderState.isTunneling()
-                && TunnelingFallback.turnOff()) {
-            failure.action("tunneling_off").action("restart_engine");
-            MessageHelpers.showLongMessage(getContext(), R.string.msg_tunneling_off);
-            mVideoLoaderController.restartEngine(failure.getKind());
+                && TunnelingFallback.turnOff(getContext())) {
+            applyTunnelingOff(failure);
             return;
         }
 
@@ -400,10 +421,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             // and a reload played 2 s more each time, six times), likely a tunneled decoder given all of it. It's given no more than
             // 2 s ahead now (see DebugInfoMediaCodecVideoRenderer#shouldFeedInput); should it happen anyway, the engine plays without
             // tunneling from now on.
-            if (VideoDecoderState.isTunneling() && TunnelingFallback.turnOff()) {
-                failure.action("tunneling_off").action("restart_engine");
-                MessageHelpers.showLongMessage(getContext(), R.string.msg_tunneling_off);
-                mVideoLoaderController.restartEngine(failure.getKind());
+            if (VideoDecoderState.isTunneling() && TunnelingFallback.turnOff(getContext())) {
+                applyTunnelingOff(failure);
             } else {
                 failure.action("reload_video");
                 mVideoLoaderController.reloadVideo(failure.getKind());
@@ -440,17 +459,23 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 }
 
                 long delayMs = RETRY_MS;
+                // Its connections still in their lookup or connecting: no load error yet, the network all the same (QYZPW0FN #3: the
+                // lookups hung 20 s, and the client was switched on a network that was down)
+                String stuckConnection = Connections.getStuckConnection(STUCK_CONNECTION_MS);
+                failure.detail("stuckConnection", stuckConnection);
 
-                if (LoadErrors.hasConnectionErrorWithin(CONNECTION_ERROR_WINDOW_MS)) {
+                if (LoadErrors.hasConnectionErrorWithin(CONNECTION_ERROR_WINDOW_MS) || stuckConnection != null) {
                     // A load's connection failed (it didn't connect, or no answer came): every client streams from the same servers,
                     // another one wouldn't help (FARAJV5R #46, S4PGCB6X #10, #11, #15). Tried again later each time.
                     failure.action("network_wait");
+                    undoStallClientSwitch(failure);
                     delayMs = mStallRetries.next(getVideo().videoId);
                 } else {
                     // Also, some clients like ANDROID_REEL may just hang at start
                     MessageHelpers.showLongMessage(getContext(), "Fixing stalled client...");
                     failure.action("switch_next_client_now");
                     YouTubeServiceManager.instance().switchNextClientNow();
+                    mStallSwitchVideoId = getVideo().videoId;
                 }
 
                 failure.action(delayed("reload_video", delayMs));
@@ -463,9 +488,12 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             // the read timed out again at 1080p, #4). Tried again later each time instead.
             boolean hasConnectionError = LoadErrors.hasConnectionErrorWithin(CONNECTION_ERROR_WINDOW_MS);
             failure.detail("loadConnectionError", hasConnectionError);
+            String stuckConnection = Connections.getStuckConnection(STUCK_CONNECTION_MS);
+            failure.detail("stuckConnection", stuckConnection);
 
-            if (hasConnectionError || FormatAttempts.isFastEnough()) {
+            if (hasConnectionError || stuckConnection != null || FormatAttempts.isFastEnough()) {
                 failure.action("network_wait");
+                undoStallClientSwitch(failure);
                 long delayMs = mStallRetries.next(getVideo() != null ? getVideo().videoId : null);
                 failure.action(delayed("reload_video", delayMs));
                 mVideoLoaderController.reloadVideo((int) delayMs, failure.getKind());
@@ -830,9 +858,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     /**
      * SABR's server refused the request with a SabrError (see SabrProtocolError), e.g. sabr.malformed_config: the player response's
      * ustreamer config no longer applies, and every request after it is refused. Sent again, the request gets the same answer: the
-     * player response is fetched again, with the same client. Refused again soon after, the fresh one didn't help: the next client
-     * right away. Not its poToken first (see YouTubeServiceManager#switchNextClient): that one may be reset again a minute later, so
-     * a client refused each time after that was never left.<br/>
+     * player response is fetched again, with the same client. Refused again soon after, or refused with a player response the stream
+     * had just fetched again itself (the server asked it to, see SabrManifest#requestSessionRefresh), the fresh one didn't help: the
+     * next client right away, for this video only (see VideoLoaderController#pickNextClientForVideo). Not its poToken first (see
+     * YouTubeServiceManager#switchNextClient): that one may be reset again a minute later, so a client refused each time after that
+     * was never left.<br/>
      * Not reset when it plays: a refused player response plays what it loaded before.
      */
     private boolean applySabrProtocolErrorAction(Throwable error, PlayerFailure failure) {
@@ -843,12 +873,30 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return false;
         }
 
-        long nowMs = SystemClock.elapsedRealtime();
+        SabrProtocolError protocolError = (SabrProtocolError) cause;
+        // What the refused request asked for, and how fresh its session was (see SabrManifest#describeRequest)
+        failure.detail("sabrRequest", protocolError.getRequest());
+        long sessionAgeMs = protocolError.getSessionAgeMs();
+        failure.detail("sabrSessionAgeMs", sessionAgeMs >= 0 ? sessionAgeMs : null);
 
-        if (Helpers.equals(video.videoId, mSabrProtocolErrorVideoId) && nowMs - mSabrProtocolErrorTimeMs <= REPEATED_SABR_ERROR_MS) {
+        long nowMs = SystemClock.elapsedRealtime();
+        boolean isRepeated = Helpers.equals(video.videoId, mSabrProtocolErrorVideoId) && nowMs - mSabrProtocolErrorTimeMs <= REPEATED_SABR_ERROR_MS;
+        // The server had asked for the player response again, the stream fetched it, and the fresh one was refused too: fetched once
+        // more, it's refused the same (89HAAW4J, XWR8QQN7, F0SVV9N8: refused, refetched, refused again, 1.8 s each time)
+        boolean isFreshSessionRefused = sessionAgeMs >= 0 && sessionAgeMs <= FRESH_SABR_SESSION_MS;
+
+        if (isRepeated || isFreshSessionRefused) {
             MessageHelpers.showLongMessage(getContext(), cause.getMessage());
-            failure.action("switch_next_client_now");
-            YouTubeServiceManager.instance().switchNextClientNow();
+            // The client refuses this video: the next one for it only, remembered for when it's opened again. The other videos play
+            // on the order's first (89HAAW4J: TV played the others, and the switch kept TV_SAMSUNG for all of them).
+            String picked = mVideoLoaderController.pickNextClientForVideo();
+
+            if (picked != null) {
+                failure.action("client_for_video:" + picked);
+            } else {
+                failure.action("switch_next_client_now");
+                YouTubeServiceManager.instance().switchNextClientNow();
+            }
         } else {
             failure.action("refetch_player");
             YouTubeServiceManager.instance().reloadPlayerResponse(video.videoId, null);
@@ -860,6 +908,34 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mVideoLoaderController.reloadVideo(failure.getKind());
 
         return true;
+    }
+
+    /**
+     * Tunneling was turned off (see TunnelingFallback#turnOff): the engine restarts without it. Turned off in another run before, it's
+     * suspended on the device from now on, and the message says so.
+     */
+    private void applyTunnelingOff(PlayerFailure failure) {
+        boolean isSuspended = TunnelingFallback.isSuspended(getContext());
+        failure.action(isSuspended ? "tunneling_suspended" : "tunneling_off").action("restart_engine");
+        MessageHelpers.showLongMessage(getContext(), isSuspended ? R.string.msg_tunneling_suspended : R.string.msg_tunneling_off);
+        mVideoLoaderController.restartEngine(failure.getKind());
+    }
+
+    /**
+     * The video's stall switched the client as one that hangs at start (see runLongBufferingAction), and its failure now is the
+     * network's: the switch was the outage's, the first client again (QYZPW0FN: switched to VISIONOS during an outage, kept for every
+     * video of the run after it)
+     */
+    private void undoStallClientSwitch(PlayerFailure failure) {
+        Video video = getVideo();
+
+        if (video == null || mStallSwitchVideoId == null || !mStallSwitchVideoId.equals(video.videoId)) {
+            return;
+        }
+
+        mStallSwitchVideoId = null;
+        failure.action("reset_client");
+        YouTubeServiceManager.instance().resetClient();
     }
 
     /**
@@ -901,6 +977,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         failure.action("network_reload " + mNetworkErrorReloads + "/" + MAX_NETWORK_ERROR_RELOADS);
 
         if (isBrokenResponse(error)) {
+            // 15 of the 16 broken SABR responses whose commands were known came 52-786 ms after a seek, OkHttp's too (see
+            // PlayerCommands#getMsSinceSeek): said with each, not read from the commands
+            long msSinceSeek = PlayerCommands.getMsSinceSeek();
+            failure.detail("msSinceSeek", msSinceSeek >= 0 ? msSinceSeek : null);
             applyOkHttpFallback(video, failure);
         }
 
@@ -1357,6 +1437,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         // system's, its addresses reordered; Google's falls back to it), and the DNS is read at each lookup.
         if (isNetworkDown) {
             failure.action("network_wait");
+            undoStallClientSwitch(failure);
             reloadLater(failure, mFetchRetries.next(videoId));
         } else if (Helpers.containsAny(message, "Unexpected token", "Syntax error", "invalid argument") || // temporal fix
                 Helpers.equalsAny(className, "PoTokenException", "BadWebViewException")) {
