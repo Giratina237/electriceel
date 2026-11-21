@@ -93,8 +93,6 @@ The recommend method of installation the first time is to use [LocalSend](https:
 
 **5531853** `ElectricEel_stable_armeabi-v7a.apk`
 
-[Downloader code generator](https://go.aftvnews.com/)
-
 ### Discoverium
 You can install [Discoverium](https://github.com/cygnusx-1-org/Discoverium/), and then install `Electric Eel` via it.
 
