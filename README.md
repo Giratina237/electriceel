@@ -86,10 +86,11 @@ Electric Eel is a fork of [SmartTube](https://github.com/yuliskov/SmartTube), an
 ### LocalSend
 The recommend method of installation the first time is to use [LocalSend](https://localsend.org/).
 
-### [Downloader](https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en_US) codes
-**2566384** `ElectricEel_stable_32.68.5_arm64-v8a.apk`
+### Downloader codes
+<a href="https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en_US"><picture><source height="72px" media="(prefers-color-scheme: dark)" srcset="/assets/icons/Downloader.png" /><img height="72px" src="/assets/icons/Downloader.png" /></picture></a>
+**8248268** `ElectricEel_stable_arm64-v8a.apk`
 
-**3574784** `ElectricEel_stable_32.68.5_armeabi-v7a.apk`
+**5531853** `ElectricEel_stable_armeabi-v7a.apk`
 
 [Downloader code generator](https://go.aftvnews.com/)
 
