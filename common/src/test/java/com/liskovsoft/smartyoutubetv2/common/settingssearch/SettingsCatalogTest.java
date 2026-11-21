@@ -62,6 +62,26 @@ public class SettingsCatalogTest {
     }
 
     /**
+     * In the menu a row of a panel opens: Hide content, then Shorts
+     */
+    @Test
+    public void build_rowsOfMenus() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+        SettingEntry everywhere = null;
+
+        for (SettingEntry entry : catalog.getEntries()) {
+            if (entry.title.equals("Hide shorts everywhere")) {
+                everywhere = entry;
+            }
+        }
+
+        assertNotNull(everywhere);
+        assertEquals("Shorts", everywhere.menuItemTitle);
+        assertEquals(SettingEntry.KIND_TOGGLE, everywhere.kind);
+        assertEquals("Hide shorts everywhere", SettingsSearch.find(catalog.getEntries(), "hide shorts everywhere", 3).get(0).title);
+    }
+
+    /**
      * The settings are sent, the texts that aren't the app's aren't
      */
     @Test

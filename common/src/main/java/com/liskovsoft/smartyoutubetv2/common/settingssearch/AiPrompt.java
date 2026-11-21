@@ -30,7 +30,7 @@ public final class AiPrompt {
     /**
      * At most this many settings picked
      */
-    public static final int MAX_PICKS = 5;
+    public static final int MAX_PICKS = 3;
     private static final String HIDDEN = "…";
     private static final Pattern FORMAT_ARG = Pattern.compile("%(\\d+\\$)?[-#+ 0,(]*\\d*(\\.\\d+)?[sdfx]");
     /**
@@ -77,7 +77,8 @@ public final class AiPrompt {
                 .append("question: which setting to open and what to pick in it, or that the app has no such setting. No markdown. ")
                 .append("\"settings\" is the ids of the settings that answer the question, the best first, at most ")
                 .append(MAX_PICKS)
-                .append(", only ids of the list below. Empty when none does.\n")
+                .append(", only ids of the list below. Empty when none does. Pick the setting itself (e.g. the switch), not the panel or ")
+                .append("section it's in, and settings that do different things rather than the same one twice.\n")
                 .append("A question that isn't about the app's settings: say in \"reply\" that you only find settings, and pick none.\n")
                 .append("The texts of the settings are in the language of the app. ")
                 .append(HIDDEN)

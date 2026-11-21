@@ -12,6 +12,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.SettingsCardsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.misc.AppDataSourceManager;
+import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,7 +24,8 @@ import java.util.List;
  * the settings panels they open. Made from the settings themselves, as they are now: each card is clicked, and what it opens is
  * taken instead of shown (see SettingsCapture). So nothing is listed by hand: a new setting is found as soon as its panel has it.
  * <br/>
- * The lists a row opens (e.g. Video speed) aren't looked through: their rows run as they're clicked. The row itself is found.
+ * The menus a row of a panel opens (e.g. Shorts, in Hide content) are looked through too, one level down. The lists a row opens
+ * otherwise (e.g. Video speed) aren't: their rows run as they're clicked. The row itself is found.
  */
 public final class SettingsCatalog {
     private static final String TAG = SettingsCatalog.class.getSimpleName();
@@ -147,7 +149,23 @@ public final class SettingsCatalog {
             dialog.setNextTitlePrefix(sections.get(sections.size() - 1).getTitle(context));
         }
 
-        if (entry.isRow) {
+        if (entry.menuItemTitle != null) {
+            // The panel with the row of the menu focused, then the menu over it, once the panel is shown (Back goes to it)
+            dialog.setFocusedItemMatcher(entry::matchesMenu);
+            dialog.setOnStart(() -> Utils.post(() -> {
+                OptionItem menu = dialog.getFocusedItem();
+
+                if (menu == null || !menu.isMenu()) {
+                    return;
+                }
+
+                if (entry.isRow) {
+                    dialog.setFocusedItemMatcher(entry::matches);
+                }
+
+                menu.onSelect(true);
+            }));
+        } else if (entry.isRow) {
             dialog.setFocusedItemMatcher(entry::matches);
         }
 
@@ -186,6 +204,15 @@ public final class SettingsCatalog {
     private static final class Builder {
         private final Context mContext;
         private final List<SettingEntry> mEntries = new ArrayList<>();
+        /**
+         * While a menu of a panel is looked through: the row that opens it
+         */
+        private String mMenuCategoryTitle;
+        private String mMenuItemTitle;
+        /**
+         * The rows of the menus looked through: a menu of the same rows (e.g. Sections, of each filter) isn't listed again
+         */
+        private final List<java.util.Set<String>> mMenus = new ArrayList<>();
 
         private Builder(Context context) {
             mContext = context;
@@ -337,9 +364,45 @@ public final class SettingsCatalog {
                 }
 
                 boolean isMenu = item.isMenu();
-                add(isMenu ? SettingEntry.KIND_BUTTON : SettingEntry.KIND_TOGGLE, title, label != null ? plus(inside, label) : inside,
+                List<String> itemPath = label != null ? plus(inside, label) : inside;
+                add(isMenu ? SettingEntry.KIND_BUTTON : SettingEntry.KIND_TOGGLE, title, itemPath,
                         toText(item.getDescription()), Collections.emptyList(), null, !isMenu && item.isSelected(), cards, true,
                         categoryTitle, title);
+
+                if (isMenu && mMenuItemTitle == null) {
+                    addMenu(item, categoryTitle, title, cards, plus(itemPath, title));
+                }
+            }
+        }
+
+        /**
+         * The rows of the menu a row opens, under the row
+         */
+        private void addMenu(OptionItem item, @Nullable String categoryTitle, String title, int[] cards, List<String> path) {
+            AppDialogPresenter dialog = AppDialogPresenter.instance(mContext);
+            SettingsCapture.Result result;
+
+            try {
+                result = SettingsCapture.capture(() -> item.onSelect(true));
+            } catch (RuntimeException e) {
+                Log.e(TAG, "Can't look through the menu " + title + ": " + e);
+                return;
+            } finally {
+                dialog.clearPending();
+            }
+
+            if (result.panel == null || isListed(getRowTitles(result.panel))) {
+                return;
+            }
+
+            mMenuCategoryTitle = categoryTitle;
+            mMenuItemTitle = title;
+
+            try {
+                addPanel(result.panel, cards, path);
+            } finally {
+                mMenuCategoryTitle = null;
+                mMenuItemTitle = null;
             }
         }
 
@@ -347,7 +410,48 @@ public final class SettingsCatalog {
                          @Nullable String picked, boolean isOn, int[] cards, boolean isRow, @Nullable String categoryTitle,
                          @Nullable String itemTitle) {
             mEntries.add(new SettingEntry("s" + (mEntries.size() + 1), kind, title, path, toText(description), choices, picked,
-                    isOn, cards, isRow, categoryTitle, itemTitle));
+                    isOn, cards, isRow, categoryTitle, itemTitle, mMenuCategoryTitle, mMenuItemTitle));
+        }
+
+        /**
+         * Mostly the same rows as a menu looked through already (e.g. the Sections of each filter, a row more or less): only
+         * the row that opens it is listed. Otherwise it's kept, as listed.
+         */
+        private boolean isListed(java.util.Set<String> titles) {
+            for (java.util.Set<String> menu : mMenus) {
+                int same = 0;
+
+                for (String title : titles) {
+                    if (menu.contains(title)) {
+                        same++;
+                    }
+                }
+
+                if (same >= 0.8f * Math.min(menu.size(), titles.size()) && same >= 3) {
+                    return true;
+                }
+            }
+
+            mMenus.add(titles);
+            return false;
+        }
+
+        private static java.util.Set<String> getRowTitles(List<OptionCategory> categories) {
+            java.util.Set<String> titles = new java.util.HashSet<>();
+
+            for (OptionCategory category : categories) {
+                if (category.options == null) {
+                    continue;
+                }
+
+                for (OptionItem item : category.options) {
+                    if (item.getTitle() != null) {
+                        titles.add(item.getTitle().toString());
+                    }
+                }
+            }
+
+            return titles;
         }
 
         private static List<String> plus(List<String> list, String item) {

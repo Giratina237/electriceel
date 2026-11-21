@@ -52,6 +52,15 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
     @Nullable
     private String mError;
     /**
+     * Of the error: another model might answer
+     */
+    private boolean mIsModelError;
+    /**
+     * Asked of it as the one picked was busy: null when it wasn't
+     */
+    @Nullable
+    private String mFallbackModel;
+    /**
      * The row of the AI in the results shown: its text changes as the answer comes
      */
     private OptionItem mAiRow;
@@ -107,6 +116,13 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
     }
 
     private void search(String question) {
+        search(question, false);
+    }
+
+    /**
+     * @param replace instead of the dialogs shown (e.g. the results, and a list picked from over them)
+     */
+    private void search(String question, boolean replace) {
         Context context = getContext();
 
         if (context == null) {
@@ -117,6 +133,7 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         mQuestion = question;
         mAnswer = null;
         mError = null;
+        mIsModelError = false;
 
         try {
             mCatalog = SettingsCatalog.build(context);
@@ -133,13 +150,24 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
             startRequest(context);
         }
 
-        showResults();
+        showResults(replace);
     }
 
     private void startRequest(Context context) {
+        mFallbackModel = null;
+        startRequest(context, null);
+    }
+
+    /**
+     * @param model instead of the one picked, null for it
+     */
+    private void startRequest(Context context, @Nullable String model) {
         AiSearchData data = AiSearchData.instance(context);
         String key = data.getKey(mProvider);
-        String model = data.getModel(mProvider);
+
+        if (model == null) {
+            model = data.getModel(mProvider);
+        }
 
         if (key == null || model == null) {
             mProvider = null;
@@ -174,7 +202,25 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
             return;
         }
 
+        // Busy (e.g. Gemini's 503 "high demand"): asked once more, of another model
+        String fallback = getFallbackModel(context, error);
+
+        if (fallback != null) {
+            mFallbackModel = fallback;
+            startRequest(context, fallback);
+            return;
+        }
+
         mError = AiSearchSettingsPresenter.getErrorText(context, mProvider, error);
+
+        if (error instanceof AiClient.AiException) {
+            AiClient.ErrorKind kind = ((AiClient.AiException) error).kind;
+            mIsModelError = kind == AiClient.ErrorKind.MODEL || kind == AiClient.ErrorKind.SERVER || kind == AiClient.ErrorKind.LIMIT;
+        }
+
+        if (mIsModelError) {
+            mError += " " + context.getString(R.string.ai_search_press_pick_model);
+        }
         updateResults();
     }
 
@@ -223,7 +269,10 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
 
         if (mProvider != null) {
             mAiRow = UiOptionItem.from(mProvider.title, getAiText(context), option -> {
-                if (mAnswer != null || mError != null) {
+                if (mIsModelError && mError != null) {
+                    String question = mQuestion;
+                    AiSearchSettingsPresenter.instance(context).pickModel(() -> search(question, true));
+                } else if (mAnswer != null || mError != null) {
                     showResults(true);
                 }
             });
@@ -239,6 +288,8 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
                 }
             }
         } else {
+            // Without the AI: the best ones on top as well
+            picks.addAll(mMatches.subList(0, Math.min(AiPrompt.MAX_PICKS, mMatches.size())));
             mAiRow = null;
             dialog.appendSingleButton(UiOptionItem.from(context.getString(R.string.ai_search_setup),
                     context.getString(R.string.ai_search_setup_desc),
@@ -260,17 +311,10 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         if (matches.isEmpty() && picks.isEmpty() && (mProvider == null || mAnswer != null)) {
             dialog.appendSingleButton(note(context.getString(R.string.find_setting_none, mQuestion)));
         } else if (!matches.isEmpty()) {
-            dialog.appendSingleButton(note(context.getString(picks.isEmpty() && mProvider == null ?
-                    R.string.find_setting_matches : R.string.find_setting_more)));
+            dialog.appendSingleButton(note(context.getString(R.string.find_setting_more)));
 
             for (SettingEntry entry : matches) {
-                OptionItem row = createRow(context, entry);
-                dialog.appendSingleButton(row);
-
-                // Without the AI: the best match
-                if (focused == null && mProvider == null) {
-                    focused = row;
-                }
+                dialog.appendSingleButton(createRow(context, entry));
             }
         }
 
@@ -316,6 +360,22 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         }
 
         return mAnswer.reply;
+    }
+
+    /**
+     * @return null when there's none, or it was asked already
+     */
+    @Nullable
+    private String getFallbackModel(Context context, Throwable error) {
+        if (mFallbackModel != null || mProvider == null || mProvider.fallbackModel == null || !(error instanceof AiClient.AiException)
+                || ((AiClient.AiException) error).kind != AiClient.ErrorKind.SERVER) {
+            return null;
+        }
+
+        String model = AiSearchData.instance(context).getModel(mProvider);
+        String fallback = mProvider.fallbackModel.equals(model) ? mProvider.defaultModel : mProvider.fallbackModel;
+
+        return fallback != null && !fallback.equals(model) ? fallback : null;
     }
 
     private void disposeRequest() {

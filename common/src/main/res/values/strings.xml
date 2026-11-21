@@ -1262,7 +1262,6 @@
     <string name="card_desc_find_setting">Type what you want to change, and open the setting that does it</string>
     <string name="find_setting_hint">E.g. subtitle size, skip sponsors</string>
     <string name="find_setting_new">New search</string>
-    <string name="find_setting_matches">Matches</string>
     <string name="find_setting_more">More matches</string>
     <string name="find_setting_none">No setting matches \"%s\"</string>
     <string name="find_setting_gone">This setting isn\'t there anymore. Search again.</string>
@@ -1294,7 +1293,8 @@
     <string name="ai_error_network">Couldn\'t reach %s. Check the connection.</string>
     <string name="ai_error_declined">%s declined to answer.</string>
     <string name="ai_error_bad_answer">%s answered something the app can\'t read. Try again.</string>
-    <string name="ai_error_model">%s can\'t use this model. Pick another in AI settings search.</string>
-    <string name="ai_error_server">%s is having problems. Try again later.</string>
+    <string name="ai_error_model">%s can\'t use this model.</string>
+    <string name="ai_error_server">%s is busy right now, or having problems.</string>
+    <string name="ai_search_press_pick_model">Press to pick another model and ask again.</string>
     <string name="ai_error_save_key">The key couldn\'t be saved on this device.</string>
 </resources>

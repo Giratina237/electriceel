@@ -543,11 +543,16 @@ public final class AiClient {
                 return ErrorKind.LIMIT;
             }
 
-            if (code == 404 || getMessage(body).toLowerCase(Locale.ROOT).contains("model")) {
+            // E.g. 503 "This model is currently experiencing high demand": busy, not a wrong model
+            if (code >= 500) {
+                return ErrorKind.SERVER;
+            }
+
+            if (code == 404 || code == 400 && getMessage(body).toLowerCase(Locale.ROOT).contains("model")) {
                 return ErrorKind.MODEL;
             }
 
-            return code >= 500 ? ErrorKind.SERVER : ErrorKind.BAD_ANSWER;
+            return ErrorKind.BAD_ANSWER;
         }
 
         /**

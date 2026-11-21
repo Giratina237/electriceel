@@ -73,10 +73,18 @@ public final class SettingEntry {
     @Nullable
     final String itemTitle;
     final boolean isRow;
+    /**
+     * Of a row of a menu opened by a row of the panel (e.g. Hide shorts everywhere, in the menu of Shorts in Hide content): the
+     * list of that row and its title. Null for a row of the panel itself.
+     */
+    @Nullable
+    final String menuCategoryTitle;
+    @Nullable
+    final String menuItemTitle;
 
     SettingEntry(String id, int kind, String title, List<String> path, @Nullable String description, List<String> choices,
                  @Nullable String picked, boolean isOn, int[] cards, boolean isRow, @Nullable String categoryTitle,
-                 @Nullable String itemTitle) {
+                 @Nullable String itemTitle, @Nullable String menuCategoryTitle, @Nullable String menuItemTitle) {
         this.id = id;
         this.kind = kind;
         this.title = title;
@@ -89,6 +97,16 @@ public final class SettingEntry {
         this.isRow = isRow;
         this.categoryTitle = categoryTitle;
         this.itemTitle = itemTitle;
+        this.menuCategoryTitle = menuCategoryTitle;
+        this.menuItemTitle = menuItemTitle;
+    }
+
+    /**
+     * The row of the panel that opens the menu it's in
+     */
+    boolean matchesMenu(OptionCategory category, OptionItem item) {
+        return menuItemTitle != null && item.isMenu() && sameText(category.title, menuCategoryTitle)
+                && sameText(item.getTitle(), menuItemTitle);
     }
 
     /**

@@ -34,6 +34,11 @@ public class AiSearchSettingsPresenter extends BasePresenter<Void> {
     private Disposable mAction;
     private UiOptionItem mKeyRow;
     private UiOptionItem mModelRow;
+    /**
+     * Run once a model is picked from the list (e.g. the question asked again with it)
+     */
+    @Nullable
+    private Runnable mOnModelPicked;
 
     private AiSearchSettingsPresenter(Context context) {
         super(context);
@@ -220,6 +225,16 @@ public class AiSearchSettingsPresenter extends BasePresenter<Void> {
     }
 
     private void pickModel() {
+        pickModel(null);
+    }
+
+    /**
+     * The models the key can use, to pick one: over the dialog shown
+     *
+     * @param onPicked run once one is picked from the list
+     */
+    public void pickModel(@Nullable Runnable onPicked) {
+        mOnModelPicked = onPicked;
         Context context = getContext();
 
         if (context == null) {
@@ -263,6 +278,12 @@ public class AiSearchSettingsPresenter extends BasePresenter<Void> {
                 mData.setModel(provider, model.id);
                 updateRows();
                 dialog.goBack();
+                Runnable onPicked = mOnModelPicked;
+                mOnModelPicked = null;
+
+                if (onPicked != null) {
+                    onPicked.run();
+                }
             }, model.id.equals(current)));
         }
 
