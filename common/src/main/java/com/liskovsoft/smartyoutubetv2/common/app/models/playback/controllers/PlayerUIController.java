@@ -1243,6 +1243,18 @@ public class PlayerUIController extends BasePlayerController {
         // The mode of the music videos in a music video, with Music autoplay on
         MusicAutoplayManager.setPlaybackMode(getContext(), getVideo(), nextMode);
         getPlayer().setButtonState(R.id.action_repeat, nextMode);
+        onPlaybackModeChanged();
+    }
+
+    /**
+     * The next video of the video playing goes with the mode now, not from the video after it (SmartTube #6437): Shuffle picks a random one
+     */
+    private void onPlaybackModeChanged() {
+        VideoLoaderController loader = getController(VideoLoaderController.class);
+
+        if (loader != null) {
+            loader.onPlaybackModeChanged();
+        }
     }
 
     private void showPlaybackModeDialog() {
@@ -1252,7 +1264,13 @@ public class PlayerUIController extends BasePlayerController {
 
         OptionCategory category = AppDialogUtil.createPlaybackModeCategory(
                 getContext(), getVideo(), () -> {
+                    // Picked later: the player may be gone (e.g. the opaque dialog of Android 8 stops it)
+                    if (getPlayer() == null) {
+                        return;
+                    }
+
                     getPlayer().setButtonState(R.id.action_repeat, MusicAutoplayManager.getPlaybackMode(getContext(), getVideo()));
+                    onPlaybackModeChanged();
                 });
 
         AppDialogPresenter settingsPresenter = getAppDialogPresenter();
