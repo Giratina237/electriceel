@@ -36,6 +36,7 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData.ColorScheme;
 import com.liskovsoft.smartyoutubetv2.common.misc.MotherActivity;
 import com.liskovsoft.smartyoutubetv2.common.misc.Skins;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
+import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCapture;
 import com.liskovsoft.smartyoutubetv2.common.utils.ClickbaitRemover;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 
@@ -622,6 +623,11 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
      * there (deleted since) come after them.
      */
     public void showHomeScreenChannels() {
+        // Loaded in the background, and the playlists are the user's own: the settings search finds the card only
+        if (SettingsCapture.isActive()) {
+            return;
+        }
+
         MessageHelpers.showMessage(getContext(), R.string.wait_data_loading);
 
         // Not getPlaylistsInfo: it has only the account's own playlists, not Liked videos and the saved ones
