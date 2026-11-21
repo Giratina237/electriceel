@@ -301,19 +301,37 @@ public final class SettingsCatalog {
                             }
 
                             boolean isSwitch = category.type == OptionCategory.TYPE_SINGLE_SWITCH;
-                            // A button that opens a list to put in order (e.g. Sidebar order): its items, as its choices
-                            List<String> items = !isSwitch && item.isMenu() && mMenuItemTitle == null ?
-                                    getListItems(item) : Collections.emptyList();
+                            // A button that opens a list (e.g. Order of the sidebar, Set-up sections)
+                            List<OptionCategory> opened = !isSwitch && item.isMenu() && mMenuItemTitle == null ? captureClick(item) : null;
+                            // To put in order: its items, as its choices
+                            List<String> items = opened != null ? getOrderItems(opened) : Collections.emptyList();
                             add(isSwitch ? SettingEntry.KIND_TOGGLE : SettingEntry.KIND_BUTTON, title, path, toText(item.getDescription()),
                                     items, null, isSwitch && item.isSelected(), cards, true, categoryTitle, title);
+
+                            // Otherwise its rows, under it
+                            if (opened != null && items.isEmpty()) {
+                                addMenuRows(opened, categoryTitle, title, cards, plusOther(path, title));
+                            }
                         }
                         break;
                     case OptionCategory.TYPE_STRING_LIST:
                     case OptionCategory.TYPE_REORDER_LIST:
                     case OptionCategory.TYPE_LONG_TEXT:
-                        // A row that opens a list or a text
+                        // A row that opens a list or a text: the items of a list, as its choices
                         if (categoryTitle != null) {
-                            add(SettingEntry.KIND_BUTTON, categoryTitle, path, null, Collections.emptyList(), null, false, cards, true,
+                            List<String> items = new ArrayList<>();
+
+                            if (category.type != OptionCategory.TYPE_LONG_TEXT) {
+                                for (OptionItem item : category.options) {
+                                    String title = toText(item.getTitle());
+
+                                    if (title != null) {
+                                        items.add(title);
+                                    }
+                                }
+                            }
+
+                            add(SettingEntry.KIND_BUTTON, categoryTitle, path, null, items, null, false, cards, true,
                                     categoryTitle, null);
                         }
                         break;
@@ -380,34 +398,40 @@ public final class SettingsCatalog {
         }
 
         /**
-         * The items of the lists to put in order that a button opens, none when it opens none
+         * What a row opens when clicked, null when it opens no panel
          */
-        private List<String> getListItems(OptionItem item) {
+        @Nullable
+        private List<OptionCategory> captureClick(OptionItem item) {
             AppDialogPresenter dialog = AppDialogPresenter.instance(mContext);
-            List<String> result = new ArrayList<>();
 
             try {
-                SettingsCapture.Result captured = SettingsCapture.capture(() -> item.onSelect(true));
-
-                if (captured.panel != null) {
-                    for (OptionCategory category : captured.panel) {
-                        if (category.type != OptionCategory.TYPE_REORDER_LIST || category.options == null) {
-                            continue;
-                        }
-
-                        for (OptionItem listItem : category.options) {
-                            String title = toText(listItem.getTitle());
-
-                            if (title != null) {
-                                result.add(title);
-                            }
-                        }
-                    }
-                }
+                return SettingsCapture.capture(() -> item.onSelect(true)).panel;
             } catch (RuntimeException e) {
-                Log.e(TAG, "Can't look through the list of " + item.getTitle() + ": " + e);
+                Log.e(TAG, "Can't look through what " + item.getTitle() + " opens: " + e);
+                return null;
             } finally {
                 dialog.clearPending();
+            }
+        }
+
+        /**
+         * The items of its lists to put in order
+         */
+        private static List<String> getOrderItems(List<OptionCategory> panel) {
+            List<String> result = new ArrayList<>();
+
+            for (OptionCategory category : panel) {
+                if (category.type != OptionCategory.TYPE_REORDER_LIST || category.options == null) {
+                    continue;
+                }
+
+                for (OptionItem listItem : category.options) {
+                    String title = toText(listItem.getTitle());
+
+                    if (title != null) {
+                        result.add(title);
+                    }
+                }
             }
 
             return result;
@@ -417,19 +441,15 @@ public final class SettingsCatalog {
          * The rows of the menu a row opens, under the row
          */
         private void addMenu(OptionItem item, @Nullable String categoryTitle, String title, int[] cards, List<String> path) {
-            AppDialogPresenter dialog = AppDialogPresenter.instance(mContext);
-            SettingsCapture.Result result;
+            List<OptionCategory> panel = captureClick(item);
 
-            try {
-                result = SettingsCapture.capture(() -> item.onSelect(true));
-            } catch (RuntimeException e) {
-                Log.e(TAG, "Can't look through the menu " + title + ": " + e);
-                return;
-            } finally {
-                dialog.clearPending();
+            if (panel != null) {
+                addMenuRows(panel, categoryTitle, title, cards, path);
             }
+        }
 
-            if (result.panel == null || isListed(getRowTitles(result.panel))) {
+        private void addMenuRows(List<OptionCategory> panel, @Nullable String categoryTitle, String title, int[] cards, List<String> path) {
+            if (isListed(getRowTitles(panel))) {
                 return;
             }
 
@@ -437,7 +457,7 @@ public final class SettingsCatalog {
             mMenuItemTitle = title;
 
             try {
-                addPanel(result.panel, cards, path);
+                addPanel(panel, cards, path);
             } finally {
                 mMenuCategoryTitle = null;
                 mMenuItemTitle = null;

@@ -102,6 +102,25 @@ public class SettingsCatalogTest {
     }
 
     /**
+     * The rows of the list a button opens: Music, in Set-up sections of the Sidebar
+     */
+    @Test
+    public void build_rowsOfButtonLists() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+        SettingEntry music = null;
+
+        for (SettingEntry entry : catalog.getEntries()) {
+            if (entry.title.equals("Music") && entry.path.contains("Set-up sections")) {
+                music = entry;
+            }
+        }
+
+        assertNotNull(music);
+        assertEquals("Set-up sections", music.menuItemTitle);
+        assertEquals(SettingEntry.KIND_TOGGLE, music.kind);
+    }
+
+    /**
      * The settings are sent, the texts that aren't the app's aren't
      */
     @Test

@@ -222,12 +222,17 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
     public void showSidebar() {
         AppDialogPresenter dialog = AppDialogPresenter.instance(getContext());
 
-        dialog.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.side_panel_sections), option -> showEnabledSections()));
+        OptionItem sections = UiOptionItem.from(getContext().getString(R.string.side_panel_sections), option -> showEnabledSections());
+        // Opens a list: its rows are found by the settings search (see SettingsCatalog)
+        sections.setMenu(true);
+        dialog.appendSingleButton(sections);
         OptionItem sidebarOrder = UiOptionItem.from(getContext().getString(R.string.sidebar_order), option -> showSidebarOrder());
         // Opens a list: its items are found by the settings search (see SettingsCatalog)
         sidebarOrder.setMenu(true);
         dialog.appendSingleButton(sidebarOrder);
-        dialog.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.boot_to_section), option -> showBootToSection()));
+        OptionItem bootTo = UiOptionItem.from(getContext().getString(R.string.boot_to_section), option -> showBootToSection());
+        bootTo.setMenu(true);
+        dialog.appendSingleButton(bootTo);
 
         dialog.showDialog(getContext().getString(R.string.sidebar));
     }
@@ -298,7 +303,10 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
         HomeRowsData data = HomeRowsData.instance(getContext());
         AppDialogPresenter settingsPresenter = AppDialogPresenter.instance(getContext());
 
-        settingsPresenter.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.home_rows), option -> showHomeRows()));
+        OptionItem homeRows = UiOptionItem.from(getContext().getString(R.string.home_rows), option -> showHomeRows());
+        // Opens a list: its rows are found by the settings search (see SettingsCatalog)
+        homeRows.setMenu(true);
+        settingsPresenter.appendSingleButton(homeRows);
 
         settingsPresenter.appendSingleSwitch(UiOptionItem.from(getContext().getString(R.string.home_rows_order_youtube),
                 getContext().getString(R.string.home_rows_order_youtube_desc),
@@ -320,6 +328,12 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
     }
 
     private void showHomeRows() {
+        // Looked through by the settings search: the rows as they are, without loading the subscriptions
+        if (SettingsCapture.isActive()) {
+            showHomeRows(null);
+            return;
+        }
+
         MessageHelpers.showMessage(getContext(), R.string.wait_data_loading);
 
         RxHelper.execute(
@@ -572,7 +586,10 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
         }) {
             String title = getContext().getString(menu[1]);
             String description = menu[2] != 0 ? getContext().getString(menu[2]) : null;
-            settingsPresenter.appendSingleButton(UiOptionItem.from(title, description, option -> showContextMenu(menu[0], title)));
+            OptionItem contextMenu = UiOptionItem.from(title, description, option -> showContextMenu(menu[0], title));
+            // Opens a list: its rows are found by the settings search (see SettingsCatalog)
+            contextMenu.setMenu(true);
+            settingsPresenter.appendSingleButton(contextMenu);
         }
 
         settingsPresenter.showDialog(getContext().getString(R.string.context_menu));
