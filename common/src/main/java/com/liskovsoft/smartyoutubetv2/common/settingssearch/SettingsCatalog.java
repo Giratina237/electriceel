@@ -301,8 +301,11 @@ public final class SettingsCatalog {
                             }
 
                             boolean isSwitch = category.type == OptionCategory.TYPE_SINGLE_SWITCH;
+                            // A button that opens a list to put in order (e.g. Sidebar order): its items, as its choices
+                            List<String> items = !isSwitch && item.isMenu() && mMenuItemTitle == null ?
+                                    getListItems(item) : Collections.emptyList();
                             add(isSwitch ? SettingEntry.KIND_TOGGLE : SettingEntry.KIND_BUTTON, title, path, toText(item.getDescription()),
-                                    Collections.emptyList(), null, isSwitch && item.isSelected(), cards, true, categoryTitle, title);
+                                    items, null, isSwitch && item.isSelected(), cards, true, categoryTitle, title);
                         }
                         break;
                     case OptionCategory.TYPE_STRING_LIST:
@@ -348,7 +351,8 @@ public final class SettingsCatalog {
          * Each checkbox under the title of its list, and under its label in the list when it has one
          */
         private void addChecks(OptionCategory category, @Nullable String categoryTitle, int[] cards, List<String> path) {
-            List<String> inside = categoryTitle != null ? plus(path, categoryTitle) : path;
+            // Not named twice when the list is named as its panel (e.g. Hide content, Hide content)
+            List<String> inside = categoryTitle != null ? plusOther(path, categoryTitle) : path;
             String label = null;
 
             for (OptionItem item : category.options) {
@@ -370,9 +374,43 @@ public final class SettingsCatalog {
                         categoryTitle, title);
 
                 if (isMenu && mMenuItemTitle == null) {
-                    addMenu(item, categoryTitle, title, cards, plus(itemPath, title));
+                    addMenu(item, categoryTitle, title, cards, plusOther(itemPath, title));
                 }
             }
+        }
+
+        /**
+         * The items of the lists to put in order that a button opens, none when it opens none
+         */
+        private List<String> getListItems(OptionItem item) {
+            AppDialogPresenter dialog = AppDialogPresenter.instance(mContext);
+            List<String> result = new ArrayList<>();
+
+            try {
+                SettingsCapture.Result captured = SettingsCapture.capture(() -> item.onSelect(true));
+
+                if (captured.panel != null) {
+                    for (OptionCategory category : captured.panel) {
+                        if (category.type != OptionCategory.TYPE_REORDER_LIST || category.options == null) {
+                            continue;
+                        }
+
+                        for (OptionItem listItem : category.options) {
+                            String title = toText(listItem.getTitle());
+
+                            if (title != null) {
+                                result.add(title);
+                            }
+                        }
+                    }
+                }
+            } catch (RuntimeException e) {
+                Log.e(TAG, "Can't look through the list of " + item.getTitle() + ": " + e);
+            } finally {
+                dialog.clearPending();
+            }
+
+            return result;
         }
 
         /**
@@ -452,6 +490,13 @@ public final class SettingsCatalog {
             }
 
             return titles;
+        }
+
+        /**
+         * Plus the item, unless it's the last one already
+         */
+        private static List<String> plusOther(List<String> list, String item) {
+            return !list.isEmpty() && list.get(list.size() - 1).equals(item) ? list : plus(list, item);
         }
 
         private static List<String> plus(List<String> list, String item) {

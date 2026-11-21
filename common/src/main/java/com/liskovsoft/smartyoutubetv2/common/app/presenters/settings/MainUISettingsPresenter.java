@@ -223,7 +223,10 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
         AppDialogPresenter dialog = AppDialogPresenter.instance(getContext());
 
         dialog.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.side_panel_sections), option -> showEnabledSections()));
-        dialog.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.sidebar_order), option -> showSidebarOrder()));
+        OptionItem sidebarOrder = UiOptionItem.from(getContext().getString(R.string.sidebar_order), option -> showSidebarOrder());
+        // Opens a list: its items are found by the settings search (see SettingsCatalog)
+        sidebarOrder.setMenu(true);
+        dialog.appendSingleButton(sidebarOrder);
         dialog.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.boot_to_section), option -> showBootToSection()));
 
         dialog.showDialog(getContext().getString(R.string.sidebar));
@@ -308,7 +311,10 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
                 },
                 data.isYouTubeOrdered()));
 
-        settingsPresenter.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.home_rows_order), option -> showHomeRowsOrder()));
+        OptionItem homeRowsOrder = UiOptionItem.from(getContext().getString(R.string.home_rows_order), option -> showHomeRowsOrder());
+        // Opens a list: its items are found by the settings search (see SettingsCatalog)
+        homeRowsOrder.setMenu(true);
+        settingsPresenter.appendSingleButton(homeRowsOrder);
 
         settingsPresenter.showDialog(getContext().getString(R.string.header_home), () -> BrowsePresenter.instance(getContext()).updateHomeRows());
     }
@@ -576,7 +582,10 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
         AppDialogPresenter dialog = AppDialogPresenter.instance(getContext());
 
         dialog.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.context_menu_items), option -> showContextMenuItemsList(menu)));
-        dialog.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.context_menu_order), option -> showContextMenuOrder(menu)));
+        OptionItem menuOrder = UiOptionItem.from(getContext().getString(R.string.context_menu_order), option -> showContextMenuOrder(menu));
+        // Opens a list: its items are found by the settings search (see SettingsCatalog)
+        menuOrder.setMenu(true);
+        dialog.appendSingleButton(menuOrder);
 
         dialog.showDialog(title);
     }

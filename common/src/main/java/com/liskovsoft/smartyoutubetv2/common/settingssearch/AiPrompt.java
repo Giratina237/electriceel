@@ -80,6 +80,8 @@ public final class AiPrompt {
                 .append(", only ids of the list below. Empty when none does. Pick the setting itself (e.g. the switch), not the panel or ")
                 .append("section it's in, and settings that do different things rather than the same one twice.\n")
                 .append("A question that isn't about the app's settings: say in \"reply\" that you only find settings, and pick none.\n")
+                .append("The choices of a button are the items of the list it opens, e.g. to put in order: what isn't among them can't be ")
+                .append("changed there. Say so when the app can't do what's asked.\n")
                 .append("The texts of the settings are in the language of the app. ")
                 .append(HIDDEN)
                 .append(" is a private text, left out.\n\n")

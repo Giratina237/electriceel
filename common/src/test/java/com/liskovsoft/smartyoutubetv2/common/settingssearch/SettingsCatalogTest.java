@@ -82,6 +82,26 @@ public class SettingsCatalogTest {
     }
 
     /**
+     * The items of the list a button opens to put in order: Settings isn't one of the Sidebar order, it's always last
+     */
+    @Test
+    public void build_itemsOfOrderLists() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+        SettingEntry order = null;
+
+        for (SettingEntry entry : catalog.getEntries()) {
+            if (entry.title.equals("Order of the sidebar")) {
+                order = entry;
+            }
+        }
+
+        assertNotNull(order);
+        assertFalse(order.choices.isEmpty());
+        assertTrue(order.choices.toString(), order.choices.contains("Home"));
+        assertFalse(order.choices.contains("Settings"));
+    }
+
+    /**
      * The settings are sent, the texts that aren't the app's aren't
      */
     @Test
