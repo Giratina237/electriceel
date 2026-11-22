@@ -48,6 +48,9 @@ public class SystemSectionSettingsPresenter extends BasePresenter<Void> implemen
         items.add(new SettingsItem(context.getString(R.string.storage_sync),
                 () -> StorageSettingsPresenter.instance(context).show(), R.drawable.settings_storage_sync)
                 .setDescription(context.getString(R.string.storage_sync_desc)));
+        items.add(new SettingsItem(context.getString(R.string.ai_search),
+                () -> AiSearchSettingsPresenter.instance(context).show(), R.drawable.settings_ai_search)
+                .setDescription(context.getString(R.string.card_desc_ai_search)));
 
         return items;
     }

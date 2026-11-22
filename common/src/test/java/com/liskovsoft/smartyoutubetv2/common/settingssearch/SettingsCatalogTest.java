@@ -119,4 +119,28 @@ public class SettingsCatalogTest {
         assertEquals("Set-up sections", music.menuItemTitle);
         assertEquals(SettingEntry.KIND_TOGGLE, music.kind);
     }
+
+    /**
+     * The settings are sent, the texts that aren't the app's aren't
+     */
+    @Test
+    public void prompt_onlyTheAppsTexts() {
+        Application app = RuntimeEnvironment.getApplication();
+        SettingsCatalog catalog = SettingsCatalog.build(app);
+        AiPrompt prompt = new AiPrompt(app);
+
+        String system = prompt.getSystem(catalog.getEntries());
+        System.out.println("Settings: " + catalog.getEntries().size() + ", prompt: " + system.length() + " chars");
+
+        assertTrue(prompt.isAllowed(app.getString(com.liskovsoft.smartyoutubetv2.common.R.string.find_setting)));
+        assertTrue(prompt.isAllowed("720p"));
+        assertTrue(prompt.isAllowed("1.25x"));
+        assertFalse(prompt.isAllowed("my-server.example.com"));
+        assertFalse(prompt.isAllowed("John's Account"));
+        assertFalse(prompt.isAllowed("jdoe@gmail.com"));
+        assertFalse(prompt.isAllowed("192.168.0.3"));
+        assertTrue(prompt.isAllowed("German"));
+        assertTrue(prompt.isAllowed("0.16Mbps, opus, DRC"));
+        assertTrue(system.contains("| "));
+    }
 }

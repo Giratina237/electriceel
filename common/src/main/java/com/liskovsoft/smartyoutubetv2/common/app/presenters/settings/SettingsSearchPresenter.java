@@ -8,11 +8,16 @@ import androidx.annotation.Nullable;
 
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
+import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
+import com.liskovsoft.smartyoutubetv2.common.settingssearch.AiClient;
+import com.liskovsoft.smartyoutubetv2.common.settingssearch.AiPrompt;
+import com.liskovsoft.smartyoutubetv2.common.settingssearch.AiProvider;
+import com.liskovsoft.smartyoutubetv2.common.settingssearch.AiSearchData;
 import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingEntry;
 import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCatalog;
 import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsSearch;
@@ -21,23 +26,44 @@ import com.liskovsoft.smartyoutubetv2.common.utils.SimpleEditDialog;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.reactivex.disposables.Disposable;
+
 /**
  * The "Find a setting" card of the Settings section: a question, then the settings that answer it, as rows that open them (the
- * panel with the row focused, see SettingsCatalog.open). Found on the device (SettingsSearch): the best ones on top.
+ * panel with the row focused, see SettingsCatalog.open). Found on the device at once (SettingsSearch), and by the AI the user
+ * set up (AiSearchSettingsPresenter), whose picks come first once it answers. The AI only finds settings: it changes nothing.
  */
 public class SettingsSearchPresenter extends BasePresenter<Void> {
     private static final String TAG = SettingsSearchPresenter.class.getSimpleName();
     public static final int SEARCH_ID = 153;
     private static final int MAX_MATCHES = 25;
-    /**
-     * The best matches, on top of the others
-     */
-    private static final int MAX_PICKS = 3;
     @SuppressLint("StaticFieldLeak")
     private static SettingsSearchPresenter sInstance;
     private String mQuestion;
     private SettingsCatalog mCatalog;
     private List<SettingEntry> mMatches;
+    private AiProvider mProvider;
+    private Disposable mRequest;
+    /**
+     * Of the question asked: null while it's asked
+     */
+    @Nullable
+    private AiClient.Answer mAnswer;
+    @Nullable
+    private String mError;
+    /**
+     * Of the error: another model might answer
+     */
+    private boolean mIsModelError;
+    /**
+     * Asked of it as the one picked was busy: null when it wasn't
+     */
+    @Nullable
+    private String mFallbackModel;
+    /**
+     * The row of the AI in the results shown: its text changes as the answer comes
+     */
+    private OptionItem mAiRow;
 
     private SettingsSearchPresenter(Context context) {
         super(context);
@@ -79,19 +105,35 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
                     return true;
                 }, () -> {
                     if (!isSearched[0] && previous != null && mQuestion != null) {
+                        // The request stopped as the results closed
+                        if (mProvider != null && mAnswer == null && mError == null) {
+                            startRequest(context);
+                        }
+
                         showResults();
                     }
                 });
     }
 
     private void search(String question) {
+        search(question, false);
+    }
+
+    /**
+     * @param replace instead of the dialogs shown (e.g. the results, and a list picked from over them)
+     */
+    private void search(String question, boolean replace) {
         Context context = getContext();
 
         if (context == null) {
             return;
         }
 
+        disposeRequest();
         mQuestion = question;
+        mAnswer = null;
+        mError = null;
+        mIsModelError = false;
 
         try {
             mCatalog = SettingsCatalog.build(context);
@@ -102,11 +144,111 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         }
 
         mMatches = SettingsSearch.find(mCatalog.getEntries(), question, MAX_MATCHES);
+        mProvider = AiSearchData.instance(context).getReadyProvider();
 
-        showResults();
+        if (mProvider != null) {
+            startRequest(context);
+        }
+
+        showResults(replace);
+    }
+
+    private void startRequest(Context context) {
+        mFallbackModel = null;
+        startRequest(context, null);
+    }
+
+    /**
+     * @param model instead of the one picked, null for it
+     */
+    private void startRequest(Context context, @Nullable String model) {
+        AiSearchData data = AiSearchData.instance(context);
+        String key = data.getKey(mProvider);
+
+        if (model == null) {
+            model = data.getModel(mProvider);
+        }
+
+        if (key == null || model == null) {
+            mProvider = null;
+            return;
+        }
+
+        AiPrompt prompt = new AiPrompt(context);
+        List<SettingEntry> entries = mCatalog.getEntries();
+        String question = mQuestion;
+        mRequest = AiClient.ask(mProvider, model, key, prompt.getSystem(entries), prompt.getUser(entries, question))
+                .subscribe(answer -> onAnswer(question, answer), error -> onError(question, error));
+    }
+
+    private void onAnswer(String question, AiClient.Answer answer) {
+        if (!question.equals(mQuestion)) {
+            return;
+        }
+
+        mAnswer = answer;
+        updateResults();
+    }
+
+    private void onError(String question, Throwable error) {
+        if (!question.equals(mQuestion)) {
+            return;
+        }
+
+        Log.e(TAG, "The AI didn't answer: " + error);
+        Context context = getContext();
+
+        if (context == null) {
+            return;
+        }
+
+        // Busy (e.g. Gemini's 503 "high demand"): asked once more, of another model
+        String fallback = getFallbackModel(context, error);
+
+        if (fallback != null) {
+            mFallbackModel = fallback;
+            startRequest(context, fallback);
+            return;
+        }
+
+        mError = AiSearchSettingsPresenter.getErrorText(context, mProvider, error);
+
+        if (error instanceof AiClient.AiException) {
+            AiClient.ErrorKind kind = ((AiClient.AiException) error).kind;
+            mIsModelError = kind == AiClient.ErrorKind.MODEL || kind == AiClient.ErrorKind.SERVER || kind == AiClient.ErrorKind.LIMIT;
+        }
+
+        if (mIsModelError) {
+            mError += " " + context.getString(R.string.ai_search_press_pick_model);
+        }
+        updateResults();
+    }
+
+    /**
+     * The results built again when they're the dialog shown: the AI's picks first, focused. When a setting is open over them,
+     * their AI row says the answer came, and pressing it shows it.
+     */
+    private void updateResults() {
+        Context context = getContext();
+
+        if (context == null) {
+            return;
+        }
+
+        AppDialogPresenter dialog = AppDialogPresenter.instance(context);
+
+        if (dialog.isDialogShown() && dialog.getId() == SEARCH_ID) {
+            showResults(true);
+        } else if (mAiRow instanceof UiOptionItem && mProvider != null) {
+            ((UiOptionItem) mAiRow).setDescription(context.getString(R.string.ai_search_answered, mProvider.title));
+        }
     }
 
     private void showResults() {
+        showResults(false);
+    }
+
+    private void showResults(boolean replace) {
         Context context = getContext();
 
         if (context == null || mQuestion == null || mCatalog == null) {
@@ -117,12 +259,42 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         OptionItem focused = null;
 
         dialog.appendSingleButton(UiOptionItem.from(context.getString(R.string.find_setting_new), mQuestion, option -> {
+            disposeRequest();
             // The text field is behind the dialog otherwise, and the dialog keeps the keys
             dialog.closeDialog();
             askQuestion(mQuestion);
         }));
 
-        List<SettingEntry> picks = new ArrayList<>(mMatches.subList(0, Math.min(MAX_PICKS, mMatches.size())));
+        List<SettingEntry> picks = new ArrayList<>();
+
+        if (mProvider != null) {
+            mAiRow = UiOptionItem.from(mProvider.title, getAiText(context), option -> {
+                if (mIsModelError && mError != null) {
+                    String question = mQuestion;
+                    AiSearchSettingsPresenter.instance(context).pickModel(() -> search(question, true));
+                } else if (mAnswer != null || mError != null) {
+                    showResults(true);
+                }
+            });
+            dialog.appendSingleButton(mAiRow);
+
+            if (mAnswer != null) {
+                for (String id : mAnswer.settings) {
+                    SettingEntry entry = mCatalog.find(id);
+
+                    if (entry != null && !picks.contains(entry) && picks.size() < AiPrompt.MAX_PICKS) {
+                        picks.add(entry);
+                    }
+                }
+            }
+        } else {
+            // Without the AI: the best ones on top as well
+            picks.addAll(mMatches.subList(0, Math.min(AiPrompt.MAX_PICKS, mMatches.size())));
+            mAiRow = null;
+            dialog.appendSingleButton(UiOptionItem.from(context.getString(R.string.ai_search_setup),
+                    context.getString(R.string.ai_search_setup_desc),
+                    option -> AiSearchSettingsPresenter.instance(context).show()));
+        }
 
         for (SettingEntry entry : picks) {
             OptionItem row = createRow(context, entry);
@@ -136,7 +308,7 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         List<SettingEntry> matches = new ArrayList<>(mMatches);
         matches.removeAll(picks);
 
-        if (picks.isEmpty()) {
+        if (matches.isEmpty() && picks.isEmpty() && (mProvider == null || mAnswer != null)) {
             dialog.appendSingleButton(note(context.getString(R.string.find_setting_none, mQuestion)));
         } else if (!matches.isEmpty()) {
             dialog.appendSingleButton(note(context.getString(R.string.find_setting_more)));
@@ -151,8 +323,9 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         }
 
         dialog.enableExpandable(false);
+        dialog.enableReplace(replace);
         dialog.setId(SEARCH_ID);
-        dialog.showDialog(context.getString(R.string.find_setting));
+        dialog.showDialog(context.getString(R.string.find_setting), this::disposeRequest);
     }
 
     private OptionItem createRow(Context context, SettingEntry entry) {
@@ -175,5 +348,38 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         UiOptionItem item = (UiOptionItem) UiOptionItem.from(text);
         item.setNote(true);
         return item;
+    }
+
+    private String getAiText(Context context) {
+        if (mError != null) {
+            return mError;
+        }
+
+        if (mAnswer == null) {
+            return context.getString(R.string.ai_search_asking, mProvider.title);
+        }
+
+        return mAnswer.reply;
+    }
+
+    /**
+     * @return null when there's none, or it was asked already
+     */
+    @Nullable
+    private String getFallbackModel(Context context, Throwable error) {
+        if (mFallbackModel != null || mProvider == null || mProvider.fallbackModel == null || !(error instanceof AiClient.AiException)
+                || ((AiClient.AiException) error).kind != AiClient.ErrorKind.SERVER) {
+            return null;
+        }
+
+        String model = AiSearchData.instance(context).getModel(mProvider);
+        String fallback = mProvider.fallbackModel.equals(model) ? mProvider.defaultModel : mProvider.fallbackModel;
+
+        return fallback != null && !fallback.equals(model) ? fallback : null;
+    }
+
+    private void disposeRequest() {
+        RxHelper.disposeActions(mRequest);
+        mRequest = null;
     }
 }
