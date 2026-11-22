@@ -660,6 +660,9 @@
   <string name="copy_playlist_to_youtube">Copia a YouTube</string>
   <string name="copied_to_youtube">S\'ha copiat a YouTube</string>
   <string name="export_playlists">Exporta les llistes de reproducció</string>
+  <string name="playlists_on_youtube">Llistes de reproducció a YouTube</string>
+  <string name="playlists_on_this_device">Llistes de reproducció en aquest dispositiu</string>
+  <string name="on_this_device">En aquest dispositiu</string>
   <string name="import_playlists">Importa llistes de reproducció</string>
   <string name="import_to_device">Importa a aquest dispositiu</string>
   <string name="import_to_youtube">Importa a YouTube</string>

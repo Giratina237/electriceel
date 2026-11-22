@@ -402,6 +402,9 @@
   <string name="copy_playlist_to_youtube">Kopiraj v YouTube</string>
   <string name="copied_to_youtube">Kopirano v YouTube</string>
   <string name="export_playlists">Izvozi sezname predvajanja</string>
+  <string name="playlists_on_youtube">Seznami predvajanja v YouTubu</string>
+  <string name="playlists_on_this_device">Seznami predvajanja v tej napravi</string>
+  <string name="on_this_device">V tej napravi</string>
   <string name="import_playlists">Uvozi sezname predvajanja</string>
   <string name="import_to_device">Uvozi v to napravo</string>
   <string name="import_to_youtube">Uvozi v YouTube</string>

@@ -657,6 +657,9 @@
   <string name="copy_playlist_to_youtube">کپی در YouTube</string>
   <string name="copied_to_youtube">در YouTube کپی شد</string>
   <string name="export_playlists">برون‌بری فهرست‌های پخش</string>
+  <string name="playlists_on_youtube">فهرست‌های پخش در YouTube</string>
+  <string name="playlists_on_this_device">فهرست‌های پخش در این دستگاه</string>
+  <string name="on_this_device">در این دستگاه</string>
   <string name="import_playlists">درون‌ریزی فهرست‌های پخش</string>
   <string name="import_to_device">درون‌ریزی به این دستگاه</string>
   <string name="import_to_youtube">درون‌ریزی به YouTube</string>

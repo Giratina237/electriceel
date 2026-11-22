@@ -660,6 +660,9 @@
     <string name="copy_playlist_to_youtube">Kopijuoti į YouTube</string>
     <string name="copied_to_youtube">Nukopijuota į YouTube</string>
     <string name="export_playlists">Eksportuoti grojaraščius</string>
+    <string name="playlists_on_youtube">YouTube grojaraščiai</string>
+    <string name="playlists_on_this_device">Grojaraščiai šiame įrenginyje</string>
+    <string name="on_this_device">Šiame įrenginyje</string>
     <string name="import_playlists">Importuoti grojaraščius</string>
     <string name="import_to_device">Importuoti į šį įrenginį</string>
     <string name="import_to_youtube">Importuoti į YouTube</string>

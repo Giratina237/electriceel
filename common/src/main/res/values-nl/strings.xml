@@ -688,6 +688,9 @@
   <string name="copy_playlist_to_youtube">Naar YouTube kopiëren</string>
   <string name="copied_to_youtube">Naar YouTube gekopieerd</string>
   <string name="export_playlists">Afspeellijsten exporteren</string>
+  <string name="playlists_on_youtube">Afspeellijsten op YouTube</string>
+  <string name="playlists_on_this_device">Afspeellijsten op dit apparaat</string>
+  <string name="on_this_device">Op dit apparaat</string>
   <string name="import_playlists">Afspeellijsten importeren</string>
   <string name="import_to_device">Naar dit apparaat importeren</string>
   <string name="import_to_youtube">Naar YouTube importeren</string>

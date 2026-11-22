@@ -687,6 +687,9 @@
   <string name="copy_playlist_to_youtube">Copiar a YouTube</string>
   <string name="copied_to_youtube">Copiada a YouTube</string>
   <string name="export_playlists">Exportar as listas de reprodución</string>
+  <string name="playlists_on_youtube">Listaxes de reprodución en YouTube</string>
+  <string name="playlists_on_this_device">Listaxes de reprodución neste dispositivo</string>
+  <string name="on_this_device">Neste dispositivo</string>
   <string name="import_playlists">Importar listas de reprodución</string>
   <string name="import_to_device">Importar a este dispositivo</string>
   <string name="import_to_youtube">Importar a YouTube</string>

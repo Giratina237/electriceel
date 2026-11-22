@@ -58,6 +58,7 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.HomeRowsData.Row;
 import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SectionFilterData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
+import com.liskovsoft.youtubeapi.service.YouTubeMediaItemService;
 import com.liskovsoft.youtubeapi.service.internal.MediaServiceData;
 
 import java.util.ArrayList;
@@ -1052,6 +1053,10 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
                         mediaGroup.getRowKind() == MediaGroup.ROW_KIND_SHORTS ? R.string.history_shorts : R.string.history_videos));
             } else if (section.getId() == MediaGroup.TYPE_MY_VIDEOS && videoGroup.isShorts()) {
                 videoGroup.setTitle(getContext().getString(R.string.my_shorts));
+            } else if (section.getId() == MediaGroup.TYPE_USER_PLAYLISTS && YouTubeMediaItemService.instance().isKeptOnDevice(mediaGroup)) {
+                // Apart from one on YouTube of the same title: they're separate playlists
+                videoGroup.setTitle(String.format("%s %s %s", videoGroup.getTitle(), Video.TERTIARY_TEXT_DELIM,
+                        getContext().getString(R.string.on_this_device)));
             }
 
             // Named after the channel, the subscription group, or Subscriptions
@@ -1105,6 +1110,22 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
         return row.title;
     }
 
+    /**
+     * The cards of the playlists kept on this device in the Playlists section say so: one on YouTube may have the same title, and
+     * they're separate playlists
+     */
+    private void markKeptOnDevice(BrowseSection section, VideoGroup group) {
+        if (section.getId() != MediaGroup.TYPE_USER_PLAYLISTS || group.getVideos() == null) {
+            return;
+        }
+
+        for (Video video : group.getVideos()) {
+            if (video.mediaItem != null && YouTubeMediaItemService.instance().isKeptOnDevice(video.mediaItem)) {
+                video.secondTitle = getContext().getString(R.string.on_this_device);
+            }
+        }
+    }
+
     private void updateVideoGrid(BrowseSection section, Observable<MediaGroup> group, int column) {
         disposeActions();
 
@@ -1144,6 +1165,7 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
                             }
 
                             VideoGroup videoGroup = VideoGroup.from(baseGroup, mediaGroup);
+                            markKeptOnDevice(section, videoGroup);
                             // The grid of History with Hide Shorts History: the videos watched here, its shorts hidden too
                             appendLocalHistory(videoGroup, false, videoGroup.isEmpty());
                             getView().updateSection(videoGroup);

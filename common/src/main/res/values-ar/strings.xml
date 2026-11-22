@@ -666,6 +666,9 @@
   <string name="copy_playlist_to_youtube">نسخ إلى YouTube</string>
   <string name="copied_to_youtube">تم النسخ إلى YouTube</string>
   <string name="export_playlists">تصدير قوائم التشغيل</string>
+  <string name="playlists_on_youtube">قوائم التشغيل على YouTube</string>
+  <string name="playlists_on_this_device">قوائم التشغيل على هذا الجهاز</string>
+  <string name="on_this_device">على هذا الجهاز</string>
   <string name="import_playlists">استيراد قوائم التشغيل</string>
   <string name="import_to_device">استيراد إلى هذا الجهاز</string>
   <string name="import_to_youtube">استيراد إلى YouTube</string>

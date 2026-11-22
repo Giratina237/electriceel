@@ -706,6 +706,9 @@
     <string name="copy_playlist_to_youtube">Kopēt uz YouTube</string>
     <string name="copied_to_youtube">Nokopēts uz YouTube</string>
     <string name="export_playlists">Eksportēt atskaņošanas sarakstus</string>
+    <string name="playlists_on_youtube">Atskaņošanas saraksti YouTube</string>
+    <string name="playlists_on_this_device">Atskaņošanas saraksti šajā ierīcē</string>
+    <string name="on_this_device">Šajā ierīcē</string>
     <string name="import_playlists">Importēt atskaņošanas sarakstus</string>
     <string name="import_to_device">Importēt šajā ierīcē</string>
     <string name="import_to_youtube">Importēt YouTube</string>

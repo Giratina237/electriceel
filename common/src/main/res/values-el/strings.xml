@@ -659,6 +659,9 @@
   <string name="copy_playlist_to_youtube">Αντιγραφή στο YouTube</string>
   <string name="copied_to_youtube">Αντιγράφηκε στο YouTube</string>
   <string name="export_playlists">Εξαγωγή λιστών αναπαραγωγής</string>
+  <string name="playlists_on_youtube">Λίστες αναπαραγωγής στο YouTube</string>
+  <string name="playlists_on_this_device">Λίστες αναπαραγωγής σε αυτή τη συσκευή</string>
+  <string name="on_this_device">Σε αυτή τη συσκευή</string>
   <string name="import_playlists">Εισαγωγή λιστών αναπαραγωγής</string>
   <string name="import_to_device">Εισαγωγή σε αυτή τη συσκευή</string>
   <string name="import_to_youtube">Εισαγωγή στο YouTube</string>

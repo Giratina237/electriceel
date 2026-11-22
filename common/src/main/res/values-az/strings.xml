@@ -705,6 +705,9 @@
     <string name="copy_playlist_to_youtube">YouTube-a köçür</string>
     <string name="copied_to_youtube">YouTube-a köçürüldü</string>
     <string name="export_playlists">Pleylistləri ixrac et</string>
+    <string name="playlists_on_youtube">YouTube-dakı pleylistlər</string>
+    <string name="playlists_on_this_device">Bu cihazdakı pleylistlər</string>
+    <string name="on_this_device">Bu cihazda</string>
     <string name="import_playlists">Pleylistləri idxal et</string>
     <string name="import_to_device">Bu cihaza idxal et</string>
     <string name="import_to_youtube">YouTube-a idxal et</string>

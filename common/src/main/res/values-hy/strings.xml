@@ -704,6 +704,9 @@
     <string name="copy_playlist_to_youtube">Պատճենել YouTube</string>
     <string name="copied_to_youtube">Պատճենվեց YouTube</string>
     <string name="export_playlists">Արտահանել նվագացանկերը</string>
+    <string name="playlists_on_youtube">Երգացանկեր YouTube-ում</string>
+    <string name="playlists_on_this_device">Երգացանկեր այս սարքում</string>
+    <string name="on_this_device">Այս սարքում</string>
     <string name="import_playlists">Ներմուծել նվագացանկեր</string>
     <string name="import_to_device">Ներմուծել այս սարք</string>
     <string name="import_to_youtube">Ներմուծել YouTube</string>

@@ -703,6 +703,9 @@
     <string name="copy_playlist_to_youtube">YouTube にコピー</string>
     <string name="copied_to_youtube">YouTube にコピーしました</string>
     <string name="export_playlists">再生リストをエクスポート</string>
+    <string name="playlists_on_youtube">YouTube の再生リスト</string>
+    <string name="playlists_on_this_device">このデバイスの再生リスト</string>
+    <string name="on_this_device">このデバイス上</string>
     <string name="import_playlists">再生リストをインポート</string>
     <string name="import_to_device">このデバイスにインポート</string>
     <string name="import_to_youtube">YouTube にインポート</string>

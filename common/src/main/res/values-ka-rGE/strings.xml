@@ -708,6 +708,9 @@
   <string name="copy_playlist_to_youtube">YouTube-ში კოპირება</string>
   <string name="copied_to_youtube">დაკოპირდა YouTube-ში</string>
   <string name="export_playlists">ფლეილისტების ექსპორტი</string>
+  <string name="playlists_on_youtube">ფლეილისტები YouTube-ზე</string>
+  <string name="playlists_on_this_device">ფლეილისტები ამ მოწყობილობაზე</string>
+  <string name="on_this_device">ამ მოწყობილობაზე</string>
   <string name="import_playlists">ფლეილისტების იმპორტი</string>
   <string name="import_to_device">ამ მოწყობილობაზე იმპორტი</string>
   <string name="import_to_youtube">YouTube-ში იმპორტი</string>

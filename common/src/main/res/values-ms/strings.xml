@@ -710,6 +710,9 @@
     <string name="copy_playlist_to_youtube">Salin ke YouTube</string>
     <string name="copied_to_youtube">Disalin ke YouTube</string>
     <string name="export_playlists">Eksport senarai main</string>
+    <string name="playlists_on_youtube">Senarai main di YouTube</string>
+    <string name="playlists_on_this_device">Senarai main pada peranti ini</string>
+    <string name="on_this_device">Pada peranti ini</string>
     <string name="import_playlists">Import senarai main</string>
     <string name="import_to_device">Import ke peranti ini</string>
     <string name="import_to_youtube">Import ke YouTube</string>

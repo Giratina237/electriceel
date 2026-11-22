@@ -703,6 +703,9 @@
     <string name="copy_playlist_to_youtube">คัดลอกไปยัง YouTube</string>
     <string name="copied_to_youtube">คัดลอกไปยัง YouTube แล้ว</string>
     <string name="export_playlists">ส่งออกเพลย์ลิสต์</string>
+    <string name="playlists_on_youtube">เพลย์ลิสต์บน YouTube</string>
+    <string name="playlists_on_this_device">เพลย์ลิสต์บนอุปกรณ์นี้</string>
+    <string name="on_this_device">บนอุปกรณ์นี้</string>
     <string name="import_playlists">นำเข้าเพลย์ลิสต์</string>
     <string name="import_to_device">นำเข้าไปยังอุปกรณ์นี้</string>
     <string name="import_to_youtube">นำเข้าไปยัง YouTube</string>

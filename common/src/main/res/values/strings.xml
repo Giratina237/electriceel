@@ -720,6 +720,9 @@
     <string name="copy_playlist_to_youtube">Copy to YouTube</string>
     <string name="copied_to_youtube">Copied to YouTube</string>
     <string name="export_playlists">Export playlists</string>
+    <string name="playlists_on_youtube">Playlists on YouTube</string>
+    <string name="playlists_on_this_device">Playlists on this device</string>
+    <string name="on_this_device">On this device</string>
     <string name="import_playlists">Import playlists</string>
     <string name="import_to_device">Import to this device</string>
     <string name="import_to_youtube">Import to YouTube</string>

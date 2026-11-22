@@ -591,6 +591,9 @@
     <string name="copy_playlist_to_youtube">Копирај на YouTube</string>
     <string name="copied_to_youtube">Копирано на YouTube</string>
     <string name="export_playlists">Извези листе пуштања</string>
+    <string name="playlists_on_youtube">Плејлисте на YouTube-у</string>
+    <string name="playlists_on_this_device">Плејлисте на овом уређају</string>
+    <string name="on_this_device">На овом уређају</string>
     <string name="import_playlists">Увези листе пуштања</string>
     <string name="import_to_device">Увези на овај уређај</string>
     <string name="import_to_youtube">Увези на YouTube</string>

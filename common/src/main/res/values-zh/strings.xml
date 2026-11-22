@@ -685,6 +685,9 @@
   <string name="copy_playlist_to_youtube">复制到 YouTube</string>
   <string name="copied_to_youtube">已复制到 YouTube</string>
   <string name="export_playlists">导出播放列表</string>
+  <string name="playlists_on_youtube">YouTube 上的播放列表</string>
+  <string name="playlists_on_this_device">此设备上的播放列表</string>
+  <string name="on_this_device">此设备上</string>
   <string name="import_playlists">导入播放列表</string>
   <string name="import_to_device">导入到此设备</string>
   <string name="import_to_youtube">导入到 YouTube</string>

@@ -705,6 +705,9 @@
   <string name="copy_playlist_to_youtube">Kopiera till YouTube</string>
   <string name="copied_to_youtube">Kopierad till YouTube</string>
   <string name="export_playlists">Exportera spellistor</string>
+  <string name="playlists_on_youtube">Spellistor på YouTube</string>
+  <string name="playlists_on_this_device">Spellistor på den här enheten</string>
+  <string name="on_this_device">På den här enheten</string>
   <string name="import_playlists">Importera spellistor</string>
   <string name="import_to_device">Importera till den här enheten</string>
   <string name="import_to_youtube">Importera till YouTube</string>

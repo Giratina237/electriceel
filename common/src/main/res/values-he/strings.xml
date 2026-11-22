@@ -710,6 +710,9 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="copy_playlist_to_youtube">העתקה ל-YouTube</string>
     <string name="copied_to_youtube">הועתק ל-YouTube</string>
     <string name="export_playlists">ייצוא פלייליסטים</string>
+    <string name="playlists_on_youtube">פלייליסטים ב-YouTube</string>
+    <string name="playlists_on_this_device">פלייליסטים במכשיר זה</string>
+    <string name="on_this_device">במכשיר זה</string>
     <string name="import_playlists">ייבוא פלייליסטים</string>
     <string name="import_to_device">ייבוא למכשיר זה</string>
     <string name="import_to_youtube">ייבוא ל-YouTube</string>

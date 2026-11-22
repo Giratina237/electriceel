@@ -708,6 +708,9 @@
     <string name="copy_playlist_to_youtube">Kopier til YouTube</string>
     <string name="copied_to_youtube">Kopiert til YouTube</string>
     <string name="export_playlists">Eksporter spillelister</string>
+    <string name="playlists_on_youtube">Spillelister på YouTube</string>
+    <string name="playlists_on_this_device">Spillelister på denne enheten</string>
+    <string name="on_this_device">På denne enheten</string>
     <string name="import_playlists">Importer spillelister</string>
     <string name="import_to_device">Importer til denne enheten</string>
     <string name="import_to_youtube">Importer til YouTube</string>

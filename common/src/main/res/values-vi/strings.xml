@@ -381,6 +381,9 @@
   <string name="copy_playlist_to_youtube">Sao chép lên YouTube</string>
   <string name="copied_to_youtube">Đã sao chép lên YouTube</string>
   <string name="export_playlists">Xuất danh sách phát</string>
+  <string name="playlists_on_youtube">Danh sách phát trên YouTube</string>
+  <string name="playlists_on_this_device">Danh sách phát trên thiết bị này</string>
+  <string name="on_this_device">Trên thiết bị này</string>
   <string name="import_playlists">Nhập danh sách phát</string>
   <string name="import_to_device">Nhập vào thiết bị này</string>
   <string name="import_to_youtube">Nhập lên YouTube</string>

@@ -706,6 +706,9 @@
     <string name="copy_playlist_to_youtube">YouTubeకు కాపీ చేయండి</string>
     <string name="copied_to_youtube">YouTubeకు కాపీ చేయబడింది</string>
     <string name="export_playlists">ప్లేజాబితాలను ఎగుమతి చేయండి</string>
+    <string name="playlists_on_youtube">YouTubeలోని ప్లేజాబితాలు</string>
+    <string name="playlists_on_this_device">ఈ పరికరంలోని ప్లేజాబితాలు</string>
+    <string name="on_this_device">ఈ పరికరంలో</string>
     <string name="import_playlists">ప్లేజాబితాలను దిగుమతి చేయండి</string>
     <string name="import_to_device">ఈ పరికరానికి దిగుమతి చేయండి</string>
     <string name="import_to_youtube">YouTubeకు దిగుమతి చేయండి</string>

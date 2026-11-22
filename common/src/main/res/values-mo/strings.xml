@@ -714,6 +714,9 @@
     <string name="copy_playlist_to_youtube">Copiază pe YouTube</string>
     <string name="copied_to_youtube">Copiată pe YouTube</string>
     <string name="export_playlists">Exportă listele de redare</string>
+    <string name="playlists_on_youtube">Liste de redare pe YouTube</string>
+    <string name="playlists_on_this_device">Liste de redare pe acest dispozitiv</string>
+    <string name="on_this_device">Pe acest dispozitiv</string>
     <string name="import_playlists">Importă liste de redare</string>
     <string name="import_to_device">Importă pe acest dispozitiv</string>
     <string name="import_to_youtube">Importă pe YouTube</string>

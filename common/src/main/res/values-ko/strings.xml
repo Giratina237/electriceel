@@ -685,6 +685,9 @@
   <string name="copy_playlist_to_youtube">YouTube에 복사</string>
   <string name="copied_to_youtube">YouTube에 복사됨</string>
   <string name="export_playlists">재생목록 내보내기</string>
+  <string name="playlists_on_youtube">YouTube의 재생목록</string>
+  <string name="playlists_on_this_device">이 기기의 재생목록</string>
+  <string name="on_this_device">이 기기</string>
   <string name="import_playlists">재생목록 가져오기</string>
   <string name="import_to_device">이 기기로 가져오기</string>
   <string name="import_to_youtube">YouTube로 가져오기</string>

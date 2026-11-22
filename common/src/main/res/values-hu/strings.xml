@@ -661,6 +661,9 @@
   <string name="copy_playlist_to_youtube">Másolás a YouTube-ra</string>
   <string name="copied_to_youtube">Átmásolva a YouTube-ra</string>
   <string name="export_playlists">Videólisták exportálása</string>
+  <string name="playlists_on_youtube">Videólisták a YouTube-on</string>
+  <string name="playlists_on_this_device">Videólisták ezen az eszközön</string>
+  <string name="on_this_device">Ezen az eszközön</string>
   <string name="import_playlists">Videólisták importálása</string>
   <string name="import_to_device">Importálás erre az eszközre</string>
   <string name="import_to_youtube">Importálás a YouTube-ra</string>

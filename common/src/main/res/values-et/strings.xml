@@ -681,6 +681,9 @@
   <string name="copy_playlist_to_youtube">Kopeeri YouTube\'i</string>
   <string name="copied_to_youtube">Kopeeritud YouTube\'i</string>
   <string name="export_playlists">Ekspordi esitusloendid</string>
+  <string name="playlists_on_youtube">Esitusloendid YouTube\'is</string>
+  <string name="playlists_on_this_device">Esitusloendid selles seadmes</string>
+  <string name="on_this_device">Selles seadmes</string>
   <string name="import_playlists">Impordi esitusloendid</string>
   <string name="import_to_device">Impordi sellesse seadmesse</string>
   <string name="import_to_youtube">Impordi YouTube\'i</string>

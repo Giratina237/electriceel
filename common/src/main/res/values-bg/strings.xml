@@ -676,6 +676,9 @@
   <string name="copy_playlist_to_youtube">Копиране в YouTube</string>
   <string name="copied_to_youtube">Копирано в YouTube</string>
   <string name="export_playlists">Експортиране на плейлисти</string>
+  <string name="playlists_on_youtube">Плейлисти в YouTube</string>
+  <string name="playlists_on_this_device">Плейлисти на това устройство</string>
+  <string name="on_this_device">На това устройство</string>
   <string name="import_playlists">Импортиране на плейлисти</string>
   <string name="import_to_device">Импортиране на това устройство</string>
   <string name="import_to_youtube">Импортиране в YouTube</string>

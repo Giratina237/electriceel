@@ -687,6 +687,9 @@
   <string name="copy_playlist_to_youtube">Kopjo në YouTube</string>
   <string name="copied_to_youtube">U kopjua në YouTube</string>
   <string name="export_playlists">Eksporto listat e luajtjes</string>
+  <string name="playlists_on_youtube">Listat e luajtjes në YouTube</string>
+  <string name="playlists_on_this_device">Listat e luajtjes në këtë pajisje</string>
+  <string name="on_this_device">Në këtë pajisje</string>
   <string name="import_playlists">Importo listat e luajtjes</string>
   <string name="import_to_device">Importo në këtë pajisje</string>
   <string name="import_to_youtube">Importo në YouTube</string>

@@ -649,6 +649,9 @@
   <string name="copy_playlist_to_youtube">Kopioi YouTubeen</string>
   <string name="copied_to_youtube">Kopioitu YouTubeen</string>
   <string name="export_playlists">Vie soittolistat</string>
+  <string name="playlists_on_youtube">Soittolistat YouTubessa</string>
+  <string name="playlists_on_this_device">Soittolistat tässä laitteessa</string>
+  <string name="on_this_device">Tässä laitteessa</string>
   <string name="import_playlists">Tuo soittolistat</string>
   <string name="import_to_device">Tuo tähän laitteeseen</string>
   <string name="import_to_youtube">Tuo YouTubeen</string>

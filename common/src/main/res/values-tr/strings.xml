@@ -705,6 +705,9 @@
     <string name="copy_playlist_to_youtube">YouTube\'a kopyala</string>
     <string name="copied_to_youtube">YouTube\'a kopyalandı</string>
     <string name="export_playlists">Oynatma listelerini dışa aktar</string>
+    <string name="playlists_on_youtube">YouTube\'daki oynatma listeleri</string>
+    <string name="playlists_on_this_device">Bu cihazdaki oynatma listeleri</string>
+    <string name="on_this_device">Bu cihazda</string>
     <string name="import_playlists">Oynatma listelerini içe aktar</string>
     <string name="import_to_device">Bu cihaza içe aktar</string>
     <string name="import_to_youtube">YouTube\'a içe aktar</string>

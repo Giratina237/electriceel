@@ -709,6 +709,9 @@
     <string name="copy_playlist_to_youtube">Kopírovat na YouTube</string>
     <string name="copied_to_youtube">Zkopírováno na YouTube</string>
     <string name="export_playlists">Exportovat playlisty</string>
+    <string name="playlists_on_youtube">Playlisty na YouTube</string>
+    <string name="playlists_on_this_device">Playlisty v tomto zařízení</string>
+    <string name="on_this_device">V tomto zařízení</string>
     <string name="import_playlists">Importovat playlisty</string>
     <string name="import_to_device">Importovat do tohoto zařízení</string>
     <string name="import_to_youtube">Importovat na YouTube</string>
