@@ -96,6 +96,11 @@ public final class VideoStart {
      */
     public static final String OUTCOME_UNPLAYABLE = "unplayable";
     /**
+     * A live stream or a premiere that hasn't begun: nothing to play yet. It was recorded as unplayable, with no why (6ABPRYGH: one
+     * opened from the suggestions).
+     */
+    public static final String OUTCOME_UPCOMING = "upcoming";
+    /**
      * Ready to play and paused (by the user, or started so) 15 s after the user's action, not played: timed till it was ready. It was
      * recorded as given up, as if it were stuck.
      */

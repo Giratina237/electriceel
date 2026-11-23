@@ -12,7 +12,9 @@ import java.util.Map;
  * The client a video was moved to after the one it came from refused it (e.g. TV's SABR answering sabr.no_video_selected, see
  * ErrorFixerController#applySabrProtocolErrorAction): opened again, it's asked of that one first, in this run and the next ones, for
  * a week. That video's only: the others go by the order (89HAAW4J, XWR8QQN7, F0SVV9N8: one video refused by TV in four runs, relearned
- * each time in 4-7 s, while TV played the other videos).
+ * each time in 4-7 s, while TV played the other videos). Remembered once the video played on it, and forgotten once another client's
+ * formats are the video's (see VideoLoaderController): H8ZP1GPV was sent to TV_SAMSUNG, remembered as it was picked, which answered 503
+ * to every segment, then and when the video was opened again.
  */
 public final class VideoClientPicks {
     private static final String PREFS = "video_client_picks";
@@ -66,6 +68,17 @@ public final class VideoClientPicks {
         }
 
         editor.apply();
+    }
+
+    /**
+     * It failed the video (see VideoLoaderController): the order's clients again
+     */
+    public static synchronized void forget(@Nullable Context context, String videoId) {
+        if (context == null || videoId == null) {
+            return;
+        }
+
+        getPrefs(context).edit().remove(videoId).apply();
     }
 
     /**

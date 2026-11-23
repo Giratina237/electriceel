@@ -372,6 +372,80 @@ public class PlaybackHealthTest {
     }
 
     /**
+     * YHN2G3G9 #1: a start resumed at 20:20 dropped 124 of 136 frames in its first 0.8 s, none in the 10 s after. Its decoder caught up
+     * to the position it was sent to, as after a seek's resume.
+     */
+    @Test
+    public void dropsOfAStartSentToAPositionAreItsCatchUp() {
+        startDropping(true, true);
+
+        assertTrue(mFound.toString(), mFound.isEmpty());
+    }
+
+    /**
+     * The same with the seek and the start before the format's first sample (it may come 500 ms after the source was prepared)
+     */
+    @Test
+    public void dropsOfAStartSentToAPositionBeforeItsFirstSampleAreItsCatchUp() {
+        startDropping(true, false);
+
+        assertTrue(mFound.toString(), mFound.isEmpty());
+    }
+
+    /**
+     * The same drops of a start from where it begins: nothing to catch up on
+     */
+    @Test
+    public void dropsOfAStartFromTheBeginningAreFrameDrops() {
+        startDropping(false, true);
+
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_FRAME_DROPS), mFound);
+    }
+
+    /**
+     * A seek of the video before (e.g. left right after one) isn't this start's
+     */
+    @Test
+    public void aSeekBeforeThePrepareIsntTheStartsCatchUp() {
+        mHealth.onSeek(mSample.nowMs);
+        startDropping(false, true);
+
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_FRAME_DROPS), mFound);
+    }
+
+    /**
+     * As YHN2G3G9 #1: prepared, sent to the position or not, 124 of 136 frames dropped in the first 0.8 s it plays, then none in 10 s
+     *
+     * @param isSampledFirst the format's first sample before the seek and the start, else after
+     */
+    private void startDropping(boolean isSentToPosition, boolean isSampledFirst) {
+        mSample.isVideoRendered = true;
+        mSample.attempt = 2;
+        mHealth.onPrepare();
+        mSample.isPlaying = false;
+
+        if (isSampledFirst) {
+            tick(500, 0, 0, 0);
+        } else {
+            mSample.nowMs += 500;
+        }
+
+        if (isSentToPosition) {
+            mHealth.onSeek(mSample.nowMs);
+        }
+
+        mSample.nowMs += 700;
+        mSample.isPlaying = true;
+        mHealth.onStarted(mSample.nowMs);
+        tick(400, 400, 6, 62);
+        tick(400, 400, 12, 124);
+
+        for (int i = 1; i <= 10; i++) {
+            tick(1_000, 1_000, 12 + i * 28, 124);
+        }
+    }
+
+    /**
      * As #19: paused 7.5 s (the window holds little playing), sent elsewhere the given time before it plays again (-1 for not), then
      * 44 dropped and 26 shown in 1.5 s, then none dropped
      */
@@ -736,7 +810,7 @@ public class PlaybackHealthTest {
         assertEquals(1, mHealth.getResumeTrail().size());
 
         mHealth.onInterrupted(PlaybackHealth.RESUMED_BY_PAUSE);
-        mHealth.onStarted();
+        mHealth.onStarted(mSample.nowMs);
         tick(500, 500, 3, 0);
         assertTrue(mHealth.getResumeTrail().isEmpty());
 

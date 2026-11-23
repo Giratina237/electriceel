@@ -176,6 +176,11 @@ public class VideoLoaderController extends BasePlayerController {
      */
     private String mKnownPickVideoId;
     /**
+     * The client the video was moved to (see pickNextClientForVideo), remembered for it once it plays there (see confirmClientPick)
+     */
+    private String mPendingPick;
+    private String mPendingPickVideoId;
+    /**
      * The formats came from another client than the one picked, said once (see showPickedClientFallback)
      */
     private boolean mIsPickedClientFallbackShown;
@@ -400,6 +405,7 @@ public class VideoLoaderController extends BasePlayerController {
     @Override
     public void onPlay() {
         Video video = getVideo();
+        confirmClientPick(video);
 
         // Streams given for no longer than that: the ones fetched again would be as close to expiring, fetched again at their start, and
         // so on. Only their last minutes then, as before.
@@ -729,8 +735,11 @@ public class VideoLoaderController extends BasePlayerController {
         VideoStarts.onFormats(getVideo().videoId, getClientName(formatInfo), formatInfo.getCreatedTimeMs());
         getVideo().sync(formatInfo);
 
+        // Of the formats before, the same video's (e.g. a reload's) or another's
+        String previousClient = getFormatClient();
         mFormatVideoId = getVideo().videoId;
         mFormatClient = getClientName(formatInfo);
+        forgetFailedClientPick(getVideo(), previousClient, mFormatClient);
         mFormatProtocol = null;
         setStreamsExpireTime(formatInfo);
         showPickedClientFallback(formatInfo);
@@ -817,6 +826,8 @@ public class VideoLoaderController extends BasePlayerController {
                 // Not started yet: a reload when it does is all there is to do
                 if (!isUpcoming(formatInfo)) {
                     failure.action("reload_video").record();
+                } else {
+                    VideoStarts.onUpcoming(getVideo().videoId);
                 }
 
                 String reason = formatInfo.getPlayabilityReason();
@@ -974,8 +985,8 @@ public class VideoLoaderController extends BasePlayerController {
 
     /**
      * The video playing is refused by the client its formats came from (e.g. TV's SABR, see ErrorFixerController): its formats are
-     * asked of the client the order has after that one, for this video only, and remembered for when it's opened again (see
-     * VideoClientPicks). The other videos play on the order's first client. The caller reloads it.
+     * asked of the client the order has after that one, for this video only, and remembered for when it's opened again once it plays
+     * there (see VideoClientPicks, confirmClientPick). The other videos play on the order's first client. The caller reloads it.
      *
      * @return the client picked, null with no other one to pick (e.g. the order has one client)
      */
@@ -995,11 +1006,71 @@ public class VideoLoaderController extends BasePlayerController {
         }
 
         String next = order.get((index + 1) % order.size());
-        VideoClientPicks.remember(getContext(), video.videoId, next);
+        mPendingPick = next;
+        mPendingPickVideoId = video.videoId;
         YouTubeServiceManager.instance().pickClient(video.videoId, next);
         mKnownPickVideoId = video.videoId;
 
         return next;
+    }
+
+    /**
+     * The video plays on the client it was moved to (see pickNextClientForVideo): remembered for it now, not as it was picked, when it
+     * may fail it too (H8ZP1GPV: TV_SAMSUNG answered 503 to every segment, and was asked first again when the video was reopened)
+     */
+    private void confirmClientPick(@Nullable Video video) {
+        if (video == null || mPendingPick == null || !Helpers.equals(video.videoId, mPendingPickVideoId)
+                || !mPendingPick.equals(getFormatClient())) {
+            return;
+        }
+
+        VideoClientPicks.remember(getContext(), video.videoId, mPendingPick);
+        mPendingPick = null;
+        mPendingPickVideoId = null;
+    }
+
+    /**
+     * The client remembered for the video (see VideoClientPicks) failed it, and isn't asked first again: asked, it didn't give the
+     * formats (it refused it, or gave none), or the video played on it and its formats are another client's now (its segments failed,
+     * and the error fixer moved on). Not when the user picked the client for it, nor for formats of another client it wasn't asked for
+     * (e.g. fetched ahead as the next video).
+     *
+     * @param previousClient of the formats before, the video's when it's reloaded (see getFormatClient)
+     */
+    private void forgetFailedClientPick(Video video, @Nullable String previousClient, @Nullable String client) {
+        if (video.videoId == null || client == null || video.videoId.equals(mPickedClientVideoId)) {
+            return;
+        }
+
+        String remembered = VideoClientPicks.get(getContext(), video.videoId);
+
+        if (remembered == null || remembered.equals(client)) {
+            return;
+        }
+
+        if (remembered.equals(previousClient) || hasFailedOn(video.videoId, remembered)) {
+            Log.d(TAG, "%s was moved to %s before, which failed it: asked of the order's clients again", video.videoId, remembered);
+            VideoClientPicks.forget(getContext(), video.videoId);
+        }
+    }
+
+    /**
+     * The fetch of the video's formats asked the client, which didn't give them (see ClientAttempts)
+     */
+    private static boolean hasFailedOn(String videoId, String client) {
+        List<ClientAttempts.Attempt> attempts = ClientAttempts.get(videoId);
+
+        if (attempts == null) {
+            return false;
+        }
+
+        for (ClientAttempts.Attempt attempt : attempts) {
+            if (client.equals(attempt.client) && !ClientAttempts.RESULT_OK.equals(attempt.result)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

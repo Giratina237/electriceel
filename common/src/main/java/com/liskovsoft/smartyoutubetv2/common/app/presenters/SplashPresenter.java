@@ -103,7 +103,6 @@ public class SplashPresenter extends BasePresenter<SplashView> {
     private void runOnceTasks() {
         if (!sRunOnce) {
             sRunOnce = true;
-            RxHelper.setupGlobalErrorHandler();
             initGlobalPrefs();
             initLocaleData();
             initHideContentData();

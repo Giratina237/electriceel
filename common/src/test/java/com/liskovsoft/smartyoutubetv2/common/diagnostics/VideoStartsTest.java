@@ -22,6 +22,7 @@ import static com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStartFixtur
 import static com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStartFixture.stages;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -839,6 +840,23 @@ public class VideoStartsTest {
     }
 
     /**
+     * 6ABPRYGH: a live stream that hadn't begun, opened from the suggestions, was recorded as unplayable, with no why. It's upcoming,
+     * recorded however soon: the protocol none after it doesn't make it unplayable.
+     */
+    @Test
+    public void anUpcomingStartIsRecordedAsSuch() {
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(600);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+        VideoStarts.onUpcoming(VIDEO_ID);
+        VideoStarts.onProtocol(null);
+
+        assertEquals(1, mFixture.recorded.size());
+        assertEquals(VideoStart.OUTCOME_UPCOMING, last().outcome);
+    }
+
+    /**
      * Found unplayable at once (e.g. a live stream's answer with nothing to play from): the app's outcome, not a skip, so recorded
      */
     @Test
@@ -1543,7 +1561,8 @@ public class VideoStartsTest {
 
     /**
      * K067TC3S, MqrcTLfOLKo: the run's first video loaded a new player itself for 12 s, and nothing said whether the warm-up had run.
-     * Its first start says which warm-ups began before it ended, in its time; the next ones say nothing of them.
+     * Its first start says which warm-ups began before it ended, in its time. One still going then is in the next starts too (see
+     * aWarmUpStillGoingEndsInTheNextStart).
      */
     @Test
     public void theRunsFirstStartSaysWhichWarmUpsRan() throws Exception {
@@ -1577,11 +1596,60 @@ public class VideoStartsTest {
         assertFalse(going.getJSONArray("steps").getJSONObject(0).has("endMs"));
         assertFalse(going.getJSONArray("steps").getJSONObject(0).has("result"));
 
+    }
+
+    /**
+     * Every warm-up had ended by the run's first start's end: the next starts say nothing of them
+     */
+    @Test
+    public void warmUpsThatEndedAreOnlyInTheFirstStart() throws Exception {
+        mFixture.warmUps.add(new WarmUps.Run(T0 - 9_400, T0 - 6_100, Collections.singletonList(
+                new WarmUps.Step("player data", T0 - 9_400, T0 - 6_950, "ready"))));
+
+        assertEquals(1, mFixture.slowStart().warmUps.size());
+
         VideoStart next = mFixture.slowStart();
 
         assertFalse(next.isFirstOfRun);
         assertNull(next.warmUps);
         assertFalse(next.toJson().has("warmUps"));
+    }
+
+    /**
+     * QJVVSYS7: the run's first start gave up at 15 s, waiting for the warm-up's player preprocess, still going then; when it ended was
+     * in no record. The next start has the warm-ups, as they are by its end; the one after, nothing of them.
+     */
+    @Test
+    public void aWarmUpStillGoingEndsInTheNextStart() throws Exception {
+        mFixture.warmUps.add(new WarmUps.Run(T0 - 82_000, WarmUps.OPEN, Collections.singletonList(
+                new WarmUps.Step("player data", T0 - 82_000, WarmUps.OPEN, null))));
+
+        assertTrue(mFixture.slowStart().warmUps.get(0).isOpen());
+
+        mFixture.warmUps.clear();
+        mFixture.warmUps.add(new WarmUps.Run(T0 - 82_000, T0 + 13_000, Collections.singletonList(
+                new WarmUps.Step("player data", T0 - 82_000, T0 + 13_000, "ready"))));
+        VideoStart next = mFixture.slowStart();
+
+        assertFalse(next.isFirstOfRun);
+        assertEquals(13_000, next.warmUps.get(0).endMs);
+        assertEquals(13_000, next.toJson().getJSONArray("warmUps").getJSONObject(0).getJSONArray("steps").getJSONObject(0).getLong("endMs"));
+        assertNull(mFixture.slowStart().warmUps);
+    }
+
+    /**
+     * One that never ends isn't in every start: the three after the first at most
+     */
+    @Test
+    public void aWarmUpThatNeverEndsIsFollowedThreeStarts() throws Exception {
+        mFixture.warmUps.add(new WarmUps.Run(T0 - 1_000, WarmUps.OPEN, Collections.emptyList()));
+        mFixture.slowStart();
+
+        for (int i = 0; i < 3; i++) {
+            assertNotNull(mFixture.slowStart().warmUps);
+        }
+
+        assertNull(mFixture.slowStart().warmUps);
     }
 
     /**

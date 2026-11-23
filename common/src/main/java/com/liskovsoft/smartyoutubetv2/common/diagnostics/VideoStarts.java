@@ -14,6 +14,7 @@ import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.RendererReadiness;
 import com.google.android.exoplayer2.source.sabr.parser.SabrStream;
+import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
@@ -271,6 +272,13 @@ public final class VideoStarts {
      */
     @VisibleForTesting
     static WarmUpSource sWarmUps = WarmUps::snapshot;
+    /**
+     * The starts after the run's first that have its warm-ups too, as they are then: one still going when it was recorded (e.g. a
+     * player's first preprocess, still going 95 s on when QJVVSYS7's first start gave up at 15 s) ends in a later one's (see build).
+     * At most this many: one that never ends isn't in every start.
+     */
+    private static final int MAX_WARM_UP_FOLLOW_UPS = 3;
+    private static int sWarmUpFollowUps;
     /**
      * Where the device is at, for a start that never played (see DeviceCapabilities#buildStartState)
      */
@@ -937,6 +945,16 @@ public final class VideoStarts {
     }
 
     /**
+     * The formats are of a live stream or a premiere that hasn't begun (see VideoLoaderController#isUpcoming): the start ends, with
+     * nothing to play yet
+     */
+    public static void onUpcoming(String videoId) {
+        if (getTimer(videoId) != null) {
+            abandon(VideoStart.OUTCOME_UPCOMING);
+        }
+    }
+
+    /**
      * How the formats are played, e.g. sabr (see PlayerFailure#PROTOCOL_SABR). Null for none: the video can't be played.
      */
     public static void onProtocol(@Nullable String protocol) {
@@ -1402,8 +1420,8 @@ public final class VideoStarts {
             return;
         }
 
-        // Unplayable is the app's own outcome, not the user skipping it
-        if (now - timer.t0 < MIN_ABANDONED_MS && !VideoStart.OUTCOME_UNPLAYABLE.equals(outcome)) {
+        // Unplayable (or not begun) is the app's own outcome, not the user skipping it
+        if (now - timer.t0 < MIN_ABANDONED_MS && !Helpers.equalsAny(outcome, VideoStart.OUTCOME_UNPLAYABLE, VideoStart.OUTCOME_UPCOMING)) {
             Log.d(TAG, "Video start %s after %d ms: %s", outcome, now - timer.t0, timer.videoId);
             return;
         }
@@ -1587,8 +1605,14 @@ public final class VideoStarts {
             stages.add(new VideoStart.Stage(STAGE_FIRST_FRAME, null, 0, frameMs, frameMs));
         }
 
-        // Whether the run's first video found ready what the warm-up was to get ready, or the warm-up never ran
-        List<VideoStart.WarmUp> warmUps = timer.isFirstOfRun && !isLookedAt ? buildWarmUps(timer, endMs) : null;
+        // Whether the run's first video found ready what the warm-up was to get ready, or the warm-up never ran. Still going then, when
+        // it ended is in the next starts'.
+        boolean isWarmUpFollowUp = !timer.isFirstOfRun && sWarmUpFollowUps > 0;
+        List<VideoStart.WarmUp> warmUps = (timer.isFirstOfRun || isWarmUpFollowUp) && !isLookedAt ? buildWarmUps(timer, endMs) : null;
+
+        if (warmUps != null) {
+            sWarmUpFollowUps = !hasOpen(warmUps) ? 0 : timer.isFirstOfRun ? MAX_WARM_UP_FOLLOW_UPS : sWarmUpFollowUps - 1;
+        }
         // E.g. starved of memory
         JSONObject state = !isReady && !isLookedAt ? sState.get() : null;
 
@@ -1625,6 +1649,22 @@ public final class VideoStarts {
         }
 
         return result;
+    }
+
+    private static boolean hasOpen(List<VideoStart.WarmUp> warmUps) {
+        for (VideoStart.WarmUp warmUp : warmUps) {
+            if (warmUp.isOpen()) {
+                return true;
+            }
+
+            for (VideoStart.WarmUpStep step : warmUp.steps) {
+                if (step.isOpen()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     @Nullable
@@ -1866,6 +1906,7 @@ public final class VideoStarts {
         sRecorder = VideoStarts::save;
         sFramesRecorder = VideoStarts::saveFrames;
         sWarmUps = WarmUps::snapshot;
+        sWarmUpFollowUps = 0;
         sState = VideoStarts::getState;
     }
 }

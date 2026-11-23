@@ -24,6 +24,7 @@ import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowActivityManager.ApplicationExitInfoBuilder;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -84,6 +85,63 @@ public class AppExitsTest {
         assertTrue(written, written.contains("\"videoId\":\"playing\""));
         assertTrue(written, written.contains("\"thread\":\"worker\""));
         assertTrue(written, written.contains("Boom"));
+    }
+
+    /**
+     * Past the root cause's first frames, which may all be a library's (53M2PA8E: OkHttp's call cancelled): the bottom of its stack,
+     * where the thread ran it from, and the top of what it was thrown as
+     */
+    @Test
+    public void aCrashKeepsHowItCameToCrash() throws Exception {
+        IOException root = new IOException("Canceled");
+        root.setStackTrace(frames("okhttp3.RealCall", 40));
+        IllegalStateException error = new IllegalStateException(root);
+        error.setStackTrace(frames("io.reactivex.plugins.RxJavaPlugins", 15));
+
+        AppExits.recordCrash(getContext(), new Thread("pool-2-thread-6"), error);
+
+        String[] lines = new String(Files.readAllBytes(new File(mFolder.getRoot(), PlayerFailureLog.CURRENT).toPath()),
+                StandardCharsets.UTF_8).trim().split("\n");
+        JSONArray stack = new JSONObject(lines[lines.length - 1]).getJSONObject("error").getJSONArray("stack");
+        List<String> expected = new ArrayList<>();
+
+        for (int i = 0; i < 20; i++) {
+            expected.add(frame("okhttp3.RealCall", i));
+        }
+
+        expected.add("... 12 more");
+
+        for (int i = 32; i < 40; i++) {
+            expected.add(frame("okhttp3.RealCall", i));
+        }
+
+        expected.add("--- thrown as IllegalStateException");
+
+        for (int i = 0; i < 12; i++) {
+            expected.add(frame("io.reactivex.plugins.RxJavaPlugins", i));
+        }
+
+        List<String> actual = new ArrayList<>();
+
+        for (int i = 0; i < stack.length(); i++) {
+            actual.add(stack.getString(i));
+        }
+
+        assertEquals(expected, actual);
+    }
+
+    private static StackTraceElement[] frames(String className, int count) {
+        StackTraceElement[] result = new StackTraceElement[count];
+
+        for (int i = 0; i < count; i++) {
+            result[i] = new StackTraceElement(className, "m" + i, "F.java", i + 1);
+        }
+
+        return result;
+    }
+
+    private static String frame(String className, int index) {
+        return new StackTraceElement(className, "m" + index, "F.java", index + 1).toString();
     }
 
     @Test

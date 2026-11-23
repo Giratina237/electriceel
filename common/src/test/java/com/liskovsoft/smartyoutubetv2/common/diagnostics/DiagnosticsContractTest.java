@@ -329,7 +329,8 @@ public class DiagnosticsContractTest {
 
         // Waiting is a look at a start going on: never recorded
         assertEquals(new HashSet<>(Arrays.asList(VideoStart.OUTCOME_PLAYED, VideoStart.OUTCOME_GAVE_UP, VideoStart.OUTCOME_LEFT,
-                VideoStart.OUTCOME_REPLACED, VideoStart.OUTCOME_UNPLAYABLE, VideoStart.OUTCOME_PAUSED)), schemaOutcomes);
+                VideoStart.OUTCOME_REPLACED, VideoStart.OUTCOME_UNPLAYABLE, VideoStart.OUTCOME_PAUSED, VideoStart.OUTCOME_UPCOMING)),
+                schemaOutcomes);
     }
 
     private void recordEveryKind() throws Exception {

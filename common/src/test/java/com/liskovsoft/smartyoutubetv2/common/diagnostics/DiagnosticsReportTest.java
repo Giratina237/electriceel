@@ -361,6 +361,32 @@ public class DiagnosticsReportTest {
     }
 
     @Test
+    public void videoIdsNamedInTheRecordsAreLeftOutWhenNotIncluded() throws Exception {
+        // A lock wait names the video whose fetch it waited for, one no start was recorded for too (SKCS2PB6)
+        VideoStartLog.useForTesting(mFolder.getRoot()).record(new VideoStart(NOW, "aaaaaaaaaaa", VideoStart.TRIGGER_OPEN, true, 5_000,
+                "TV", "sabr", false, 2_500, Arrays.asList(
+                        new VideoStart.Stage("lock wait", "fetch 06cF1xPpRYY, 103 ms in", 1, 0, 103),
+                        new VideoStart.Stage("lock wait", "next video's prefetch -MFigmQupa8, abandoned, 9 ms in", 1, 103, 112),
+                        new VideoStart.Stage("lock wait", "fetch bbbbbbbbbbb, 40 ms in", 1, 112, 152),
+                        new VideoStart.Stage("player JS", "translation languages", 1, 152, 200))));
+        getDebuggingData().setVideoIdsIncluded(false);
+
+        JSONObject report = build(null, 0, failures("bbbbbbbbbbb"));
+        JSONArray stages = report.getJSONArray("videoStarts").getJSONObject(0).getJSONArray("stages");
+        String json = report.toString();
+
+        for (String id : Arrays.asList("aaaaaaaaaaa", "bbbbbbbbbbb", "06cF1xPpRYY", "-MFigmQupa8")) {
+            assertFalse(id + " in " + json, json.contains(id));
+        }
+
+        assertEquals("fetch <video>, 103 ms in", stages.getJSONObject(0).getString("detail"));
+        assertEquals("next video's prefetch <video>, abandoned, 9 ms in", stages.getJSONObject(1).getString("detail"));
+        assertEquals("fetch <video>, 40 ms in", stages.getJSONObject(2).getString("detail"));
+        // Not an id: no record has it and no lock holder's before it
+        assertEquals("translation languages", stages.getJSONObject(3).getString("detail"));
+    }
+
+    @Test
     public void theAccountNumbersStayTheSame() throws Exception {
         Account first = account("A", null, "Profile_A");
         Account second = account("B", null, "Profile_B");

@@ -78,6 +78,7 @@ import okhttp3.Protocol;
 import okhttp3.Request;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
 @RunWith(RobolectricTestRunner.class)
@@ -431,6 +432,70 @@ public class ErrorFixerControllerTest {
         assertEquals(Arrays.asList("client_for_video:TV_SAMSUNG", "reload_video"), getActions(event));
         assertEquals("init, video 248, audio 140, selected none, session 1", event.getJSONObject("details").getString("sabrRequest"));
         assertEquals(400, event.getJSONObject("details").getLong("sabrSessionAgeMs"));
+    }
+
+    /**
+     * 0CW972QK: TV played the video between refusals, each one 38-95 ms into a session the stream had just swapped in. Played on the
+     * client since the refusal before, it's the stream's: a whole new one on the same client. Refused again before it plays, the client's.
+     */
+    @Test
+    public void aSabrErrorWithAFreshSessionAfterItPlayedStaysOnTheClientOnce() throws Exception {
+        TestController controller = new TestController(video("Hf-CqpBeDs0"), "TV");
+        controller.mNextClient = "TV_SAMSUNG";
+        controller.onPlay();
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofSeconds(15));
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(freshSessionRefusal(62)));
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(freshSessionRefusal(95)));
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("refetch_player", "reload_video"), getActions(events.get(0)));
+        assertTrue(events.get(0).getJSONObject("details").getBoolean("sabrPlayedOnClient"));
+        assertEquals(Arrays.asList("client_for_video:TV_SAMSUNG", "reload_video"), getActions(events.get(1)));
+    }
+
+    /**
+     * Played again in between, each refusal is the stream's again
+     */
+    @Test
+    public void aSabrErrorAfterEachPlayStaysOnTheClient() throws Exception {
+        TestController controller = new TestController(video("Hf-CqpBeDs0"), "TV");
+        controller.mNextClient = "TV_SAMSUNG";
+
+        for (int i = 0; i < 3; i++) {
+            controller.onPlay();
+            org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofSeconds(20));
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                    new UnexpectedLoaderException(freshSessionRefusal(70)));
+        }
+
+        for (JSONObject event : mLog.readAll()) {
+            assertEquals(Arrays.asList("refetch_player", "reload_video"), getActions(event));
+        }
+    }
+
+    /**
+     * Refused a moment after it began to play: its first answer only, it's the client's
+     */
+    @Test
+    public void aSabrErrorRightAfterItBeganToPlayMovesTheVideo() throws Exception {
+        TestController controller = new TestController(video("Hf-CqpBeDs0"), "TV");
+        controller.mNextClient = "TV_SAMSUNG";
+        controller.onPlay();
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofSeconds(2));
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(freshSessionRefusal(70)));
+
+        assertEquals(Arrays.asList("client_for_video:TV_SAMSUNG", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    private static SabrProtocolError freshSessionRefusal(long sessionAgeMs) {
+        SabrProtocolError error = new SabrProtocolError("sabr.no_video_selected", 2, SabrProtocolError.UNSET);
+        error.setRequest("init, video 248, audio 251, selected 251, session 1", sessionAgeMs);
+        return error;
     }
 
     /**
@@ -801,9 +866,30 @@ public class ErrorFixerControllerTest {
      */
     @Test
     public void unplayableOnEveryClientIsUnplayable() throws Exception {
+        ClientAttempts.clear("ended");
+        ClientAttempts.record("ended", ClientAttempts.Attempt.unplayable("TV", "UNPLAYABLE", "This live stream recording is not available."));
+        ClientAttempts.record("ended", ClientAttempts.Attempt.unplayable("WEB", "ERROR", "This video is unavailable"));
+        ClientAttempts.record("ended", ClientAttempts.Attempt.nullResponse("INNERTUBE"));
+        TestController controller = new TestController(video("ended"));
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals("unplayable", event.getString("kind"));
+        assertEquals("UNPLAYABLE", event.getJSONObject("playability").getString("status"));
+        assertEquals("This live stream recording is not available.", event.getJSONObject("playability").getString("reason"));
+        assertEquals("reload_video_30s", event.getJSONArray("actions").getString(0));
+    }
+
+    /**
+     * Every client said it's gone (BG2Y27G3: removed by the uploader): it won't be in 30 s either. Opened by the user, it stays with
+     * its why.
+     */
+    @Test
+    public void aVideoGoneOnEveryClientIsntTriedAgain() throws Exception {
         ClientAttempts.clear("removed");
-        ClientAttempts.record("removed", ClientAttempts.Attempt.unplayable("TV", "ERROR", "This video is unavailable"));
-        ClientAttempts.record("removed", ClientAttempts.Attempt.unplayable("WEB", "ERROR", "This video is unavailable"));
+        ClientAttempts.record("removed", ClientAttempts.Attempt.unplayable("TV", "ERROR", "This video has been removed by the uploader"));
+        ClientAttempts.record("removed", ClientAttempts.Attempt.unplayable("WEB", "ERROR", "Video unavailable"));
         ClientAttempts.record("removed", ClientAttempts.Attempt.nullResponse("INNERTUBE"));
         TestController controller = new TestController(video("removed"));
 
@@ -811,9 +897,41 @@ public class ErrorFixerControllerTest {
 
         JSONObject event = mLog.readAll().get(0);
         assertEquals("unplayable", event.getString("kind"));
-        assertEquals("ERROR", event.getJSONObject("playability").getString("status"));
-        assertEquals("This video is unavailable", event.getJSONObject("playability").getString("reason"));
-        assertEquals("reload_video_30s", event.getJSONArray("actions").getString(0));
+        assertEquals(Arrays.asList("gone_stay"), getActions(event));
+    }
+
+    /**
+     * Refused for the viewer's age (6ABPRYGH: every client, 5 opens, each tried again every 30 s): it won't play in 30 s either
+     */
+    @Test
+    public void anAgeGatedVideoIsntTriedAgain() throws Exception {
+        ClientAttempts.clear("adults");
+        ClientAttempts.record("adults", ClientAttempts.Attempt.unplayable("TV", "UNPLAYABLE",
+                "Sign in to your primary account to confirm your age."));
+        ClientAttempts.record("adults", ClientAttempts.Attempt.unplayable("WEB", "LOGIN_REQUIRED", "Sign in to confirm your age", false,
+                null, true));
+        ClientAttempts.record("adults", ClientAttempts.Attempt.unplayable("WEB_EMBED", "ERROR", "This video is unavailable"));
+        TestController controller = new TestController(video("adults"));
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        assertEquals(Arrays.asList("age_gated_stay"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * A client asked for a sign-in not for the age (a bot check, LOGIN_REQUIRED too): that may pass, it's tried again
+     */
+    @Test
+    public void anAgeGateWithABotCheckIsTriedAgain() throws Exception {
+        ClientAttempts.clear("botcheck");
+        ClientAttempts.record("botcheck", ClientAttempts.Attempt.unplayable("TV", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot"));
+        ClientAttempts.record("botcheck", ClientAttempts.Attempt.unplayable("WEB", "LOGIN_REQUIRED", "Sign in to confirm your age", false,
+                null, true));
+        TestController controller = new TestController(video("botcheck"));
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        assertEquals(Arrays.asList("reload_video_30s"), getActions(mLog.readAll().get(0)));
     }
 
     /**
@@ -1179,6 +1297,55 @@ public class ErrorFixerControllerTest {
         controller.onLongBuffering();
 
         assertEquals(Arrays.asList("reload_video"), getActions(mLog.readAll().get(1)));
+    }
+
+    /**
+     * 27XPFNZC #1, #2: AV1 1080p50 dropped frames on one video, then on the next, with decoders that declare 1080p60 (VP9 1080p50 had
+     * dropped none on that device). The first video's may be its own: nothing. The second plays another codec of its size.
+     */
+    @Test
+    public void framesDroppedOnACodecVideoAfterVideoTryAnotherCodec() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,30,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,30,vp9", false),
+                ExoFormatItem.fromVideoSpec("1280,720,30,av01", false));
+        Video video = video("1YKvmLD3QW4");
+        TestController controller = new TestController(video, formats, formats.get(0));
+        controller.onPlay();
+
+        dropFrames(controller);
+        video.videoId = "g1T4NT2f_dA";
+        dropFrames(controller);
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Collections.emptyList(), getActions(events.get(0)));
+        assertEquals(Arrays.asList("other_codec:vp9", "restart_engine"), getActions(events.get(1)));
+        assertEquals(1, controller.mRestarts.size());
+    }
+
+    /**
+     * The same video's drops again (e.g. after a reload) aren't another video's
+     */
+    @Test
+    public void framesDroppedAgainOnTheSameVideoDontTryAnotherCodec() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,30,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,30,vp9", false));
+        TestController controller = new TestController(video("1YKvmLD3QW4"), formats, formats.get(0));
+        controller.onPlay();
+
+        dropFrames(controller);
+        dropFrames(controller);
+
+        for (JSONObject event : mLog.readAll()) {
+            assertEquals(Collections.emptyList(), getActions(event));
+        }
+    }
+
+    private static void dropFrames(TestController controller) {
+        PlayerFailure failure = PlayerFailure.create(RuntimeEnvironment.getApplication(), PlaybackHealth.KIND_FRAME_DROPS);
+        controller.onHealthFailure(PlaybackHealth.KIND_FRAME_DROPS, failure);
+        failure.record();
     }
 
     /**

@@ -33,10 +33,14 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -46,6 +50,14 @@ import java.util.regex.Pattern;
 public final class DiagnosticsReport {
     public static final int SCHEMA = 1;
     private static final Pattern BUILDER_NAME = Pattern.compile("\\beng\\.[^.\\s]+");
+    /**
+     * A video id where one may be: an id of the report's records, or the one after a lock wait's holder, e.g. "fetch 06cF1xPpRYY, 103 ms
+     * in" or "next video's prefetch ..." (see FormatInfoWrapper#getLockHolder in MediaServiceCore), which may name a video none was
+     * recorded for
+     */
+    private static final Pattern VIDEO_ID = Pattern.compile("(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{11}(?![A-Za-z0-9_-])");
+    private static final Pattern LOCK_HOLDER_ID = Pattern.compile("\\b(fetch|prefetch) [A-Za-z0-9_-]{11}(?![A-Za-z0-9_-])");
+    private static final String NO_VIDEO_ID = "<video>";
 
     private DiagnosticsReport() {
     }
@@ -109,13 +121,14 @@ public final class DiagnosticsReport {
             result.put("device", DeviceCapabilities.build(context));
 
             boolean includeVideoIds = debuggingData.isVideoIdsIncluded();
+
+            if (!includeVideoIds) {
+                removeVideoIds(failures, videoStarts);
+            }
+
             JSONArray failuresJson = new JSONArray();
 
             for (JSONObject failure : failures) {
-                if (!includeVideoIds) {
-                    failure.remove("videoId");
-                }
-
                 failuresJson.put(failure);
             }
 
@@ -132,15 +145,10 @@ public final class DiagnosticsReport {
         }
 
         try {
-            // Every video started, and where the time went (see VideoStarts)
-            boolean includeVideoIds = debuggingData.isVideoIdsIncluded();
+            // Every video started, and where the time went (see VideoStarts). Without video ids, they were removed with the failures'.
             JSONArray videoStartsJson = new JSONArray();
 
             for (JSONObject start : videoStarts) {
-                if (!includeVideoIds) {
-                    start.remove("videoId");
-                }
-
                 videoStartsJson.put(start);
             }
 
@@ -150,6 +158,97 @@ public final class DiagnosticsReport {
         }
 
         return result;
+    }
+
+    /**
+     * The video ids left out (see DebuggingData#isVideoIdsIncluded): each record's own, and wherever a record's text names one, e.g. a
+     * start's lock wait waiting for "fetch 06cF1xPpRYY" (SKCS2PB6 sent that with video ids off)
+     */
+    @VisibleForTesting
+    static void removeVideoIds(List<JSONObject> failures, List<JSONObject> videoStarts) {
+        Set<String> ids = new HashSet<>();
+
+        for (List<JSONObject> records : Arrays.asList(failures, videoStarts)) {
+            for (JSONObject record : records) {
+                Object id = record.remove("videoId");
+
+                if (id instanceof String) {
+                    ids.add((String) id);
+                }
+            }
+        }
+
+        for (List<JSONObject> records : Arrays.asList(failures, videoStarts)) {
+            for (JSONObject record : records) {
+                removeVideoIds(record, ids);
+            }
+        }
+    }
+
+    private static void removeVideoIds(JSONObject json, Set<String> ids) {
+        JSONArray names = json.names();
+
+        for (int i = 0; names != null && i < names.length(); i++) {
+            String name = names.optString(i);
+            Object value = json.opt(name);
+            Object scrubbed = removeVideoIdsOf(value, ids);
+
+            if (scrubbed != value) {
+                try {
+                    json.put(name, scrubbed);
+                } catch (JSONException e) {
+                    // Not for a string
+                }
+            }
+        }
+    }
+
+    /**
+     * @return the value itself when it names no video
+     */
+    private static Object removeVideoIdsOf(Object value, Set<String> ids) {
+        if (value instanceof JSONObject) {
+            removeVideoIds((JSONObject) value, ids);
+        } else if (value instanceof JSONArray) {
+            JSONArray array = (JSONArray) value;
+
+            for (int i = 0; i < array.length(); i++) {
+                Object item = array.opt(i);
+                Object scrubbed = removeVideoIdsOf(item, ids);
+
+                if (scrubbed != item) {
+                    try {
+                        array.put(i, scrubbed);
+                    } catch (JSONException e) {
+                        // Not for a string
+                    }
+                }
+            }
+        } else if (value instanceof String) {
+            String text = (String) value;
+            String result = LOCK_HOLDER_ID.matcher(text).replaceAll("$1 " + NO_VIDEO_ID);
+            Matcher matcher = VIDEO_ID.matcher(result);
+            StringBuffer buffer = null;
+
+            while (matcher.find()) {
+                if (ids.contains(matcher.group())) {
+                    if (buffer == null) {
+                        buffer = new StringBuffer();
+                    }
+
+                    matcher.appendReplacement(buffer, NO_VIDEO_ID);
+                }
+            }
+
+            if (buffer != null) {
+                matcher.appendTail(buffer);
+                result = buffer.toString();
+            }
+
+            return result.equals(text) ? value : result;
+        }
+
+        return value;
     }
 
     /**

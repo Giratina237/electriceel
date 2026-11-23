@@ -600,14 +600,25 @@ public final class PlaybackHealth {
         mNoFrameMs = 0;
         mFrozenMs = 0;
         mClockStillMs = 0;
+        // The seeks and the catch up of the source before. Not when the format tried changes (see #reset): its first sample may come
+        // after the start's seek, or after it played.
+        mSeekMs = -1;
+        mCatchUpEndMs = -1;
+        mCatchUpDropped = -1;
     }
 
     /**
-     * It plays for the first time since the player was prepared: the start (see #getStartTrail)
+     * It plays for the first time since the player was prepared: the start (see #getStartTrail). Sent to a position before (e.g. a
+     * resume, see VideoStateController#restorePosition), its decoder catches up to it as after a seek's resume (see #onResumed):
+     * YHN2G3G9 dropped 124 of 136 frames in the first 0.8 s of a start resumed at 20:20, none after.
      */
-    public void onStarted() {
+    public void onStarted(long nowMs) {
         mInterruption = null;
         endResume();
+
+        if (mSeekMs >= 0) {
+            startCatchUp(nowMs);
+        }
     }
 
     /**
@@ -623,9 +634,13 @@ public final class PlaybackHealth {
         // Its decoder catches up from the new position: what the renderer drops meanwhile isn't frames it can't keep up with. 1440p60
         // VP9 dropped 44 of 76 frames in the 1.35 s after a seek's resume, 12 in the 47 s before.
         if (mSeekMs >= 0 && nowMs - mSeekMs <= SEEK_RESUME_MS) {
-            mCatchUpEndMs = nowMs + CATCH_UP_MS;
-            mCatchUpDropped = -1;
+            startCatchUp(nowMs);
         }
+    }
+
+    private void startCatchUp(long nowMs) {
+        mCatchUpEndMs = nowMs + CATCH_UP_MS;
+        mCatchUpDropped = -1;
     }
 
     /**
@@ -785,9 +800,6 @@ public final class PlaybackHealth {
         mClockStillMs = 0;
         mIsStartClockStill = false;
         mIsClockStuck = false;
-        mCatchUpEndMs = -1;
-        mCatchUpDropped = -1;
-        mSeekMs = -1;
         mFrames.clear();
         mPlayedMs = 0;
         mSoundBuffersSilent = -1;

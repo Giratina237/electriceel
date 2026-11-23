@@ -42,6 +42,20 @@ public class VideoClientPicksTest {
         assertNull(VideoClientPicks.get(getContext(), "another"));
     }
 
+    /**
+     * The client failed the video (H8ZP1GPV: TV_SAMSUNG answered 503 to every segment): that video's only
+     */
+    @Test
+    public void aClientThatFailedItIsForgotten() {
+        VideoClientPicks.remember(getContext(), "Hf-CqpBeDs0", "TV_SAMSUNG");
+        VideoClientPicks.remember(getContext(), "another", "VISIONOS");
+
+        VideoClientPicks.forget(getContext(), "Hf-CqpBeDs0");
+
+        assertNull(VideoClientPicks.get(getContext(), "Hf-CqpBeDs0"));
+        assertEquals("VISIONOS", VideoClientPicks.get(getContext(), "another"));
+    }
+
     @Test
     public void aWeekOnItsForgotten() {
         VideoClientPicks.remember(getContext(), "t4P-Axqv6GA", "TV_SAMSUNG");

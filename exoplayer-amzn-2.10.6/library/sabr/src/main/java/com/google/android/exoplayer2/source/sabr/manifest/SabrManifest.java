@@ -131,6 +131,20 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
      */
     private long sessionStartMs = -1;
     /**
+     * How the session in use came, one of the SESSION_ constants (see describeRequest). A refusal 38-95 ms into a new session
+     * (0CW972QK, H8ZP1GPV) didn't come again with sessions the app asked for in a burst of seeks on the emulator (2026-11-23): the
+     * server's asks, with their reload token, were the difference left.
+     */
+    private volatile String sessionOrigin = SESSION_FIRST;
+    /**
+     * Of the session being asked for (see requestSessionRefresh)
+     */
+    private String pendingSessionOrigin;
+    static final String SESSION_FIRST = "first";
+    static final String SESSION_ASKED = "server-asked";
+    static final String SESSION_ASKED_WITH_TOKEN = "server-asked with a token";
+    static final String SESSION_REFETCHED = "refetched";
+    /**
      * When the new session being asked for was (SystemClock#elapsedRealtime), -1 for none
      */
     private long sessionRefreshStartMs = -1;
@@ -382,6 +396,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
             Log.d(TAG, "Asking for a new session of %s", videoId);
             sessionRefreshStartMs = nowMs;
+            pendingSessionOrigin = reloadPlaybackToken != null && !reloadPlaybackToken.isEmpty() ? SESSION_ASKED_WITH_TOKEN : SESSION_ASKED;
             refresher = sessionRefresher;
             refreshedSessionId = sessionId;
         }
@@ -438,6 +453,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         }
 
         refreshSession(session.serverAbrStreamingUrl, session.videoPlaybackUstreamerConfig, session.poToken);
+        sessionOrigin = pendingSessionOrigin != null ? pendingSessionOrigin : SESSION_ASKED;
 
         return true;
     }
@@ -485,6 +501,8 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
         sessionId++;
         sessionStartMs = SystemClock.elapsedRealtime();
+        // Asked for by the server, it's set after this (see onSessionRefreshed)
+        sessionOrigin = SESSION_REFETCHED;
         // The requests waiting for a new session (see requestSessionRefresh) go on with this one: the one asked for is dropped when it
         // comes (see onSessionRefreshed)
         sessionRefreshStartMs = -1;
@@ -612,7 +630,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
                 .setStreamerContext(createStreamerContext(trackType))
                 .build();
 
-        lastRequests.put(trackType, describeRequest(request, isInit, getSessionId()));
+        lastRequests.put(trackType, describeRequest(request, isInit, getSessionId(), sessionOrigin));
 
         return request;
     }
@@ -633,14 +651,21 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
     }
 
     /**
-     * The formats a request names, for a refusal's diagnostics: e.g. "init, video 248, audio 251:drc, selected none, session 1"
+     * The formats a request names, for a refusal's diagnostics: e.g. "init, video 248, audio 251:drc, selected none, session 1 (server-asked)"
      */
-    static String describeRequest(VideoPlaybackAbrRequest request, boolean isInit, int sessionId) {
+    static String describeRequest(VideoPlaybackAbrRequest request, boolean isInit, int sessionId, String sessionOrigin) {
         return (isInit ? "init" : "media")
                 + ", video " + describeFormats(request.getPreferredVideoFormatIdsList())
                 + ", audio " + describeFormats(request.getPreferredAudioFormatIdsList())
                 + ", selected " + describeFormats(request.getSelectedFormatIdsList())
-                + ", session " + sessionId;
+                + ", session " + sessionId + " (" + sessionOrigin + ")";
+    }
+
+    /**
+     * How the session in use came: first, server-asked (with a token or not), or refetched (see describeRequest)
+     */
+    public String getSessionOrigin() {
+        return sessionOrigin;
     }
 
     private static String describeFormats(List<FormatId> formats) {

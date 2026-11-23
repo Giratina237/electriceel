@@ -512,7 +512,7 @@ public class ExoPlayerController implements Player.EventListener {
     private void onHealthPlaying() {
         if (!mHasPlayedSource) {
             mHasPlayedSource = true;
-            mHealth.onStarted();
+            mHealth.onStarted(SystemClock.elapsedRealtime());
             return;
         }
 
