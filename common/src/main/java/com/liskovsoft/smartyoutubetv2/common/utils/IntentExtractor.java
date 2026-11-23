@@ -3,6 +3,8 @@ package com.liskovsoft.smartyoutubetv2.common.utils;
 import android.content.Intent;
 import android.net.Uri;
 
+import androidx.annotation.Nullable;
+
 import com.liskovsoft.sharedutils.helpers.GlobalConstants;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.querystringparser.UrlQueryString;
@@ -37,6 +39,7 @@ public class IntentExtractor {
     private static final String MY_VIDEOS_URL = "https://www.youtube.com/tv#/zylon-surface?c=FEmy_videos"; // last 'resume' param isn't parsed by intent and should be removed
     private static final String PLAYLIST_KEY = "list";
     private static final String VND_SCHEME = "vnd.youtube"; // vnd.youtube://8kKDjRmHp0g
+    private static final String ACTIVATE_PATH_SEGMENT = "activate";
     private static final Pattern timePattern = Pattern.compile("(\\d+)([A-Za-z]{0,2})");
     private static final Pattern voiceQueryPattern = Pattern.compile(":\\{\"query\":\"([^\"]*)\"");
 
@@ -47,7 +50,7 @@ public class IntentExtractor {
 
         Uri uri = extractUri(intent);
 
-        if (extractVoiceQuery(uri) != null) {
+        if (extractVoiceQuery(uri) != null || isSignInUri(uri)) {
             return null;
         }
 
@@ -168,6 +171,19 @@ public class IntentExtractor {
         UrlQueryString parser = UrlQueryStringFactory.parse(extractUri(intent));
 
         return parser.get(PLAYLIST_KEY);
+    }
+
+    /**
+     * A page to sign in a device with its code: the activation page (https://yt.be/activate, youtube.com/tv/activate), or the app's
+     * own sign-in QR code, https://youtube.com/qr/activate/&lt;code&gt; (see YTSignInPresenter). Not a video: its code, e.g.
+     * NWF-WSH-NVF, is 11 characters, and was played as one (4Z0TV6X2 #1, #2).
+     */
+    public static boolean isSignInUrl(Intent intent) {
+        return !isEmptyIntent(intent) && isSignInUri(extractUri(intent));
+    }
+
+    private static boolean isSignInUri(@Nullable Uri uri) {
+        return uri != null && uri.getPathSegments() != null && uri.getPathSegments().contains(ACTIVATE_PATH_SEGMENT);
     }
 
     private static boolean isValid(String videoId) {

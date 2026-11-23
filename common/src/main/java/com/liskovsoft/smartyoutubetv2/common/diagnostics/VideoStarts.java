@@ -1637,7 +1637,7 @@ public final class VideoStarts {
 
                 for (WarmUps.Step step : run.steps) {
                     steps.add(new VideoStart.WarmUpStep(step.name, step.startMs - timer.t0,
-                            step.isOpen() ? VideoStart.WarmUp.OPEN : step.endMs - timer.t0, step.result));
+                            step.isOpen() ? VideoStart.WarmUp.OPEN : step.endMs - timer.t0, step.result, step.detail));
                 }
 
                 result.add(new VideoStart.WarmUp(run.startMs - timer.t0, run.isOpen() ? VideoStart.WarmUp.OPEN : run.endMs - timer.t0,

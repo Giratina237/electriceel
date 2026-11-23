@@ -5,6 +5,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.BrokenPartError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
@@ -30,7 +31,11 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.FrameDropCodecs;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorManager;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
@@ -78,6 +83,7 @@ import okhttp3.Protocol;
 import okhttp3.Request;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -1253,6 +1259,280 @@ public class ErrorFixerControllerTest {
 
         assertEquals(Arrays.asList("live_end_check", "reload_video"), getActions(events.get(0)));
         assertEquals(1, controller.mMetadataLoads);
+    }
+
+    /**
+     * 97MSK8B6 #2, #4: TV_SAMSUNG's and VISIONOS's DASH answered 503 while the video played, and the client switched for every video
+     * after it. The next client for this video only.
+     */
+    @Test
+    public void aServerErrorWhilePlayingMovesTheVideoToTheNextClient() throws Exception {
+        TestController controller = new TestController(video("Hf-CqpBeDs0"), "TV_SAMSUNG");
+        controller.mNextClient = "VISIONOS";
+        controller.onPlay();
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new InvalidResponseCodeException(503, "Service Unavailable", Collections.emptyMap(), dataSpec()));
+
+        assertEquals(Arrays.asList("client_for_video:VISIONOS", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * Before it played too: the server's, not the client's poToken or n parameter
+     */
+    @Test
+    public void aServerErrorBeforePlayingMovesTheVideoToTheNextClient() throws Exception {
+        TestController controller = new TestController(video("fC86OVoSVJc"), "TV_DOWNGRADED");
+        controller.mNextClient = "WEB";
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new InvalidResponseCodeException(503, "Service Unavailable", Collections.emptyMap(),
+                        dataSpec())));
+
+        assertEquals(Arrays.asList("client_for_video:WEB", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * No other client to pick (e.g. the order has one): switched as before
+     */
+    @Test
+    public void aServerErrorWithNoClientToPickSwitchesTheClient() throws Exception {
+        TestController controller = new TestController(video("Hf-CqpBeDs0"), "TV");
+        controller.onPlay();
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new InvalidResponseCodeException(503, "Service Unavailable", Collections.emptyMap(), dataSpec()));
+
+        assertEquals(Arrays.asList("switch_next_client", "reload_video"), getActions(mLog.readAll().get(0)));
+    }
+
+    @Test
+    public void aServerErrorIsAnHttp5xx() {
+        assertTrue(ErrorFixerController.isServerError(new InvalidResponseCodeException(500, null, Collections.emptyMap(), dataSpec())));
+        assertTrue(ErrorFixerController.isServerError(new IOException(new InvalidResponseCodeException(503, null, Collections.emptyMap(),
+                dataSpec()))));
+        assertFalse(ErrorFixerController.isServerError(new InvalidResponseCodeException(403, null, Collections.emptyMap(), dataSpec())));
+        assertFalse(ErrorFixerController.isServerError(new InvalidResponseCodeException(429, null, Collections.emptyMap(), dataSpec())));
+        assertFalse(ErrorFixerController.isServerError(new IOException("Response code: 503")));
+        assertFalse(ErrorFixerController.isServerError(null));
+    }
+
+    /**
+     * 7QAT714C #1: 4K at 9.9 Mbps of an 18 Mbps format, the first stall's reload didn't play in 5 s. Its loads came slower than it plays
+     * and none failed: the next size down at the first stall.
+     */
+    @Test
+    public void theFirstStallOnAConnectionTooSlowLowersTheQuality() throws Exception {
+        try {
+            playingAt(18_006_000, 9_885);
+            TestController controller = new TestController(video("0N4ujc0HJus"), QUALITIES, QUALITIES.get(0));
+            controller.onPlay();
+
+            controller.onLongBuffering();
+
+            assertEquals(Arrays.asList("lower_quality", "restart_engine"), getActions(mLog.readAll().get(0)));
+            assertLowered(getPlayerData().getTempVideoFormat());
+        } finally {
+            FormatAttempts.end(RuntimeEnvironment.getApplication());
+        }
+    }
+
+    /**
+     * Its loads came faster than it plays: the connection stopped answering, reloaded as before
+     */
+    @Test
+    public void theFirstStallOnAConnectionFastEnoughReloads() throws Exception {
+        try {
+            playingAt(18_006_000, 30_000);
+            TestController controller = new TestController(video("0N4ujc0HJus"), QUALITIES, QUALITIES.get(0));
+            controller.onPlay();
+
+            controller.onLongBuffering();
+
+            assertEquals(Arrays.asList("reload_video"), getActions(mLog.readAll().get(0)));
+            assertEquals(null, getPlayerData().getTempVideoFormat());
+        } finally {
+            FormatAttempts.end(RuntimeEnvironment.getApplication());
+        }
+    }
+
+    /**
+     * Too slow, and a load failed on its connection: the connection's, not the format's
+     */
+    @Test
+    public void theFirstStallTooSlowWithAConnectionErrorDoesntLowerTheQuality() throws Exception {
+        try {
+            playingAt(18_006_000, 9_885);
+            TestController controller = new TestController(video("0N4ujc0HJus"), QUALITIES, QUALITIES.get(0));
+            controller.onPlay();
+            long nowMs = SystemClock.elapsedRealtime();
+            LoadErrors.onLoadError(nowMs - 1_000, nowMs, C.DATA_TYPE_MEDIA, C.TRACK_TYPE_VIDEO,
+                    new HttpDataSourceException(new SocketTimeoutException("timeout"), dataSpec(), HttpDataSourceException.TYPE_READ));
+
+            controller.onLongBuffering();
+
+            assertEquals(null, getPlayerData().getTempVideoFormat());
+        } finally {
+            FormatAttempts.end(RuntimeEnvironment.getApplication());
+        }
+    }
+
+    /**
+     * 7QAT714C #2: a private video, every client asked for a sign-in, VISIONOS too, which had played another video 10 min before. The
+     * video's, not a bot check of the session: it stays, not tried every 30 s.
+     */
+    @Test
+    public void aSignInAskedForByTheClientThatJustPlayedIsLasting() throws Exception {
+        ClientAttempts.clear("bzi_LJTPFi0");
+        ClientAttempts.record("bzi_LJTPFi0", ClientAttempts.Attempt.unplayable("TV", "LOGIN_REQUIRED", "This video is private"));
+        ClientAttempts.record("bzi_LJTPFi0", ClientAttempts.Attempt.unplayable("VISIONOS", "LOGIN_REQUIRED", "Please sign in"));
+        ClientAttempts.record("bzi_LJTPFi0", ClientAttempts.Attempt.unplayable("WEB", "LOGIN_REQUIRED", "Private video"));
+        Video video = video("s26AHc0b_l4");
+        TestController controller = new TestController(video, "VISIONOS");
+        controller.onPlay();
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofMinutes(10));
+        video.videoId = "bzi_LJTPFi0";
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        assertEquals(Arrays.asList("sign_in_stay"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * No video played lately (or long ago): a bot check may refuse every client, tried again as before
+     */
+    @Test
+    public void aSignInAskedForWithNoClientPlayingLatelyIsTriedAgain() throws Exception {
+        ClientAttempts.clear("bzi_LJTPFi0");
+        ClientAttempts.record("bzi_LJTPFi0", ClientAttempts.Attempt.unplayable("TV", "LOGIN_REQUIRED", "This video is private"));
+        ClientAttempts.record("bzi_LJTPFi0", ClientAttempts.Attempt.unplayable("VISIONOS", "LOGIN_REQUIRED", "Please sign in"));
+        Video video = video("s26AHc0b_l4");
+        TestController controller = new TestController(video, "VISIONOS");
+        controller.onPlay();
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofMinutes(16));
+        video.videoId = "bzi_LJTPFi0";
+
+        controller.runFormatErrorAction(new IllegalStateException("fromNullable result is null"));
+
+        assertEquals(Arrays.asList("reload_video_30s"), getActions(mLog.readAll().get(0)));
+    }
+
+    @Test
+    public void aSignInIsTheVideosOnlyWhenTheClientThatPlayedAskedForIt() {
+        List<ClientAttempts.Attempt> attempts = Arrays.asList(
+                ClientAttempts.Attempt.unplayable("TV", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot"),
+                ClientAttempts.Attempt.unplayable("TV_SAMSUNG", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot"));
+
+        assertEquals("sign_in", ErrorFixerController.getLastingCause(attempts, "TV"));
+        assertEquals(null, ErrorFixerController.getLastingCause(attempts, "VISIONOS"));
+        assertEquals(null, ErrorFixerController.getLastingCause(attempts, null));
+        // Another answer than a sign-in: not one
+        assertEquals(null, ErrorFixerController.getLastingCause(Arrays.asList(attempts.get(0),
+                ClientAttempts.Attempt.unplayable("WEB", "UNPLAYABLE", "Video unavailable")), "TV"));
+    }
+
+    /**
+     * Y36K953Z after 27XPFNZC, a run apart: the drops of a run before count, the second video's drops try another codec at once
+     */
+    @Test
+    public void framesDroppedOnACodecInARunBeforeCount() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,50,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,vp9", false));
+        droppedFramesBefore("av01", "1YKvmLD3QW4");
+        TestController controller = new TestController(video("EOIkoWmVRBs"), formats, formats.get(0));
+        controller.onPlay();
+
+        dropFrames(controller);
+
+        assertEquals(Arrays.asList("other_codec:vp9", "restart_engine"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * 27XPFNZC, Y36K953Z: AV1 and AVC 1080p50 both dropped frames, VP9 none. With AVC first (preferred over VP9), AV1's other codec is
+     * VP9: AVC has dropped them too.
+     */
+    @Test
+    public void anotherCodecThatDroppedFramesIsPassedOver() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,50,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,avc", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,vp9", false));
+        droppedFramesBefore("av01", "1YKvmLD3QW4");
+        droppedFramesBefore("avc", "EOIkoWmVRBs");
+        TestController controller = new TestController(video("g1T4NT2f_dA"), formats, formats.get(0));
+        controller.onPlay();
+
+        dropFrames(controller);
+
+        assertEquals(Arrays.asList("other_codec:vp9", "restart_engine"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * Every other codec dropped frames too: the first of them, as before
+     */
+    @Test
+    public void everyOtherCodecThatDroppedFramesLeavesTheFirst() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,50,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,avc", false));
+        droppedFramesBefore("av01", "1YKvmLD3QW4");
+        droppedFramesBefore("avc", "EOIkoWmVRBs");
+        TestController controller = new TestController(video("g1T4NT2f_dA"), formats, formats.get(0));
+        controller.onPlay();
+
+        dropFrames(controller);
+
+        assertEquals(Arrays.asList("other_codec:avc", "restart_engine"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * 97MSK8B6 #8: WEB's SABR refused the video 2.4 s before its end, and four clients in 15 s didn't play it. It ended.
+     */
+    @Test
+    public void anEngineErrorSecondsBeforeTheEndOfAVideoEndsIt() throws Exception {
+        TestController controller = new TestController(video("fC86OVoSVJc"), "WEB", playerStub(atMs(299_400, 301_800)));
+        controller.onPlay();
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(freshSessionRefusal(75)));
+
+        assertEquals(Arrays.asList("play_end"), getActions(mLog.readAll().get(0)));
+        assertEquals(1, controller.mPlayEnds);
+    }
+
+    /**
+     * A stall that far from the end isn't: the end is past what's buffered, it's reloaded
+     */
+    @Test
+    public void aStallSecondsBeforeTheEndOfAVideoIsReloaded() throws Exception {
+        TestController controller = new TestController(video("fC86OVoSVJc"), null, playerStub(atMs(299_400, 301_800)));
+        controller.onPlay();
+
+        controller.onLongBuffering();
+
+        assertEquals(Arrays.asList("reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(0, controller.mPlayEnds);
+    }
+
+    /**
+     * The video dropped frames on the codec at 1080p50, in this run or one before (see FrameDropCodecs)
+     */
+    private static void droppedFramesBefore(String codec, String videoId) {
+        FrameDropCodecs.add(RuntimeEnvironment.getApplication(), FrameDropCodecs.kindOf(TrackSelectorUtil.codecNameShort(codec), 1080, 50),
+                videoId);
+    }
+
+    /**
+     * The attempt of the video playing: its format's bitrate, and its loads lately at the throughput
+     */
+    private static void playingAt(int bitrate, long throughputKbps) {
+        FormatAttempts.onNewVideo(RuntimeEnvironment.getApplication(), "0N4ujc0HJus");
+        MediaTrack track = MediaTrack.forRendererIndex(TrackSelectorManager.RENDERER_INDEX_VIDEO);
+        track.format = Format.createVideoSampleFormat("313", "video/x-vnd.on2.vp9", "vp9", bitrate, Format.NO_VALUE, 3840, 2160, 25,
+                null, null);
+        FormatAttempts.onTracks(ExoFormatItem.from(track), FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onLoad(throughputKbps * 1_000 / 8, 1_000);
     }
 
     /**

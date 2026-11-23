@@ -241,12 +241,23 @@ public final class VideoStart {
          */
         @Nullable
         public final String result;
+        /**
+         * What it ran, e.g. of the player data, its player's load: "player JS load (first of run) 19.3 s, player preprocess 12.9 s…".
+         * Null for nothing to tell (e.g. the player was loaded already).
+         */
+        @Nullable
+        public final String detail;
 
         public WarmUpStep(String name, long startMs, long endMs, @Nullable String result) {
+            this(name, startMs, endMs, result, null);
+        }
+
+        public WarmUpStep(String name, long startMs, long endMs, @Nullable String result, @Nullable String detail) {
             this.name = name;
             this.startMs = startMs;
             this.endMs = endMs;
             this.result = result;
+            this.detail = detail;
         }
 
         public boolean isOpen() {
@@ -264,6 +275,10 @@ public final class VideoStart {
 
             if (this.result != null) {
                 result.put("result", this.result);
+            }
+
+            if (detail != null) {
+                result.put("detail", detail);
             }
 
             return result;

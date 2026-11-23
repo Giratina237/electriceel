@@ -6,6 +6,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -21,6 +22,7 @@ import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolE
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
 import com.google.android.exoplayer2.source.sabr.parser.parts.PoTokenStatusSabrPart.PoTokenStatus;
 import com.google.android.exoplayer2.upstream.HttpDataSource.HttpDataSourceException;
+import com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
 import com.liskovsoft.sharedutils.helpers.Helpers;
@@ -46,6 +48,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.DecoderErrorFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.SabrDefaultLoadErrorHandlingPolicy;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.FrameDropCodecs;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
@@ -62,12 +65,8 @@ import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
 import com.liskovsoft.youtubeapi.videoinfo.V2.ClientAttempts;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 
 public class ErrorFixerController extends BasePlayerController implements OnLongBuffering {
     private static final String TAG = ErrorFixerController.class.getSimpleName();
@@ -77,6 +76,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * media), and a reload played it again from 0:00
      */
     private static final long VIDEO_END_THRESHOLD_MS = 2_000;
+    /**
+     * A video that failed this close to its end has ended: its fix takes longer than what's left (97MSK8B6 #8: WEB's SABR refused it
+     * 2.4 s before its end, and four clients in 15 s didn't play it)
+     */
+    private static final long VIDEO_END_ERROR_THRESHOLD_MS = 5_000;
     private static final int MAX_SABR_ERROR_FIX_ATTEMPTS = 3;
     private static final int MAX_NETWORK_ERROR_RELOADS = 3;
     /**
@@ -95,6 +99,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     private static final String LASTING_MEMBERS = "members";
     private static final String LASTING_AGE_GATED = "age_gated";
     private static final String LASTING_GONE = "gone";
+    private static final String LASTING_SIGN_IN = "sign_in";
+    /**
+     * How long ago a client played a video for its sign-in refusal of another to be that video's (see isSignInRefusedByPlayingClient)
+     */
+    private static final long PLAYED_CLIENT_MS = 15 * 60 * 1_000;
     /**
      * The playability status of a video that's gone, e.g. removed by the uploader or private
      */
@@ -169,11 +178,6 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     private String mDecoderErrorVideoId;
     private FormatItem mVideoFallback;
     /**
-     * Of each video codec, the videos of the run that dropped frames on it with a decoder that declares their frame rate (see
-     * onHealthFailure)
-     */
-    private final Map<String, Set<String>> mFrameDropVideos = new HashMap<>();
-    /**
      * Dropping frames on this many videos on a codec, the next ones try another (see onHealthFailure)
      */
     private static final int FRAME_DROP_VIDEOS = 2;
@@ -233,6 +237,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     private String mSabrPlayedVideoId;
     private String mSabrPlayedClient;
     private long mSabrPlayedMs;
+    /**
+     * The video that played last, its client, and when it began to (see getPlayedClient)
+     */
+    @Nullable
+    private String mPlayedVideoId;
+    @Nullable
+    private String mPlayedClient;
+    private long mPlayedMs;
     /**
      * The video reloaded once for a first segment that never came (see runLongBufferingAction)
      */
@@ -392,31 +404,35 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
-     * Frames were dropped on the codec of the format playing in another video of this run before (see onHealthFailure)
+     * Frames were dropped on the kind of the format playing (its codec, size and frame rate, see FrameDropCodecs) in another video
+     * before, of this run or one before
      */
     private boolean isDroppingOnVideoAfterVideo(@Nullable FormatItem format) {
-        String codec = getCodecName(format);
+        String kind = getFrameDropKind(format, getCodecName(format));
         Video video = getVideo();
 
-        if (codec == null || video == null || video.videoId == null) {
+        if (kind == null || video == null || video.videoId == null) {
             return false;
         }
 
-        Set<String> videoIds = mFrameDropVideos.get(codec);
+        return FrameDropCodecs.add(getContext(), kind, video.videoId) >= FRAME_DROP_VIDEOS;
+    }
 
-        if (videoIds == null) {
-            videoIds = new HashSet<>();
-            mFrameDropVideos.put(codec, videoIds);
-        }
+    /**
+     * Of a video format with the codec: e.g. "av1 1080p50" (see FrameDropCodecs), null when its codec or size isn't known
+     */
+    @Nullable
+    private static String getFrameDropKind(@Nullable FormatItem format, @Nullable String codec) {
+        int size = format != null ? Math.min(format.getWidth(), format.getHeight()) : -1;
 
-        videoIds.add(video.videoId);
-
-        return videoIds.size() >= FRAME_DROP_VIDEOS;
+        return codec != null && size > 0 ? FrameDropCodecs.kindOf(codec, size, format.getFrameRate()) : null;
     }
 
     /**
      * Another codec than the one playing, of the same size, for this video only (see lowerVideoQuality): the first of the list, as it
-     * prefers. A limit, as the quality lowered is.
+     * prefers, that hasn't dropped frames on the device at its size and frame rate (see FrameDropCodecs). Every other one has: the
+     * first of them. A limit, as the quality lowered is. 27XPFNZC and Y36K953Z: AV1 and AVC 1080p50 both dropped frames, VP9 none; with
+     * AVC preferred over VP9, AV1's other codec was AVC.
      *
      * @return the codec's name, null for none of that size
      */
@@ -435,6 +451,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return null;
         }
 
+        FormatItem other = null;
+
         for (FormatItem format : videoFormats) {
             String otherCodec = getCodecName(format);
 
@@ -442,20 +460,34 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 continue;
             }
 
-            FormatItem limit = ExoFormatItem.fromVideoSpec(String.format(Locale.US, "%d,%d,60,%s", format.getWidth(), format.getHeight(),
-                    otherCodec), false);
-
-            if (limit == null) {
-                continue;
+            if (other == null) {
+                other = format;
             }
 
-            getPlayerData().setTempVideoFormat(limit);
-            mVideoFallback = limit;
+            String kind = getFrameDropKind(format, otherCodec);
 
-            return otherCodec;
+            if (kind == null || !FrameDropCodecs.hasDropped(getContext(), kind)) {
+                other = format;
+                break;
+            }
         }
 
-        return null;
+        if (other == null) {
+            return null;
+        }
+
+        String otherCodec = getCodecName(other);
+        FormatItem limit = ExoFormatItem.fromVideoSpec(String.format(Locale.US, "%d,%d,60,%s", other.getWidth(), other.getHeight(),
+                otherCodec), false);
+
+        if (limit == null) {
+            return null;
+        }
+
+        getPlayerData().setTempVideoFormat(limit);
+        mVideoFallback = limit;
+
+        return otherCodec;
     }
 
     /**
@@ -518,7 +550,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         // The fixes below go on: a live stream that goes on is reloaded as before
         checkLiveEnd(failure);
 
-        if (isStreamEnded() || isAtVideoEnd()) {
+        if (isStreamEnded() || isAtVideoEnd(VIDEO_END_THRESHOLD_MS)) {
             failure.action("play_end");
             getMainController().onPlayEnd();
         } else if (isOfflineVideo() && isAttestationPending()) {
@@ -627,6 +659,12 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 failure.action("reload_video");
                 mVideoLoaderController.reloadVideo(failure.getKind());
             }
+        } else if (isOfflineVideo() && isConnectionTooSlow(failure) && lowerVideoQuality()) {
+            // The first stall, and its loads came slower than the format plays: a reload loads the same format as slowly (7QAT714C
+            // #1: 4K at 9.9 Mbps of a 15.3 Mbps format, its reload didn't play in 5 s and the user left; #3: 4K at 15.4 of 26.0, the
+            // reload stalled again, and two lowerings later it played at 1080p, three minutes on). For this video only.
+            failure.action("lower_quality").action("restart_engine");
+            mVideoLoaderController.restartEngine(failure.getKind());
         } else {
             // SABR may hang if the server issues a high backoffTime
             failure.action("reload_video");
@@ -686,6 +724,12 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             mSabrPlayedVideoId = videoId;
             mSabrPlayedClient = client;
             mSabrPlayedMs = SystemClock.elapsedRealtime();
+        }
+
+        if (client != null) {
+            mPlayedVideoId = videoId;
+            mPlayedClient = client;
+            mPlayedMs = SystemClock.elapsedRealtime();
         }
 
         if (getPlayer() != null) {
@@ -845,7 +889,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return;
         }
 
-        if (isStreamEnded() || isAtVideoEnd()) {
+        if (isStreamEnded() || isAtVideoEnd(VIDEO_END_ERROR_THRESHOLD_MS)) {
             // Url no longer works (e.g. live stream ended), or a video failed in its last seconds (e.g. draining its sound at the end
             // of the stream): it ended. A restart there plays nothing more, and its error message is about a video that played.
             failure.action("play_end");
@@ -1213,6 +1257,46 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         return false;
     }
 
+    /**
+     * The stream's server failed its segments (HTTP 5xx, e.g. 503): the next client for this video only, as a SABR refusal's (see
+     * applySabrProtocolErrorAction), remembered once it plays there. The other videos keep the order's first client. A switch of the
+     * client for all of them kept the run on the client it ended on (97MSK8B6 #2, #4, #7: TV_SAMSUNG's, VISIONOS's and
+     * TV_DOWNGRADED's DASH answered 503, and every video after them played on WEB, each start waiting 4–4.8 s for its server's
+     * backoff, where TV's SABR waited none in 1,488 starts).
+     *
+     * @return whether a client was picked, false for none to pick (e.g. the order has one client)
+     */
+    private boolean applyServerErrorClientPick(Throwable error, PlayerFailure failure) {
+        if (getVideo() == null || !isServerError(error)) {
+            return false;
+        }
+
+        String picked = mVideoLoaderController.pickNextClientForVideo();
+
+        if (picked == null) {
+            return false;
+        }
+
+        failure.action("client_for_video:" + picked);
+
+        return true;
+    }
+
+    /**
+     * The server answered the stream's request with an HTTP 5xx code
+     */
+    @VisibleForTesting
+    static boolean isServerError(@Nullable Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof InvalidResponseCodeException) {
+                int code = ((InvalidResponseCodeException) cause).responseCode;
+                return code >= 500 && code < 600;
+            }
+        }
+
+        return false;
+    }
+
     private void applyEngineErrorAction(int type, int rendererIndex, Throwable error, PlayerFailure failure) {
         boolean restartEngine = true;
         long restartDelayMs = RETRY_MS;
@@ -1274,6 +1358,9 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             } else if (isGeneralError && getPlayerTweaksData().isHighBitrateFormatsEnabled()) {
                 failure.action("disable_high_bitrate");
                 getPlayerTweaksData().setHighBitrateFormatsEnabled(false); // Response code: 429
+            } else if (applyServerErrorClientPick(error, failure)) {
+                // Response code: 503
+                Log.d(TAG, "Server error of the video's stream: the next client for it only");
             } else if (!mBufferingDetector.isPlayable()) { // Response code: 403
                 // The stream fails instantly if nParam isn't correct.
                 // Note, nParam generation strictly tied to the client but some reported that OkHttp could help.
@@ -1453,7 +1540,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         try {
             if (unplayable != null) {
                 failure.playability(unplayable.status, unplayable.reason);
-                runUnplayableAction(unplayable, getLastingCause(attempts), failure);
+                runUnplayableAction(unplayable, getLastingCause(attempts, getPlayedClient(getVideo())), failure);
             } else {
                 runFormatErrorAction(error, attempts, failure);
             }
@@ -1498,10 +1585,15 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * Why it won't play in a while either, null when it may: a client said only the channel's members watch it (see
      * ClientAttempts.Attempt#members), and the account isn't one; one refused it for the viewer's age (see #ageGated: every client
      * asked for a sign-in did so for the age, 6ABPRYGH); or each one said it's gone (status ERROR, e.g. removed by the uploader or
-     * private, BG2Y27G3). A bot check (a sign-in asked for not for the age) or an upcoming stream isn't one of them.
+     * private, BG2Y27G3); or each one asked for a sign-in, the client a video played on minutes ago too (see
+     * isSignInRefusedByPlayingClient). A bot check (a sign-in asked for not for the age, of every video) or an upcoming stream isn't one
+     * of them.
+     *
+     * @param playedClient the client a video played on lately (see getPlayedClient), null for none
      */
+    @VisibleForTesting
     @Nullable
-    private static String getLastingCause(@Nullable List<ClientAttempts.Attempt> attempts) {
+    static String getLastingCause(@Nullable List<ClientAttempts.Attempt> attempts, @Nullable String playedClient) {
         if (attempts == null) {
             return null;
         }
@@ -1522,6 +1614,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return isLoginRequired ? null : LASTING_AGE_GATED;
         }
 
+        if (isLoginRequired && isSignInRefusedByPlayingClient(attempts, playedClient)) {
+            return LASTING_SIGN_IN;
+        }
+
         boolean isGone = false;
 
         for (ClientAttempts.Attempt attempt : attempts) {
@@ -1535,6 +1631,47 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
 
         return isGone ? LASTING_GONE : null;
+    }
+
+    /**
+     * Each client that answered asked for a sign-in, and one of them is the client a video played on minutes ago: the session isn't
+     * refused (a bot check refuses every video), this video is, e.g. a private one (7QAT714C #2: all 11 clients asked for a sign-in,
+     * "This video is private" said TV; VISIONOS had played another video 10 min before). The reasons are in the user's language, the
+     * client that played isn't.
+     */
+    private static boolean isSignInRefusedByPlayingClient(List<ClientAttempts.Attempt> attempts, @Nullable String playedClient) {
+        if (playedClient == null) {
+            return false;
+        }
+
+        boolean isRefusedByIt = false;
+
+        for (ClientAttempts.Attempt attempt : attempts) {
+            if (!ClientAttempts.RESULT_UNPLAYABLE.equals(attempt.result)) {
+                continue;
+            }
+
+            if (attempt.ageGated || !STATUS_LOGIN_REQUIRED.equals(attempt.status)) {
+                return false;
+            }
+
+            isRefusedByIt |= playedClient.equals(attempt.client);
+        }
+
+        return isRefusedByIt;
+    }
+
+    /**
+     * The client another video played on last, if it began to within PLAYED_CLIENT_MS: null for none. Not the video's own: one that
+     * played and is refused now (e.g. its reload's fetch, an hour on) was refused for the session, not for what it is.
+     */
+    @Nullable
+    private String getPlayedClient(@Nullable Video video) {
+        if (mPlayedClient == null || video == null || Helpers.equals(video.videoId, mPlayedVideoId)) {
+            return null;
+        }
+
+        return SystemClock.elapsedRealtime() - mPlayedMs <= PLAYED_CLIENT_MS ? mPlayedClient : null;
     }
 
     /**
@@ -1830,16 +1967,20 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
-     * A video (not a live stream) that played, stalled at its end: it ended. One that never played is stuck at its start
+     * A video (not a live stream) that played, stalled or failed at its end: it ended. One that never played is stuck at its start
+     *
+     * @param thresholdMs what's left of it at most: of a short video, a tenth of it, VIDEO_END_THRESHOLD_MS at least (a 6 s clip that
+     *                    failed 1.5 s in hasn't ended)
      */
-    private boolean isAtVideoEnd() {
+    private boolean isAtVideoEnd(long thresholdMs) {
         if (getPlayer() == null || getVideo() == null || getVideo().isLive || !mBufferingDetector.isPlayable()) {
             return false;
         }
 
         long durationMs = getPlayer().getDurationMs();
+        long endMs = Math.max(VIDEO_END_THRESHOLD_MS, Math.min(thresholdMs, durationMs / 10));
 
-        return durationMs > 0 && durationMs - getPlayer().getPositionMs() < VIDEO_END_THRESHOLD_MS;
+        return durationMs > 0 && durationMs - getPlayer().getPositionMs() < endMs;
     }
 
     /**
@@ -2054,6 +2195,24 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         Format trackFormat = format.getTrack() != null ? format.getTrack().format : null;
 
         return trackFormat != null && trackFormat.codecs != null ? TrackSelectorUtil.codecNameShort(trackFormat.codecs) : null;
+    }
+
+    /**
+     * The segments of the format came slower than it plays lately (see FormatAttempts#isTooSlow), and none of its loads failed on the
+     * connection nor hangs on one: the connection keeps up with a lower one. One that stops answering isn't too slow (see the repeated
+     * stall's, runLongBufferingAction), nor one with no segment lately (e.g. SABR's server asked it to back off).
+     */
+    private boolean isConnectionTooSlow(PlayerFailure failure) {
+        boolean hasConnectionError = LoadErrors.hasConnectionErrorWithin(CONNECTION_ERROR_WINDOW_MS);
+        String stuckConnection = Connections.getStuckConnection(STUCK_CONNECTION_MS);
+
+        if (hasConnectionError || stuckConnection != null) {
+            failure.detail("loadConnectionError", hasConnectionError);
+            failure.detail("stuckConnection", stuckConnection);
+            return false;
+        }
+
+        return FormatAttempts.isTooSlow();
     }
 
     /**

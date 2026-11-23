@@ -262,6 +262,11 @@ public class ExoPlayerController implements Player.EventListener {
         mTrackFormatter.enableBitrate(PlayerTweaksData.instance(context).isQualityInfoBitrateEnabled());
         mTrackErrorFixer = new TrackErrorFixer(mTrackSelectorManager);
         mTrackErrorFixer.setOnHttpError(this::onHttpError);
+        mTrackErrorFixer.setLiveCheck(() -> {
+            // Held weakly: read once
+            Video video = getVideo();
+            return video != null && video.isLive;
+        });
         mFrameStepper = new FrameStepper(this::onFramePositionChanged);
         mRangeMuter = new RangeMuter(this::onMuteChanged);
 

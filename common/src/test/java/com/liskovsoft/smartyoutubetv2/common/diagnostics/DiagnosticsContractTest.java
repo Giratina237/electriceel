@@ -160,6 +160,8 @@ public class DiagnosticsContractTest {
         // The run's first start's warm-ups, where a start that never played had the device, one paused: checked too
         String starts = report.getJSONArray("videoStarts").toString();
         assertTrue(starts.contains("\"warmUps\""));
+        // What a warm-up's step ran
+        assertTrue(starts.contains("\"detail\":\"player JS load (first of run) 2.4 s"));
         assertTrue(starts.contains("\"availMemMb\""));
         assertTrue(starts.contains("\"" + VideoStart.OUTCOME_PAUSED + "\""));
         // How a start's play went on: its pauses and how it ended
@@ -262,7 +264,8 @@ public class DiagnosticsContractTest {
                 new VideoStart.Stage(VideoStarts.STAGE_PROTECTION, PoTokenStatus.OK.name(), 1, fromMs + 400, fromMs + 400));
         // The run's first: the warm-ups before it, one done and one still going
         fixture.warmUps.add(new WarmUps.Run(VideoStartFixture.T0 - 9_400, VideoStartFixture.T0 - 6_100, Arrays.asList(
-                new WarmUps.Step("player data", VideoStartFixture.T0 - 9_400, VideoStartFixture.T0 - 6_950, "ready"),
+                new WarmUps.Step("player data", VideoStartFixture.T0 - 9_400, VideoStartFixture.T0 - 6_950, "ready",
+                        "player JS load (first of run) 2.4 s, player preprocess (912 KB) 1.9 s"),
                 new WarmUps.Step("poToken", VideoStartFixture.T0 - 6_950, VideoStartFixture.T0 - 6_100, "got"))));
         fixture.warmUps.add(new WarmUps.Run(VideoStartFixture.T0 + 100, WarmUps.OPEN, Collections.singletonList(
                 new WarmUps.Step("translation languages", VideoStartFixture.T0 + 100, WarmUps.OPEN, null))));
