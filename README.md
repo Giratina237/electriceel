@@ -117,7 +117,7 @@ If the installation fails, either your **disk space is full** or the update didn
 
 ## Compatibility
 
-Electric Eel requires Android 4.3 or above. It does not work on non-Android devices (incl. LG or Samsung TVs). On unsupported TVs, you can use a TV stick or TV box. Though this app technically runs on smartphones and tablets, it is not optimized for such and offers no official support!
+Electric Eel requires Android 7.0 or above. It does not work on non-Android devices (incl. LG or Samsung TVs). On unsupported TVs, you can use a TV stick or TV box. Though this app technically runs on smartphones and tablets, it is not optimized for such and offers no official support!
 
 It has been successfully tested on TVs, TV boxes and TV sticks that are based on Android, including:
 
