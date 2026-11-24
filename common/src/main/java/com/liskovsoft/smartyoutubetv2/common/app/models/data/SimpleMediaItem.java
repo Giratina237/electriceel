@@ -28,6 +28,7 @@ public final class SimpleMediaItem implements MediaItem {
     private boolean mIsUpcoming;
     private boolean mIsMovie;
     private boolean mIsShow;
+    private String mMembersLabel;
     private String mSearchQuery;
     private String mClickTrackingParams;
     private String mFeedbackToken;
@@ -78,6 +79,7 @@ public final class SimpleMediaItem implements MediaItem {
         mediaItem.mIsUpcoming = video.isUpcoming;
         mediaItem.mIsMovie = video.isMovie;
         mediaItem.mIsShow = video.isShow;
+        mediaItem.mMembersLabel = video.membersLabel;
         mediaItem.mSearchQuery = video.searchQuery;
         mediaItem.mClickTrackingParams = video.clickTrackingParams;
         if (video.mediaItem != null) {
@@ -122,6 +124,11 @@ public final class SimpleMediaItem implements MediaItem {
     @Override
     public boolean isShow() {
         return mIsShow;
+    }
+
+    @Override
+    public String getMembersLabel() {
+        return mMembersLabel;
     }
 
     @Override

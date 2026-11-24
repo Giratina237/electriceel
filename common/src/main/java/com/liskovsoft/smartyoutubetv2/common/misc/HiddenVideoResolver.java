@@ -26,6 +26,7 @@ import io.reactivex.Observable;
  * The dates of shorts are held too (see ShortsDateManager): the card never gets its date after it's shown, and Hide old videos reads it.
  * So are the live streams that ended in History (see StreamedManager): its cards come without the date that tells them.
  * So are the channels of the cards that have their name alone, everywhere, while a channel is blocked with its id (see BlockedChannelManager).<br/>
+ * So are the cards with a members' video while Member videos hides them, until the account's memberships are read (see MembershipManager).<br/>
  * A failed lookup doesn't hold the group back: its videos are shown.
  */
 public class HiddenVideoResolver {
@@ -134,9 +135,12 @@ public class HiddenVideoResolver {
 
         Observable<Boolean> shortsDates = ShortsDateManager.instance(context).resolve(mediaGroups);
         Observable<Boolean> streamed = streamedManager.resolve(streamedIds);
+        MembershipManager membershipManager = MembershipManager.instance(context);
+        // Hidden members' videos appear when the account is a member (see MembersData.onMembershipsRead)
+        Observable<Boolean> memberships = membershipManager.isNeededFor(mediaGroups) ? membershipManager.resolve() : Observable.just(true);
 
         if (!isAiSListUsed && authors.isEmpty() && !isWatchLaterEnabled && blockedCandidates.isEmpty()) {
-            return Observable.zip(shortsDates, streamed, (dates, streams) -> true);
+            return Observable.zip(shortsDates, streamed, memberships, (dates, streams, members) -> true);
         }
 
         return Observable.zip(
@@ -148,7 +152,8 @@ public class HiddenVideoResolver {
                 isWatchLaterEnabled ? watchLaterManager.resolve() : Observable.just(true),
                 shortsDates,
                 streamed,
-                (lists, handles, collaborations, watchLater, dates, streams) -> true)
+                memberships,
+                (lists, handles, collaborations, watchLater, dates, streams, members) -> true)
                 // Show the videos rather than nothing
                 .onErrorReturn(error -> {
                     Log.e(TAG, "Can't resolve the hidden videos: %s", error.getMessage());
