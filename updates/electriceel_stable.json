@@ -1,13 +1,24 @@
 {
   "package": {
     "downloadUrlList_arm64-v8a": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.1/ElectricEel_stable_32.80.1_arm64-v8a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.2/ElectricEel_stable_32.80.2_arm64-v8a.apk"
     ],
     "downloadUrlList_armeabi-v7a": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.1/ElectricEel_stable_32.80.1_armeabi-v7a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.2/ElectricEel_stable_32.80.2_armeabi-v7a.apk"
     ],
     "downloadUrlList": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.1/ElectricEel_stable_32.80.1_armeabi-v7a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.2/ElectricEel_stable_32.80.2_armeabi-v7a.apk"
+    ]
+  },
+  "32.80.2": {
+    "versionCode": 2461,
+    "changelog": [
+      "Fixed Like not highlighted on a video you just liked",
+      "Fixed \"Hide watched\" ignores what you watched in the app",
+      "Fixed Adding a video to a playlist from the app makes the playlist look like one video",
+      "Fixed Shuffle does nothing on playlists of 30 or fewer",
+      "Fixed Seek acceleration sticks",
+      "Fixed Member Only Videos do not appear #104"
     ]
   },
   "32.80.1": {
