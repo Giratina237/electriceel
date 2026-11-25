@@ -29,6 +29,7 @@ import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.helpers.PermissionHelpers;
 import com.liskovsoft.smartyoutubetv2.common.misc.MotherActivity;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SearchData;
+import com.liskovsoft.smartyoutubetv2.common.utils.TypingCorrection;
 import com.liskovsoft.smartyoutubetv2.tv.BuildConfig;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 import com.liskovsoft.smartyoutubetv2.tv.util.ViewUtil;
@@ -122,6 +123,9 @@ public class ChannelHeaderPresenter extends RowPresenter {
         if (mIsKeyboardFixEnabled) {
             KeyHelpers.fixEnterKey(searchTextEditor);
         }
+
+        // Search setting, as the search screen: no suggestions or corrections from the keyboard
+        TypingCorrection.applySearchSetting(searchTextEditor);
 
         searchOrbView.setOnFocusChangeListener((v, focused) -> {
             if (focused) {

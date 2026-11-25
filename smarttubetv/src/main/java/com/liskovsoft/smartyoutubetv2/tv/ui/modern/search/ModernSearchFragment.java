@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.speech.RecognizerIntent;
 import android.text.Editable;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.KeyEvent;
@@ -36,6 +35,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.SearchView;
 import com.liskovsoft.smartyoutubetv2.common.misc.CrashRestorer;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SearchData;
+import com.liskovsoft.smartyoutubetv2.common.utils.TypingCorrection;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 import com.liskovsoft.smartyoutubetv2.tv.presenter.CardHold;
 import com.liskovsoft.smartyoutubetv2.tv.ui.common.LeanbackActivity;
@@ -419,10 +419,8 @@ public class ModernSearchFragment extends Fragment implements SearchView {
     }
 
     private void setupSystemInput() {
-        if (SearchData.instance(getContext()).isTypingCorrectionDisabled()) {
-            // Search setting, same trick as the classic search: no suggestions or corrections from the keyboard
-            mField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-        }
+        // Search setting, as the classic search: no suggestions or corrections from the keyboard
+        TypingCorrection.applySearchSetting(mField);
 
         if (SearchData.instance(getContext()).isKeyboardFixEnabled()) {
             // Search setting, as the classic search: OK doesn't open the keyboard (G20s and other remotes)

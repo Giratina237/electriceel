@@ -276,7 +276,7 @@ public class ModernChannelsView extends ModernSideListView {
     }
 
     private void showFilterDialog() {
-        SimpleEditDialog.show(getContext(), getContext().getString(R.string.lb_search_bar_hint), mFilter, text -> {
+        SimpleEditDialog.showSearch(getContext(), getContext().getString(R.string.lb_search_bar_hint), mFilter, text -> {
             mFilter = text;
             mChannels.filter(text);
             mChannels.refresh(); // the filter row shows the text
