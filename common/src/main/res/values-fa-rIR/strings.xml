@@ -643,8 +643,7 @@
   <string name="pressing_home">با فشار دادن HOME</string>
   <string name="pressing_home_back">با فشار دادن HOME یا BACK</string>
   <string name="player_number_key_seek">فاصله جستجو با دکمه‌های عددی</string>
-  <string name="save_remove_playlist">افزودن/حذف فهرست پخش از بخش فهرست‌های پخش</string>
-  <string name="remove_playlist">حذف فهرست پخش از بخش فهرست‌های پخش به طور دائم</string>
+  <string name="add_delete_playlist">افزودن به فهرست‌های پخش/حذف فهرست پخش</string>
   <string name="removed_from_playlists">از بخش فهرست‌های پخش حذف شد</string>
   <string name="saved_to_playlists">به بخش فهرست‌های پخش اضافه شد</string>
   <string name="create_playlist">ایجاد فهرست پخش</string>
@@ -894,6 +893,8 @@
   <string name="hide_upcoming_home">پنهان کردن آینده از صفحه اصلی</string>
   <string name="remember_position_of_live_videos">به خاطر سپردن موقعیت پخش زنده</string>
   <string name="save_playlist">افزودن فهرست پخش به بخش فهرست‌های پخش</string>
+  <string name="delete_playlist">حذف فهرست پخش</string>
+  <string name="delete_playlist_fmt">فهرست پخش %s حذف شود؟</string>
   <string name="skip_shorts">رد کردن کوته ویدیوها</string>
   <string name="suggestions">پیشنهادات</string>
   <string name="place_comments_left">قرار دادن نظرات در سمت چپ</string>
@@ -984,7 +985,6 @@
   <string name="player_toggle_speed">روشن/خاموش کردن سرعت</string>
   <string name="search_exit_shortcut">خروج از جستجو</string>
   <string name="player_unexpected_error">خطای پخش غیرمنتظره</string>
-  <string name="remove_playlist_fmt">%s برای همیشه حذف شود؟</string>
   <string name="create_playlist_note">توجه: در برنامه یوتیوب دیده نخواهد شد</string>
   <string name="video_flip">وارونه کردن (آینه‌ای)</string>
   <string name="remove_from_search_history">حذف از تاریخچه جستجو</string>

@@ -246,7 +246,6 @@
     <string name="unset_stream_reminder">Fjern stream-påminnelse</string>
     <string name="set_stream_reminder">Sett stream-påminnelse</string>
     <string name="subscribe_unsubscribe_from_channel">Abonner / Avslutt abonnement</string>
-    <string name="save_remove_playlist">Legg til/Fjern spilleliste fra spilleliste-seksjonen</string>
     <string name="create_playlist">Opprett spilleliste</string>
     <string name="create_playlist_requires_channel">Kontoen må ha en kanal</string>
     <string name="create_local_playlist">Opprett lokal spilleliste</string>
@@ -697,9 +696,10 @@
     <string name="pressing_home_back">ved å trykke på HJEM eller TILBAKE</string>
     <string name="pressing_back">ved å trykke på TILBAKE</string>
     <string name="player_number_key_seek">Spol med talltaster</string>
+    <string name="add_delete_playlist">Legg til i Spillelister/slett spillelisten</string>
     <string name="save_playlist">Legg til spilleliste i Spillelister-seksjonen</string>
-    <string name="remove_playlist">Fjern spilleliste permanent fra Spillelister-seksjonen</string>
-    <string name="remove_playlist_fmt">Fjerne %s permanent?</string>
+    <string name="delete_playlist">Slett spillelisten</string>
+    <string name="delete_playlist_fmt">Slette spillelisten %s?</string>
     <string name="removed_from_playlists">Fjernet fra Spillelister-seksjonen</string>
     <string name="saved_to_playlists">Lagt til i Spillelister-seksjonen</string>
     <string name="cant_delete_empty_playlist">Kan ikke slette tom spilleliste</string>

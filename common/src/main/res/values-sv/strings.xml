@@ -688,10 +688,10 @@
   <string name="pressing_home_back">genom att trycka på hem- eller bakåtknappen</string>
   <string name="pressing_back">genom att trycka på bakåtknappen</string>
   <string name="player_number_key_seek">Spola med sifferknapparna</string>
-  <string name="save_remove_playlist">Lägg till/ta bort spellistan från avsnittet Spellistor</string>
+  <string name="add_delete_playlist">Lägg till i Spellistor/radera spellistan</string>
   <string name="save_playlist">Lägg till spellistan i avsnittet Spellistor</string>
-  <string name="remove_playlist">Ta bort spellistan från avsnittet Spellistor permanent</string>
-  <string name="remove_playlist_fmt">Ta bort %s permanent\?</string>
+  <string name="delete_playlist">Radera spellistan</string>
+  <string name="delete_playlist_fmt">Radera spellistan %s?</string>
   <string name="removed_from_playlists">Borttagen från avsnittet Spellistor</string>
   <string name="saved_to_playlists">Tillagd i avsnittet Spellistor</string>
   <string name="create_playlist">Skapa en spellista</string>

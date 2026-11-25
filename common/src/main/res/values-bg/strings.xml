@@ -662,8 +662,7 @@
   <string name="pressing_home_back">с натискане на НАЧАЛО и НАЗАД </string>
   <string name="pressing_back">с натискане на НАЗАД </string>
   <string name="player_number_key_seek">Търсене с цифрови клавиши</string>
-  <string name="save_remove_playlist">Добавяне/премахване на списък за възпроизвеждане от раздел \"Списъци за възпроизвеждане</string>
-  <string name="remove_playlist">Премахване на списъка за възпроизвеждане от раздела \"Списъци за възпроизвеждане\" завинаги</string>
+  <string name="add_delete_playlist">Добавяне към Плейлисти/изтриване на плейлиста</string>
   <string name="removed_from_playlists">Премахнати от раздел Плейлисти</string>
   <string name="saved_to_playlists">Добавено към раздел Плейлисти</string>
   <string name="create_playlist">Създай плейлист</string>
@@ -899,7 +898,8 @@
   <string name="hide_shorts_from_music">Скриване на кратките видеа от Музика</string>
   <string name="remember_position_of_live_videos">Запомняне на позицията в предаване на живо</string>
   <string name="save_playlist">Добавяне на плейлиста към раздел Плейлисти</string>
-  <string name="remove_playlist_fmt">Да се премахне ли %s завинаги?</string>
+  <string name="delete_playlist">Изтриване на плейлиста</string>
+  <string name="delete_playlist_fmt">Да се изтрие ли плейлистът %s?</string>
   <string name="create_playlist_note">ЗАБЕЛЕЖКА: Няма да се вижда в приложението YouTube</string>
   <string name="skip_shorts">Пропускане на Shorts</string>
   <string name="suggestions">Предложения</string>

@@ -672,8 +672,7 @@
   <string name="pressing_home">होम दबाने पर</string>
   <string name="pressing_home_back">होम या बैक दबाने पर</string>
   <string name="player_number_key_seek">नंबर कुंजियों के साथ आगे/पीछे करे</string>
-  <string name="save_remove_playlist">प्लेलिस्ट अनुभाग से प्लेलिस्ट जोड़ें/हटाएं</string>
-  <string name="remove_playlist">प्लेलिस्ट अनुभाग से प्लेलिस्ट को स्थायी रूप से हटाएं</string>
+  <string name="add_delete_playlist">प्लेलिस्ट अनुभाग में जोड़ें/प्लेलिस्ट मिटाएं</string>
   <string name="removed_from_playlists">प्लेलिस्ट अनुभाग से हटाया गया</string>
   <string name="saved_to_playlists">प्लेलिस्ट अनुभाग में जोड़ा गया</string>
   <string name="create_playlist">प्लेलिस्ट बनायें</string>
@@ -878,7 +877,8 @@
   <string name="live_stream_fix_4k_desc">चेतावनी: यह बदलाव स्ट्रीम को रिवाइंड करना बंद कर देता है। लाइव स्ट्रीम के प्रदर्शन में काफ़ी सुधार करता है। अधिकतम रिज़ॉल्यूशन 4K है।</string>
   <string name="remember_position_of_live_videos">लाइव स्ट्रीम की स्थिति याद रखें</string>
   <string name="save_playlist">प्लेलिस्ट को प्लेलिस्ट अनुभाग में जोड़ें</string>
-  <string name="remove_playlist_fmt">%s को स्थायी रूप से हटाएं?</string>
+  <string name="delete_playlist">प्लेलिस्ट मिटाएं</string>
+  <string name="delete_playlist_fmt">प्लेलिस्ट %s को मिटाएं?</string>
   <string name="create_playlist_note">नोट: यह YouTube ऐप में दिखाई नहीं देगी</string>
   <string name="skip_shorts">शॉर्ट्स छोड़ें</string>
   <string name="suggestions">सुझाव</string>

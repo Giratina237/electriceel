@@ -402,8 +402,7 @@
   <string name="pressing_home">bằng cách nhấn nút HOME</string>
   <string name="pressing_home_back">bằng cách nhấn nút HOME hoặc nút BACK</string>
   <string name="player_number_key_seek">Tua video bằng các phím số</string>
-  <string name="save_remove_playlist">Lưu/xóa danh sách phát này khỏi mục Danh sách phát</string>
-  <string name="remove_playlist">Xóa danh sách phát này khỏi mục Danh sách phát</string>
+  <string name="add_delete_playlist">Thêm vào mục Danh sách phát/Xóa danh sách phát</string>
   <string name="subtitle_position">Phụ đề di chuyển dưới cùng</string>
   <string name="not_compatible_with">Tùy chọn đã chọn không tương thích với</string>
   <string name="master_volume">Âm lượng tổng thể</string>
@@ -849,6 +848,8 @@
   <string name="hide_upcoming_channel">Ẩn mục \"sắp tới\" khỏi Kênh</string>
   <string name="hide_upcoming_home">Ẩn mục \"sắp tới\" khỏi Trang chủ</string>
   <string name="save_playlist">Thêm danh sách phát này vào vào mục Danh sách phát</string>
+  <string name="delete_playlist">Xóa danh sách phát</string>
+  <string name="delete_playlist_fmt">Xóa danh sách phát %s?</string>
   <string name="skip_shorts">Bỏ qua Shorts</string>
   <string name="speech_engine">Công cụ tìm kiếm bằng giọng nói</string>
   <string name="dearrow_status">Kiểm tra trạng thái máy chủ của DeArrow</string>
@@ -986,7 +987,6 @@
   <string name="card_preview_full">Video có âm thanh</string>
   <string name="card_preview">Xem trước thẻ</string>
   <string name="original_lang">Nguyên bản</string>
-  <string name="remove_playlist_fmt">Xóa %s vĩnh viễn\?</string>
   <string name="auto_backup_category">Tự động sao lưu</string>
   <string name="once_a_day">Một lần một ngày</string>
   <string name="once_a_week">Một lần một tuần</string>

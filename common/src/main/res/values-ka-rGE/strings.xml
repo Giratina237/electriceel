@@ -691,10 +691,10 @@
   <string name="pressing_home_back">მთავარზე ან უკან დაჭერით</string>
   <string name="pressing_back">უკან დაჭერით</string>
   <string name="player_number_key_seek">ციფრული კლავიშებით გადახვევა</string>
-  <string name="save_remove_playlist">ფლეილისტის დამატება/წაშლა ფლეილისტების განყოფილებიდან</string>
+  <string name="add_delete_playlist">ფლეილისტებში დამატება/ფლეილისტის წაშლა</string>
   <string name="save_playlist">ფლეილისტის დამატება ფლეილისტების განყოფილებაში</string>
-  <string name="remove_playlist">ფლეილისტის წაშლა ფლეილისტების განყოფილებიდან</string>
-  <string name="remove_playlist_fmt">წავშალო %s სამუდამოდ\?</string>
+  <string name="delete_playlist">ფლეილისტის წაშლა</string>
+  <string name="delete_playlist_fmt">წავშალო ფლეილისტი %s?</string>
   <string name="removed_from_playlists">წაშლილია ფლეილისტების განყოფილებიდან</string>
   <string name="saved_to_playlists">დამატებულია ფლეილისტების განყოფილებაში</string>
   <string name="create_playlist">ფლეილისტის შექმნა</string>

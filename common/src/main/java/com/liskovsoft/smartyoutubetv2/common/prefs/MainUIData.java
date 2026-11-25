@@ -106,10 +106,10 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
     private static final Long[] MENU_ITEM_DEFAULT_ORDER = {
             MENU_ITEM_EXIT_FROM_PIP, MENU_ITEM_PLAY_VIDEO, MENU_ITEM_REFRESH_SECTION, MENU_ITEM_PLAY_VIDEO_INCOGNITO, MENU_ITEM_PLAY_FROM_START, MENU_ITEM_REMOVE_FROM_HISTORY,
             MENU_ITEM_STREAM_REMINDER, MENU_ITEM_RECENT_PLAYLIST, MENU_ITEM_ADD_TO_WATCH_LATER, MENU_ITEM_LIKE, MENU_ITEM_ADD_TO_PLAYLIST, MENU_ITEM_CREATE_PLAYLIST,
-            MENU_ITEM_CREATE_LOCAL_PLAYLIST, MENU_ITEM_RENAME_PLAYLIST, MENU_ITEM_COPY_PLAYLIST_TO_YOUTUBE, MENU_ITEM_ADD_TO_NEW_PLAYLIST, MENU_ITEM_NOT_INTERESTED, MENU_ITEM_NOT_RECOMMEND_CHANNEL, MENU_ITEM_BLOCK_CHANNEL, MENU_ITEM_REPORT_AI_CHANNEL, MENU_ITEM_HIDE_KEYWORDS,
+            MENU_ITEM_CREATE_LOCAL_PLAYLIST, MENU_ITEM_RENAME_PLAYLIST, MENU_ITEM_SAVE_REMOVE_PLAYLIST, MENU_ITEM_COPY_PLAYLIST_TO_YOUTUBE, MENU_ITEM_ADD_TO_NEW_PLAYLIST, MENU_ITEM_NOT_INTERESTED, MENU_ITEM_NOT_RECOMMEND_CHANNEL, MENU_ITEM_BLOCK_CHANNEL, MENU_ITEM_REPORT_AI_CHANNEL, MENU_ITEM_HIDE_KEYWORDS,
             MENU_ITEM_EXCLUDE_CHANNEL_FROM_HIDING, MENU_ITEM_HIDE, MENU_ITEM_MARK_AS_WATCHED, MENU_ITEM_PLAYLIST_ORDER, MENU_ITEM_PLAY_NEXT, MENU_ITEM_ADD_TO_QUEUE,
             MENU_ITEM_SHOW_QUEUE, MENU_ITEM_OPEN_CHANNEL, MENU_ITEM_OPEN_PLAYLIST, MENU_ITEM_SUBSCRIBE, MENU_ITEM_EXCLUDE_FROM_CONTENT_BLOCK,
-            MENU_ITEM_SUBSCRIPTION_GROUP, MENU_ITEM_PIN_TO_SIDEBAR, MENU_ITEM_ADD_TO_HOME_ROWS, MENU_ITEM_ADD_TO_HOME_SCREEN, MENU_ITEM_SAVE_REMOVE_PLAYLIST, MENU_ITEM_OPEN_DESCRIPTION, MENU_ITEM_OPEN_COMMENTS, MENU_ITEM_SHARE_LINK,
+            MENU_ITEM_SUBSCRIPTION_GROUP, MENU_ITEM_PIN_TO_SIDEBAR, MENU_ITEM_ADD_TO_HOME_ROWS, MENU_ITEM_ADD_TO_HOME_SCREEN, MENU_ITEM_OPEN_DESCRIPTION, MENU_ITEM_OPEN_COMMENTS, MENU_ITEM_SHARE_LINK,
             MENU_ITEM_SHARE_EMBED_LINK, MENU_ITEM_SHARE_QR_LINK, MENU_ITEM_SELECT_ACCOUNT, MENU_ITEM_TOGGLE_HISTORY, MENU_ITEM_CLEAR_HISTORY,
             MENU_ITEM_MOVE_SECTION_UP, MENU_ITEM_MOVE_SECTION_DOWN, MENU_ITEM_RENAME_SECTION, MENU_ITEM_UPDATE_CHECK
     };
@@ -637,6 +637,7 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
         // the ones never saved (the defaults of an account that changed none).
         boolean isNewUser = TextUtils.isEmpty(data) && isFirstInstall(mContext);
         mSkinId = Helpers.parseInt(split, 32, isNewUser ? SKIN_HYBRID : SKIN_CLASSIC);
+        // 33: restoreMenus
 
         int idx = -1;
         for (Long menuItem : MENU_ITEM_DEFAULT_ORDER) {
@@ -687,10 +688,13 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
      * has them, in their order. The sidebar one had a fixed order: it keeps it. Not interested is new to Subscriptions: it's off there.
      * The subscription group one was last and off: it's put above the sidebar one and on, once, where it's still like that.
      * Hide was only in Subscriptions: it's new to the other card menus, so it's on there as by default.
+     * Add to Playlists/Delete playlist was down by Add/Remove from the home screen: it's put right below its default neighbour,
+     * once, where it's still below it.
      */
     private void restoreMenus(String[] split) {
         List<Long> menuItems = Helpers.parseLongList(split, 25);
         boolean isSubscriptionGroupPlaced = Helpers.parseBoolean(split, 31, false);
+        boolean isSaveRemovePlaylistPlaced = Helpers.parseBoolean(split, 33, false);
         List<ContextMenuProvider> providers = new ContextMenuManager(mContext).getProviders();
 
         mMenuItemsOrderedByMenu.clear();
@@ -748,9 +752,33 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
                 mMenuItemsByMenu[menu] |= MENU_ITEM_SUBSCRIPTION_GROUP;
             }
 
+            if (!isSaveRemovePlaylistPlaced) {
+                placeAfterDefaultNeighbour(order, defaultOrder, MENU_ITEM_SAVE_REMOVE_PLAYLIST);
+            }
+
             mMenuItemsOrderedByMenu.add(order);
             mMenuItemsByMenu[menu] &= getMenuItems(menu);
         }
+    }
+
+    /**
+     * Right below the item above it in the default order, where it's below that one
+     */
+    private static void placeAfterDefaultNeighbour(List<Long> order, List<Long> defaultOrder, long menuItem) {
+        int defaultIdx = defaultOrder.indexOf(menuItem);
+
+        if (defaultIdx < 1) {
+            return;
+        }
+
+        int neighbourIdx = order.indexOf(defaultOrder.get(defaultIdx - 1));
+
+        if (neighbourIdx == -1 || order.indexOf(menuItem) <= neighbourIdx) {
+            return;
+        }
+
+        order.remove((Long) menuItem);
+        order.add(neighbourIdx + 1, menuItem);
     }
 
     /**
@@ -829,7 +857,8 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
                 Helpers.mergeList(mMenuItemsOrderedByMenu.get(MENU_PLAYLISTS)),
                 Helpers.mergeList(mMenuItemsOrderedByMenu.get(MENU_SIDEBAR)),
                 true, // the subscription group item placed (see restoreMenus)
-                mSkinId));
+                mSkinId,
+                true)); // the Add to Playlists/Delete playlist item placed (see restoreMenus)
     }
 
     public static class ColorScheme {

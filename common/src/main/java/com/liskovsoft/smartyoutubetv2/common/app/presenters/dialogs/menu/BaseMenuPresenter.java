@@ -23,6 +23,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.AccountSelec
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.AppUpdatePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter.VideoMenuCallback;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.WatchLaterManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.HomeRowsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.HomeScreenPlaylistsData;
@@ -37,6 +38,7 @@ import io.reactivex.Observable;
 import java.util.List;
 
 public abstract class BaseMenuPresenter extends BasePresenter<Void> {
+    private static final String LIKED_PLAYLIST_ID = "LL"; // Liked videos (see BrowseApiHelper.LIKED_PLAYLIST)
     private final MediaServiceManager mServiceManager;
     private boolean mIsPinToSidebarEnabled;
     private boolean mIsSaveRemovePlaylistEnabled;
@@ -369,9 +371,13 @@ public abstract class BaseMenuPresenter extends BasePresenter<Void> {
             return;
         }
 
+        if (original.belongsToUserPlaylists() && isBuiltInPlaylist(original)) {
+            return;
+        }
+
         getDialogPresenter().appendSingleButton(
                 UiOptionItem.from(
-                        getContext().getString(original.belongsToUserPlaylists()? R.string.remove_playlist : R.string.save_playlist),
+                        getContext().getString(original.belongsToUserPlaylists()? R.string.delete_playlist : R.string.save_playlist),
                         optionItem -> {
                             if (original.hasPlaylist()) {
                                 syncToggleSaveRemovePlaylist(original, null);
@@ -412,6 +418,14 @@ public abstract class BaseMenuPresenter extends BasePresenter<Void> {
                 ));
     }
 
+    /**
+     * Watch later and Liked videos: YouTube's own, they can't be deleted or renamed (see PlaylistService.removePlaylist and
+     * PlaylistServiceWrapper.renameCachedPlaylist)
+     */
+    private static boolean isBuiltInPlaylist(Video video) {
+        return Helpers.equalsAny(video.findPlaylistId(), WatchLaterManager.WATCH_LATER_PLAYLIST_ID, LIKED_PLAYLIST_ID);
+    }
+
     private void syncToggleSaveRemovePlaylist(Video original, String playlistId) {
         Video video = Video.from(original);
 
@@ -445,7 +459,7 @@ public abstract class BaseMenuPresenter extends BasePresenter<Void> {
                 if (video.playlistId == null) {
                     MessageHelpers.showMessage(getContext(), R.string.cant_delete_empty_playlist);
                 } else {
-                    AppDialogUtil.showConfirmationDialog(getContext(), getContext().getString(R.string.remove_playlist_fmt, video.title), () -> {
+                    AppDialogUtil.showConfirmationDialog(getContext(), getContext().getString(R.string.delete_playlist_fmt, video.title), () -> {
                         removePlaylist(video);
                         closeDialog();
                     });
@@ -656,7 +670,7 @@ public abstract class BaseMenuPresenter extends BasePresenter<Void> {
 
         BrowsePresenter presenter = BrowsePresenter.instance(getContext());
 
-        if (original == null || !(presenter.isPlaylistsSection() && presenter.inForeground())) {
+        if (original == null || !(presenter.isPlaylistsSection() && presenter.inForeground()) || isBuiltInPlaylist(original)) {
             return;
         }
 

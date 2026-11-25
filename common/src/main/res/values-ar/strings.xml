@@ -651,8 +651,7 @@
   <string name="pressing_home">بالضغط على زر HOME</string>
   <string name="pressing_home_back">بالضغط على زر HOME أو الرجوع</string>
   <string name="player_number_key_seek">التنقل باستخدام مفاتيح الأرقام</string>
-  <string name="save_remove_playlist">إضافة/إزالة قائمة التشغيل من قسم قوائم التشغيل</string>
-  <string name="remove_playlist">إزالة قائمة التشغيل من قسم قوائم التشغيل بشكل دائم</string>
+  <string name="add_delete_playlist">إضافة إلى قوائم التشغيل/حذف قائمة التشغيل</string>
   <string name="removed_from_playlists">تمت الإزالة من قسم قوائم التشغيل</string>
   <string name="saved_to_playlists">تمت الإضافة إلى قسم قوائم التشغيل</string>
   <string name="create_playlist">إنشاء قائمة التشغيل</string>
@@ -903,6 +902,8 @@
   <string name="hide_upcoming_home">إخفاء الفيديوهات القادمة من الصفحة الرئيسية</string>
   <string name="remember_position_of_live_videos">تذكر تقدم البث المباشر</string>
   <string name="save_playlist">إضافة قائمة التشغيل إلى قسم قوائم التشغيل</string>
+  <string name="delete_playlist">حذف قائمة التشغيل</string>
+  <string name="delete_playlist_fmt">هل تريد حذف قائمة التشغيل %s؟</string>
   <string name="skip_shorts">تخطي Shorts</string>
   <string name="suggestions">الاقتراحات</string>
   <string name="place_comments_left">ضع التعليقات على اليسار</string>
@@ -982,7 +983,6 @@
   <string name="hide_shorts_from_gaming">إخفاء Shorts من ألعاب الفيديو</string>
   <string name="hide_shorts_from_news">إخفاء Shorts من الأخبار</string>
   <string name="hide_shorts_from_music">إخفاء Shorts من الموسيقى</string>
-  <string name="remove_playlist_fmt">هل تريد إزالة %s بشكل دائم؟</string>
   <string name="video_flip">انعكاس (مرآة)</string>
   <string name="play_from_start">التشغيل من البداية</string>
   <string name="player_chapter_notification2">الانتقال إلى الفصل التالي بالنقر على الإشعار</string>

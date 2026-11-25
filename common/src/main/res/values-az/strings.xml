@@ -688,10 +688,10 @@
     <string name="pressing_home_back">Ev və ya Geri düyməsinə basaraq</string>
     <string name="pressing_back">Geri düyməsinə basaraq</string>
     <string name="player_number_key_seek">Rəqəm düymələri ilə irəli/geri çək</string>
-    <string name="save_remove_playlist">Pleylistlər bölməsindən pleylist əlavə et / sil</string>
+    <string name="add_delete_playlist">Pleylistlərə əlavə et/pleylisti sil</string>
     <string name="save_playlist">Pleylistlər bölməsinə pleylist əlavə et</string>
-    <string name="remove_playlist">Pleylistlər bölməsindən pleylisti həmişəlik sil</string>
-    <string name="remove_playlist_fmt">%s həmişəlik silinsinmi?</string>
+    <string name="delete_playlist">Pleylisti sil</string>
+    <string name="delete_playlist_fmt">%s pleylisti silinsin?</string>
     <string name="removed_from_playlists">Pleylistlər bölməsindən silindi</string>
     <string name="saved_to_playlists">Pleylistlər bölməsinə əlavə olundu</string>
     <string name="create_playlist">Pleylist yarat</string>
