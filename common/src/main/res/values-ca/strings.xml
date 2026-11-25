@@ -646,8 +646,7 @@
   <string name="pressing_home">prement HOME</string>
   <string name="pressing_home_back">prement HOME o BACK</string>
   <string name="player_number_key_seek">Cerca amb tecles numèriques</string>
-  <string name="save_remove_playlist">Afegeix/elimina una llista de reproducció de la secció Llistes de reproducció</string>
-  <string name="remove_playlist">Suprimeix la llista de reproducció de la secció Llistes de reproducció permanentment</string>
+  <string name="add_delete_playlist">Afegeix a Llistes de reproducció/suprimeix la llista de reproducció</string>
   <string name="removed_from_playlists">S\'ha eliminat de la secció Llistes de reproducció</string>
   <string name="saved_to_playlists">S\'ha afegit a la secció Llistes de reproducció</string>
   <string name="create_playlist">Crea una llista de reproducció</string>
@@ -819,7 +818,8 @@
   <string name="live_stream_fix_4k_desc">Avís: aquest ajust desactiva el rebobinatge de les emissions. Millora considerablement el rendiment de les emissions en directe. La resolució màxima és 4K.</string>
   <string name="remember_position_of_live_videos">Recorda la posició de les emissions en directe</string>
   <string name="save_playlist">Afegeix la llista a la secció Llistes de reproducció</string>
-  <string name="remove_playlist_fmt">Voleu eliminar %s definitivament?</string>
+  <string name="delete_playlist">Suprimeix la llista de reproducció</string>
+  <string name="delete_playlist_fmt">Voleu suprimir la llista de reproducció %s?</string>
   <string name="create_playlist_note">NOTA: No es veurà a l\'aplicació de YouTube</string>
   <string name="skip_shorts">Omet els Shorts</string>
   <string name="speech_engine">Motor de cerca per veu</string>

@@ -693,10 +693,10 @@
     <string name="pressing_home_back">dengan menekan HOME atau BACK</string>
     <string name="pressing_back">dengan menekan BACK</string>
     <string name="player_number_key_seek">Lompat dengan kekunci nombor</string>
-    <string name="save_remove_playlist">Tambah/Alih keluar senarai main daripada bahagian Senarai main</string>
+    <string name="add_delete_playlist">Tambah ke Senarai main/Padam senarai main</string>
     <string name="save_playlist">Tambah senarai main ke bahagian Senarai main</string>
-    <string name="remove_playlist">Alih keluar senarai main daripada bahagian Senarai main secara kekal</string>
-    <string name="remove_playlist_fmt">Alih keluar %s secara kekal?</string>
+    <string name="delete_playlist">Padam senarai main</string>
+    <string name="delete_playlist_fmt">Padam senarai main %s?</string>
     <string name="removed_from_playlists">Dialih keluar daripada bahagian Senarai main</string>
     <string name="saved_to_playlists">Ditambah ke bahagian Senarai main</string>
     <string name="create_playlist">Cipta senarai main</string>

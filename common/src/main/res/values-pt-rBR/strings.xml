@@ -687,10 +687,10 @@
   <string name="pressing_home_back">Pressionando o botão \"Início\" ou \"Voltar\"</string>
   <string name="pressing_back">Pressionando o botão \"Voltar\"</string>
   <string name="player_number_key_seek">Avanço/Retrocesso com as teclas numéricas</string>
-  <string name="save_remove_playlist">Salvar/Remover essa playlist da seção \"Playlists\"</string>
+  <string name="add_delete_playlist">Adicionar às Playlists/Excluir playlist</string>
   <string name="save_playlist">Adicionar playlist para seção de \"Playlists\"</string>
-  <string name="remove_playlist">Remover essa playlist da seção \"Playlists\" permanentemente</string>
-  <string name="remove_playlist_fmt">Remove %s permanently\?</string>
+  <string name="delete_playlist">Excluir playlist</string>
+  <string name="delete_playlist_fmt">Excluir a playlist %s?</string>
   <string name="removed_from_playlists">Removida da seção \"Playlists\"</string>
   <string name="saved_to_playlists">Salva na seção \"Playlists\"</string>
   <string name="create_playlist">Criar nova playlist </string>

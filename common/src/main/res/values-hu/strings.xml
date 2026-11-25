@@ -647,8 +647,7 @@
   <string name="pressing_home">a HOME gomb megnyomásával</string>
   <string name="pressing_home_back">a HOME vagy a BACK gomb megnyomásával</string>
   <string name="player_number_key_seek">Keresés a számbillentyűkkel</string>
-  <string name="save_remove_playlist">Lista mentése/eltávolítása a videólisták részből</string>
-  <string name="remove_playlist">Videó eltávolítása</string>
+  <string name="add_delete_playlist">Hozzáadás a Videólistákhoz/videólista törlése</string>
   <string name="removed_from_playlists">Eltávolítva a videólistából</string>
   <string name="saved_to_playlists">Mentés a videólistákhoz</string>
   <string name="create_playlist">Videólista létrehozása</string>
@@ -900,6 +899,8 @@
   <string name="player_loop_shorts">Rövid klipek újrajátszása</string>
   <string name="auto_frame_rate_desc">Ez az opció eltávolítja a remegést olyan jeleneteknél, ahol a kamera gyorsan mozog, pl. sport streaming</string>
   <string name="save_playlist">Lista hozzáadása a videólisták részhez</string>
+  <string name="delete_playlist">Videólista törlése</string>
+  <string name="delete_playlist_fmt">%s videólista törlése?</string>
   <string name="pin_playlist">Videólista hozzáadása az oldalsávhoz</string>
   <string name="pin_channel">Csatorna hozzáadása az oldalsávhoz</string>
   <string name="action_sound_off">Hang kikapcsolása</string>
@@ -991,7 +992,6 @@
   <string name="card_unlocalized_titles">Nem lokalizált videócímek</string>
   <string name="oculus_quest_fix">Oculus Quest javítása</string>
   <string name="original_lang">Eredeti</string>
-  <string name="remove_playlist_fmt">%s végleges eltávolítása\?</string>
   <string name="play_from_start">Lejátszás az elejétől</string>
   <string name="player_chapter_notification2">Váltson a következő fejezetre az értesítésre kattintva</string>
   <string name="dont_resize_video_to_fit_dialog">Ne méretezze át a videót </string>

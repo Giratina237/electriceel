@@ -718,10 +718,10 @@
   <string name="pressing_home_back">s pritiskom na HOME ali BACK</string>
   <string name="pressing_back">s pritiskom na BACK</string>
   <string name="player_number_key_seek">Premikanje s številskimi tipkami</string>
-  <string name="save_remove_playlist">Dodaj seznam predvajanja v razdelek Seznami predvajanja / odstrani z njega</string>
+  <string name="add_delete_playlist">Dodaj v razdelek Seznami predvajanja/izbriši seznam predvajanja</string>
   <string name="save_playlist">Dodaj seznam predvajanja v razdelek Seznami predvajanja</string>
-  <string name="remove_playlist">Trajno odstrani seznam predvajanja iz razdelka Seznami predvajanja</string>
-  <string name="remove_playlist_fmt">Želite trajno odstraniti %s?</string>
+  <string name="delete_playlist">Izbriši seznam predvajanja</string>
+  <string name="delete_playlist_fmt">Želite izbrisati seznam predvajanja %s?</string>
   <string name="removed_from_playlists">Odstranjeno iz razdelka Seznami predvajanja</string>
   <string name="saved_to_playlists">Dodano v razdelek Seznami predvajanja</string>
   <string name="create_playlist">Ustvari seznam predvajanja</string>

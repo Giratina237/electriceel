@@ -648,8 +648,7 @@
     <string name="pressing_home">Pritiskom na HOME</string>
     <string name="pressing_home_back">Pritiskom na HOME ili BACK</string>
     <string name="player_number_key_seek">Premotavaj s brojčanim tipkama</string>
-    <string name="save_remove_playlist">Dodaj/Obriši popis izvođenja iz odjeljka Zbirka</string>
-    <string name="remove_playlist">Obriši trajno popis izvođenja iz odjeljka Zbirka</string>
+    <string name="add_delete_playlist">Dodaj u Zbirku/obriši popis izvođenja</string>
     <string name="removed_from_playlists">Obrisano iz odjeljka Zbirka</string>
     <string name="saved_to_playlists">Dodano u odjeljak Zbirka</string>
     <string name="create_playlist">Stvori popis izvođenja</string>
@@ -813,7 +812,8 @@
     <string name="remember_position_of_live_videos">Zapamti položaj streama uživo</string>
     <string name="pressing_back">pritiskom na BACK</string>
     <string name="save_playlist">Dodaj popis za reprodukciju u odjeljak Popisi za reprodukciju</string>
-    <string name="remove_playlist_fmt">Trajno ukloniti %s?</string>
+    <string name="delete_playlist">Obriši popis izvođenja</string>
+    <string name="delete_playlist_fmt">Obrisati popis izvođenja %s?</string>
     <string name="create_playlist_note">NAPOMENA: Neće se vidjeti u aplikaciji YouTube</string>
     <string name="skip_shorts">Preskoči Shorts</string>
     <string name="suggestions">Prijedlozi</string>

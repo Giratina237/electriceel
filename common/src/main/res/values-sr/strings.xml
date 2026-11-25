@@ -575,10 +575,10 @@
     <string name="pressing_home_back">притиском на ПОЧЕТНА или НАЗАД</string>
     <string name="pressing_back">пристиском на НАЗАД</string>
     <string name="player_number_key_seek">Премотај са тастерима бројева</string>
-    <string name="save_remove_playlist">Додај/Обриши листу из одељка Листе</string>
-    <string name="remove_playlist_fmt">Обриши %s трајно?</string>
+    <string name="add_delete_playlist">Додај у Листе/Обриши листу</string>
     <string name="save_playlist">Сачувај листу на одељку Листе</string>
-    <string name="remove_playlist">Обриши листу трајно из одељка Листе</string>
+    <string name="delete_playlist">Обриши листу</string>
+    <string name="delete_playlist_fmt">Обрисати листу %s?</string>
     <string name="removed_from_playlists">Обрисана из одељка Листе</string>
     <string name="saved_to_playlists">Додата у одељак Листе</string>
     <string name="create_playlist">Направи листу пуштања</string>

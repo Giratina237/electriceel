@@ -284,7 +284,7 @@ public final class SyncedSettings {
         add("tweaks.playerButtons2", 0, Type.INT, "Player buttons (more)");
 
         section("Interface", MainUIData.MAIN_UI_DATA, true);
-        // Not: 1 and 2 the grid and UI scales (the screen's), 31 a marker
+        // Not: 1 and 2 the grid and UI scales (the screen's), 31 and 33 markers
         add("ui.colorScheme", 3, Type.INT, "Color scheme");
         add("ui.cardMultilineTitle", 4, Type.BOOL, "Card titles on several lines");
         add("ui.channelCategorySorting", 5, Type.INT, "Channels sorting");
