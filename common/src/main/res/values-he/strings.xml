@@ -513,6 +513,7 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="collaborations_desc">סרטון שהערוץ שלו מוצג כ-\"X and Y\", כאשר X ו-Y הם שמות ערוצים. כל שם נבדק פעם אחת בחיפוש ערוצים ללא כניסה לחשבון. אנגלית בלבד.</string>
     <string name="collaborations_sections">מדורים</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">משתפי פעולה</string>
     <string name="watch_later">לצפייה בהמשך</string>
     <string name="watch_later_show">הצגה</string>
     <string name="watch_later_mark">סימון</string>

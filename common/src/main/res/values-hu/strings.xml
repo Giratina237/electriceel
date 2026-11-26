@@ -480,6 +480,7 @@
   <string name="collaborations_desc">Videó, amelynek csatornája \"X and Y\" alakú, ahol X és Y csatornanév. Minden nevet egyszer ellenőriz egy bejelentkezés nélküli csatornakeresés. Csak angolul.</string>
   <string name="collaborations_sections">Szakaszok</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Közreműködők</string>
   <string name="watch_later">Megnézendő</string>
   <string name="watch_later_show">Megjelenítés</string>
   <string name="watch_later_mark">Megjelölés</string>

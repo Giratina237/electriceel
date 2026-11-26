@@ -509,6 +509,7 @@
     <string name="collaborations_desc">ఛానెల్ \"X and Y\"గా చూపబడే వీడియో, ఇక్కడ X మరియు Y రెండూ ఛానెల్ పేర్లు. ప్రతి పేరు సైన్ ఇన్ చేయని ఛానెల్ శోధనతో ఒకసారి తనిఖీ చేయబడుతుంది. ఇంగ్లీష్ మాత్రమే.</string>
     <string name="collaborations_sections">విభాగాలు</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">సహకారులు</string>
     <string name="watch_later">తర్వాత చూడండి</string>
     <string name="watch_later_show">చూపించు</string>
     <string name="watch_later_mark">గుర్తించు</string>

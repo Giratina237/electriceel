@@ -472,6 +472,7 @@
     <string name="collaborations_desc">วิดีโอที่ช่องแสดงเป็น \"X and Y\" โดย X และ Y เป็นชื่อช่องทั้งคู่ แต่ละชื่อจะถูกตรวจสอบหนึ่งครั้งด้วยการค้นหาช่องโดยไม่ลงชื่อเข้าใช้ ภาษาอังกฤษเท่านั้น</string>
     <string name="collaborations_sections">ส่วน</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">ผู้ร่วมงาน</string>
     <string name="watch_later">ดูภายหลัง</string>
     <string name="watch_later_show">แสดง</string>
     <string name="watch_later_mark">ทำเครื่องหมาย</string>

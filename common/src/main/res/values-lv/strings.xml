@@ -509,6 +509,7 @@
     <string name="collaborations_desc">Video, kura kanāls parādīts kā \"X and Y\", kur X un Y ir kanālu nosaukumi. Katru nosaukumu vienreiz pārbauda ar kanālu meklēšanu bez pierakstīšanās. Tikai angļu valodā.</string>
     <string name="collaborations_sections">Sadaļas</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Sadarbības partneri</string>
     <string name="watch_later">Skatīties vēlāk</string>
     <string name="watch_later_show">Rādīt</string>
     <string name="watch_later_mark">Atzīmēt</string>

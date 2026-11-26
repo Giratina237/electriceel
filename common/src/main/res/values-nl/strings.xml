@@ -503,6 +503,7 @@
   <string name="collaborations_desc">Een video waarvan het kanaal wordt getoond als \"X and Y\", met X en Y allebei kanaalnamen. Elke naam wordt één keer opgezocht zonder inloggen. Alleen Engels.</string>
   <string name="collaborations_sections">Secties</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Medewerkers</string>
   <string name="watch_later">Later bekijken</string>
   <string name="watch_later_show">Tonen</string>
   <string name="watch_later_mark">Markeren</string>

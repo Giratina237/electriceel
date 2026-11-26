@@ -469,6 +469,7 @@
   <string name="collaborations_desc">ویدیویی که کانالش به‌صورت \"X and Y\" نشان داده می‌شود و X و Y هر دو نام کانال‌اند. هر نام یک بار با جستجوی کانال بدون ورود بررسی می‌شود. فقط انگلیسی.</string>
   <string name="collaborations_sections">بخش‌ها</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">همکاران</string>
   <string name="watch_later">تماشا در آینده</string>
   <string name="watch_later_show">نمایش</string>
   <string name="watch_later_mark">علامت‌گذاری</string>

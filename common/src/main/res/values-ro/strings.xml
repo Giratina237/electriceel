@@ -502,6 +502,7 @@
   <string name="collaborations_desc">Un videoclip al cărui canal apare ca \"X and Y\", unde X și Y sunt ambele nume de canale. Fiecare nume este verificat o dată printr-o căutare de canale fără autentificare. Doar în engleză.</string>
   <string name="collaborations_sections">Secțiuni</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Colaboratori</string>
   <string name="watch_later">Vizionează mai târziu</string>
   <string name="watch_later_show">Arată</string>
   <string name="watch_later_mark">Marchează</string>

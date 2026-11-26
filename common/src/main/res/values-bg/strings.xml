@@ -491,6 +491,7 @@
   <string name="collaborations_desc">Видеоклип, чийто канал е показан като \"X and Y\", където X и Y са имена на канали. Всяко име се проверява веднъж чрез търсене на канали без вписване. Само на английски.</string>
   <string name="collaborations_sections">Раздели</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Сътрудници</string>
   <string name="watch_later">Гледай по-късно</string>
   <string name="watch_later_show">Показване</string>
   <string name="watch_later_mark">Отбелязване</string>

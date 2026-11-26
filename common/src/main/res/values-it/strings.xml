@@ -508,6 +508,7 @@
     <string name="collaborations_desc">Un video il cui canale appare come \"X and Y\", dove X e Y sono entrambi nomi di canali. Ogni nome viene cercato una volta con una ricerca di canali senza accesso. Solo in inglese.</string>
     <string name="collaborations_sections">Sezioni</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Collaboratori</string>
     <string name="watch_later">Guarda più tardi</string>
     <string name="watch_later_show">Mostra</string>
     <string name="watch_later_mark">Contrassegna</string>

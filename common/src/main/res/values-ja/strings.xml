@@ -506,6 +506,7 @@
     <string name="collaborations_desc">チャンネルが「X and Y」と表示され、X と Y がどちらもチャンネル名である動画。各名前はログインなしのチャンネル検索で一度だけ確認されます。英語のみ。</string>
     <string name="collaborations_sections">セクション</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">コラボレーター</string>
     <string name="watch_later">後で見る</string>
     <string name="watch_later_show">表示</string>
     <string name="watch_later_mark">マーク</string>

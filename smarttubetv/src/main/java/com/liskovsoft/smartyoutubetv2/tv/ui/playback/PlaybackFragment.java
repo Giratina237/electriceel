@@ -1186,7 +1186,8 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.dislikeCount, Helpers.NON_BREAKING_SPACE, Helpers.THUMB_DOWN); // color of thumb cannot be changed
         }
 
-        if (getContext() != null && video.subscriberCount != null) {
+        // A collaboration's would be the uploader's alone: each channel's is in the Collaborators panel (see CollaboratorsPresenter)
+        if (getContext() != null && video.subscriberCount != null && !video.hasCollaborators()) {
             result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.subscriberCount.replace(" ", Helpers.NON_BREAKING_SPACE));
         }
 
@@ -1702,9 +1703,9 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     }
 
     @Override
-    public void setChannelIcon(String iconUrl) {
+    public void setChannelIcons(List<String> iconUrls) {
         if (mPlayerGlue != null) {
-            mPlayerGlue.setChannelIcon(iconUrl);
+            mPlayerGlue.setChannelIcons(iconUrls);
         }
     }
 

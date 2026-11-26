@@ -106,8 +106,10 @@ public class HiddenVideoResolver {
                     continue;
                 }
 
-                // The name is looked up for the blocked channels too, AiSList left off: it neither marks nor hides then (see VideoGroup)
-                boolean isBlockedCandidate = isBlockedChannelLookedUp && BlockedChannelManager.isCandidate(video);
+                // The name is looked up for the blocked channels too, AiSList left off: it neither marks nor hides then (see VideoGroup).
+                // A collaboration's too when the card has its uploader's id: any of its channels may be the blocked one.
+                boolean isBlockedCandidate = isBlockedChannelLookedUp
+                        && (BlockedChannelManager.isCandidate(video) || BlockedChannelManager.isCollaborationCandidate(video));
 
                 if (isBlockedCandidate) {
                     blockedCandidates.add(video);

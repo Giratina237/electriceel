@@ -521,6 +521,7 @@
     <string name="collaborations_desc">En video der kanalen vises som \"X and Y\", der X og Y begge er kanalnavn. Hvert navn slås opp én gang med et kanalsøk uten pålogging. Bare engelsk.</string>
     <string name="collaborations_sections">Seksjoner</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Samarbeidspartnere</string>
     <string name="watch_later">Se senere</string>
     <string name="watch_later_show">Vis</string>
     <string name="watch_later_mark">Merk</string>

@@ -508,6 +508,7 @@
   <string name="collaborations_desc">En video vars kanal visas som \"X and Y\", där X och Y båda är kanalnamn. Varje namn slås upp en gång med en kanalsökning utan inloggning. Endast engelska.</string>
   <string name="collaborations_sections">Avsnitt</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Medverkande</string>
   <string name="watch_later">Titta senare</string>
   <string name="watch_later_show">Visa</string>
   <string name="watch_later_mark">Markera</string>

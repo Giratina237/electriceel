@@ -475,6 +475,7 @@
   <string name="collaborations_desc">Video có kênh được hiển thị là \"X and Y\", trong đó X và Y đều là tên kênh. Mỗi tên được tra một lần bằng tìm kiếm kênh khi chưa đăng nhập. Chỉ tiếng Anh.</string>
   <string name="collaborations_sections">Mục</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Người cộng tác</string>
   <string name="watch_later">Xem sau</string>
   <string name="watch_later_show">Hiện</string>
   <string name="watch_later_mark">Đánh dấu</string>

@@ -471,6 +471,7 @@
   <string name="collaborations_desc">ऐसा वीडियो जिसका चैनल \"X and Y\" के रूप में दिखता है, जहाँ X और Y दोनों चैनल के नाम हैं। हर नाम को साइन इन किए बिना चैनल खोज से एक बार जाँचा जाता है। केवल अंग्रेज़ी।</string>
   <string name="collaborations_sections">अनुभाग</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">सहयोगी</string>
   <string name="watch_later">बाद में देखें</string>
   <string name="watch_later_show">दिखाएँ</string>
   <string name="watch_later_mark">चिह्नित करें</string>

@@ -473,6 +473,7 @@
   <string name="collaborations_desc">Βίντεο με κανάλι της μορφής \"X and Y\", όπου X και Y είναι ονόματα καναλιών. Κάθε όνομα ελέγχεται μία φορά με αναζήτηση καναλιών χωρίς σύνδεση. Μόνο στα αγγλικά.</string>
   <string name="collaborations_sections">Ενότητες</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Συνεργάτες</string>
   <string name="watch_later">Παρακολούθηση αργότερα</string>
   <string name="watch_later_show">Εμφάνιση</string>
   <string name="watch_later_mark">Σήμανση</string>

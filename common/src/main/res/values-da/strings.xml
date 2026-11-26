@@ -474,6 +474,7 @@
   <string name="collaborations_desc">En video, hvis kanal vises som \"X and Y\", hvor X og Y begge er kanalnavne. Hvert navn slås op én gang med en kanalsøgning uden login. Kun engelsk.</string>
   <string name="collaborations_sections">Sektioner</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Samarbejdspartnere</string>
   <string name="watch_later">Se senere</string>
   <string name="watch_later_show">Vis</string>
   <string name="watch_later_mark">Markér</string>

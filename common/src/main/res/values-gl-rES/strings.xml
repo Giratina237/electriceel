@@ -500,6 +500,7 @@
   <string name="collaborations_desc">Un vídeo cuxa canle aparece como \"X and Y\", onde X e Y son nomes de canle. Cada nome compróbase unha vez cunha busca de canles sen sesión. Só en inglés.</string>
   <string name="collaborations_sections">Seccións</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Colaboradores</string>
   <string name="watch_later">Ver máis tarde</string>
   <string name="watch_later_show">Mostrar</string>
   <string name="watch_later_mark">Marcar</string>

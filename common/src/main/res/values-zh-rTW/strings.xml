@@ -476,6 +476,7 @@
   <string name="collaborations_desc">頻道顯示為「X and Y」的影片，其中 X 和 Y 都是頻道名稱。每個名稱都會以未登入的頻道搜尋查詢一次。僅限英文。</string>
   <string name="collaborations_sections">區塊</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">合作者</string>
   <string name="watch_later">稍後觀看</string>
   <string name="watch_later_show">顯示</string>
   <string name="watch_later_mark">標記</string>

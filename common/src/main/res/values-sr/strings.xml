@@ -440,6 +440,7 @@
     <string name="collaborations_desc">Видео чији је канал приказан као \"X and Y\", где су X и Y називи канала. Сваки назив се једном проверава претрагом канала без пријаве. Само на енглеском.</string>
     <string name="collaborations_sections">Одељци</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Сарадници</string>
     <string name="watch_later">Гледај касније</string>
     <string name="watch_later_show">Прикажи</string>
     <string name="watch_later_mark">Означи</string>

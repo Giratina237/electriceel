@@ -516,6 +516,7 @@
     <string name="collaborations_desc">A video whose channel is shown as \"X and Y\", where X and Y are both channel names. Each name is looked up once with a signed-out channel search. English only.</string>
     <string name="collaborations_sections">Sections</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Collaborators</string>
     <string name="watch_later">Watch later</string>
     <string name="watch_later_show">Show</string>
     <string name="watch_later_mark">Mark</string>

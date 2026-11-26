@@ -479,6 +479,7 @@
     <string name="collaborations_desc">Vaizdo įrašas, kurio kanalas rodomas kaip \"X and Y\", kur X ir Y abu yra kanalų pavadinimai. Kiekvienas pavadinimas patikrinamas vieną kartą kanalų paieška neprisijungus. Tik anglų kalba.</string>
     <string name="collaborations_sections">Skiltys</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Bendradarbiai</string>
     <string name="watch_later">Žiūrėti vėliau</string>
     <string name="watch_later_show">Rodyti</string>
     <string name="watch_later_mark">Žymėti</string>

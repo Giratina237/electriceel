@@ -511,6 +511,7 @@
     <string name="collaborations_desc">Video, ktorého kanál je zobrazený ako \"X and Y\", kde X aj Y sú názvy kanálov. Každý názov sa raz overí vyhľadaním kanála bez prihlásenia. Len v angličtine.</string>
     <string name="collaborations_sections">Sekcie</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Spolupracovníci</string>
     <string name="watch_later">Pozrieť neskôr</string>
     <string name="watch_later_show">Zobraziť</string>
     <string name="watch_later_mark">Označiť</string>

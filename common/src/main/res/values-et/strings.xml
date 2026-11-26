@@ -496,6 +496,7 @@
   <string name="collaborations_desc">Video, mille kanal on kuvatud kujul \"X and Y\", kus X ja Y on mõlemad kanalite nimed. Iga nime kontrollitakse üks kord sisselogimata kanaliotsinguga. Ainult inglise keeles.</string>
   <string name="collaborations_sections">Jaotised</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Kaastöötajad</string>
   <string name="watch_later">Vaata hiljem</string>
   <string name="watch_later_show">Näita</string>
   <string name="watch_later_mark">Märgista</string>

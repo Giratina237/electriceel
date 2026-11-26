@@ -477,6 +477,7 @@
   <string name="collaborations_desc">فيديو تظهر قناته بالشكل \"X and Y\"، حيث X وY كلاهما اسما قناتين. يُبحث عن كل اسم مرة واحدة ببحث قنوات دون تسجيل الدخول. الإنجليزية فقط.</string>
   <string name="collaborations_sections">الأقسام</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">المتعاونون</string>
   <string name="watch_later">المشاهدة لاحقًا</string>
   <string name="watch_later_show">عرض</string>
   <string name="watch_later_mark">تمييز</string>

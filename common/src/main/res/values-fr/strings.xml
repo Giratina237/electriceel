@@ -488,6 +488,7 @@
   <string name="collaborations_desc">Une vidéo dont la chaîne s\'affiche \"X and Y\", X et Y étant des noms de chaîne. Chaque nom est vérifié une fois par une recherche de chaîne sans connexion. Anglais uniquement.</string>
   <string name="collaborations_sections">Sections</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Collaborateurs</string>
   <string name="watch_later">À regarder plus tard</string>
   <string name="watch_later_show">Afficher</string>
   <string name="watch_later_mark">Marquer</string>

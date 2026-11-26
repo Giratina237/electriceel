@@ -511,6 +511,7 @@
   <string name="collaborations_desc">ვიდეო, რომლის არხიც ნაჩვენებია როგორც \"X and Y\", სადაც X და Y ორივე არხის სახელია. თითოეული სახელი ერთხელ მოწმდება არხების ძიებით სისტემაში შესვლის გარეშე. მხოლოდ ინგლისურად.</string>
   <string name="collaborations_sections">სექციები</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">თანამშრომლები</string>
   <string name="watch_later">მოგვიანებით ნახვა</string>
   <string name="watch_later_show">ჩვენება</string>
   <string name="watch_later_mark">მონიშვნა</string>

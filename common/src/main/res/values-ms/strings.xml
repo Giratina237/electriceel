@@ -513,6 +513,7 @@
     <string name="collaborations_desc">Video yang salurannya ditunjukkan sebagai \"X and Y\", dengan X dan Y nama saluran. Setiap nama disemak sekali dengan carian saluran tanpa log masuk. Bahasa Inggeris sahaja.</string>
     <string name="collaborations_sections">Bahagian</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Kolaborator</string>
     <string name="watch_later">Tonton kemudian</string>
     <string name="watch_later_show">Tunjukkan</string>
     <string name="watch_later_mark">Tandakan</string>

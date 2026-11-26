@@ -498,6 +498,7 @@
   <string name="collaborations_desc">채널이 \"X and Y\"로 표시되고 X와 Y가 모두 채널 이름인 동영상. 각 이름은 로그아웃 상태의 채널 검색으로 한 번 확인합니다. 영어만 지원.</string>
   <string name="collaborations_sections">섹션</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">공동 작업자</string>
   <string name="watch_later">나중에 볼 동영상</string>
   <string name="watch_later_show">보이기</string>
   <string name="watch_later_mark">표시</string>

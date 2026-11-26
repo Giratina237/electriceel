@@ -507,6 +507,7 @@
     <string name="collaborations_desc">Տեսանյութ, որի ալիքը ցուցադրվում է \"X and Y\" ձևով, որտեղ X-ը և Y-ը ալիքների անուններ են։ Յուրաքանչյուր անուն ստուգվում է մեկ անգամ՝ առանց մուտքի որոնմամբ։ Միայն անգլերեն։</string>
     <string name="collaborations_sections">Բաժիններ</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Համագործակիցներ</string>
     <string name="watch_later">Դիտել ավելի ուշ</string>
     <string name="watch_later_show">Ցույց տալ</string>
     <string name="watch_later_mark">Նշել</string>

@@ -500,6 +500,7 @@
   <string name="collaborations_desc">Një video, kanali i së cilës shfaqet si \"X and Y\", ku X dhe Y janë të dy emra kanalesh. Çdo emër kontrollohet një herë me një kërkim kanalesh pa hyrë. Vetëm në anglisht.</string>
   <string name="collaborations_sections">Seksionet</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Bashkëpunëtorët</string>
   <string name="watch_later">Shiko më vonë</string>
   <string name="watch_later_show">Shfaq</string>
   <string name="watch_later_mark">Shëno</string>

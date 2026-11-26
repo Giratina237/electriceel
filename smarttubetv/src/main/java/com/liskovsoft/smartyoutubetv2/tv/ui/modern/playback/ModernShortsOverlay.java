@@ -25,6 +25,9 @@ import com.bumptech.glide.load.resource.bitmap.CircleCrop;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 import com.liskovsoft.smartyoutubetv2.tv.ui.modern.common.ModernColorScheme;
+import com.liskovsoft.smartyoutubetv2.tv.util.ChannelAvatars;
+
+import java.util.List;
 
 /**
  * Shorts screen: vertical video on the start side, details and actions on the end side.<br/>
@@ -48,6 +51,8 @@ public class ModernShortsOverlay extends FrameLayout {
     private ImageView mState;
     private TextView mTime;
     private float mProgress;
+    // A load started for an earlier video doesn't replace the avatar of the next one
+    private int mChannelIconRequest;
 
     public interface Listener {
         void onShortsAction(int actionId);
@@ -111,10 +116,30 @@ public class ModernShortsOverlay extends FrameLayout {
         refreshActions();
     }
 
-    public void setChannelIcon(String url) {
-        if (url != null && mChannel != null) {
-            Glide.with(getContext()).load(url).transform(new CircleCrop()).into((ImageView) mChannel.findViewById(R.id.modern_shorts_row_icon));
+    /**
+     * A collaboration's first two channels as a group (see ChannelAvatars)
+     */
+    public void setChannelIcons(List<String> urls) {
+        int request = ++mChannelIconRequest;
+
+        if (urls == null || urls.isEmpty() || mChannel == null) {
+            return;
         }
+
+        ImageView avatar = mChannel.findViewById(R.id.modern_shorts_row_icon);
+
+        if (urls.size() == 1) {
+            Glide.with(getContext()).load(urls.get(0)).transform(new CircleCrop()).into(avatar);
+            return;
+        }
+
+        // An avatar still loading would come over the group
+        Glide.with(getContext()).clear(avatar);
+        ChannelAvatars.loadGroup(getContext(), urls, getResources().getDimensionPixelSize(R.dimen.modern_rail_avatar_size), group -> {
+            if (group != null && request == mChannelIconRequest) {
+                avatar.setImageDrawable(group);
+            }
+        });
     }
 
     /**

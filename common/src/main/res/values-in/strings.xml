@@ -498,6 +498,7 @@
   <string name="collaborations_desc">Video yang channel-nya ditampilkan sebagai \"X and Y\", dengan X dan Y sama-sama nama channel. Setiap nama dicek sekali dengan pencarian channel tanpa login. Khusus bahasa Inggris.</string>
   <string name="collaborations_sections">Bagian</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Kolaborator</string>
   <string name="watch_later">Tonton nanti</string>
   <string name="watch_later_show">Tampilkan</string>
   <string name="watch_later_mark">Tandai</string>

@@ -425,6 +425,42 @@ public class AiSListManager implements OnDataChange {
     }
 
     /**
+     * The name of the channel of the handle, from a card of that channel alone (not of a collaboration)
+     * @return null when no such card was looked up
+     */
+    public String getCachedChannelName(String handle) {
+        for (Map.Entry<String, Map<String, String>> entry : mHandlesByAuthor.entrySet()) {
+            Map<String, String> handles = entry.getValue();
+
+            if (handles.size() == 1 && handles.containsKey(handle) && !entry.getKey().startsWith(CHANNEL_ID_KEY_PREFIX)) {
+                return entry.getKey();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The channel ids found earlier for the channel name: one per channel of a collaboration, the uploader's first
+     * (see BlockedChannelManager)
+     * @return empty when none is known
+     */
+    public List<String> getCachedChannelIds(String author) {
+        Map<String, String> handles = author != null ? mHandlesByAuthor.get(author) : null;
+        List<String> result = new ArrayList<>();
+
+        if (handles != null) {
+            for (String channelId : handles.values()) {
+                if (channelId != null) {
+                    result.add(channelId);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Looks up the handles of the channel names not known yet, a few at a time, before the cards are shown
      * (see HiddenVideoResolver). Completes once every lookup is done, the failed ones too.
      * @param videoIdByKey the key of the handle cache (see {@link #getLookupKey}) -> a video of the channel

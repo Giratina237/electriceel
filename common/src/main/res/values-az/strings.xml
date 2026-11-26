@@ -508,6 +508,7 @@
     <string name="collaborations_desc">Kanalı \"X and Y\" kimi göstərilən və X ilə Y-nin hər ikisinin kanal adı olduğu video. Hər ad hesaba daxil olmadan kanal axtarışı ilə bir dəfə yoxlanılır. Yalnız ingiliscə.</string>
     <string name="collaborations_sections">Bölmələr</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Əməkdaşlar</string>
     <string name="watch_later">Sonra izlə</string>
     <string name="watch_later_show">Göstər</string>
     <string name="watch_later_mark">İşarələ</string>

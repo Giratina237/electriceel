@@ -504,6 +504,7 @@
   <string name="collaborations_desc">Film, którego kanał jest pokazany jako \"X and Y\", gdzie X i Y to nazwy kanałów. Każda nazwa jest sprawdzana raz wyszukiwaniem kanałów bez logowania. Tylko po angielsku.</string>
   <string name="collaborations_sections">Sekcje</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Współpracownicy</string>
   <string name="watch_later">Do obejrzenia</string>
   <string name="watch_later_show">Pokazuj</string>
   <string name="watch_later_mark">Oznaczaj</string>

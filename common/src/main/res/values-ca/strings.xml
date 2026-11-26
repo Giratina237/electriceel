@@ -479,6 +479,7 @@
   <string name="collaborations_desc">Un vídeo el canal del qual apareix com a \"X and Y\", on X i Y són noms de canal. Cada nom es comprova una vegada amb una cerca de canals sense sessió. Només en anglès.</string>
   <string name="collaborations_sections">Seccions</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Col·laboradors</string>
   <string name="watch_later">Mira-ho més tard</string>
   <string name="watch_later_show">Mostra</string>
   <string name="watch_later_mark">Marca</string>

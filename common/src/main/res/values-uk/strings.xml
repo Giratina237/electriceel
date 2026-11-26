@@ -508,6 +508,7 @@
     <string name="collaborations_desc">Відео, канал якого показано як «X and Y», де X і Y — обидва назви каналів. Кожна назва перевіряється один раз пошуком каналів без входу. Лише англійською.</string>
     <string name="collaborations_sections">Розділи</string>
     <string name="collaboration_mark">Колаб</string>
+    <string name="collaborators">Співавтори</string>
     <string name="watch_later">Переглянути пізніше</string>
     <string name="watch_later_show">Показувати</string>
     <string name="watch_later_mark">Позначати</string>

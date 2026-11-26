@@ -470,6 +470,7 @@
   <string name="collaborations_desc">Video, jonka kanava näytetään muodossa \"X and Y\", jossa X ja Y ovat molemmat kanavien nimiä. Jokainen nimi tarkistetaan kerran kanavahaulla ilman kirjautumista. Vain englanniksi.</string>
   <string name="collaborations_sections">Osiot</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Yhteistyökumppanit</string>
   <string name="watch_later">Katso myöhemmin</string>
   <string name="watch_later_show">Näytä</string>
   <string name="watch_later_mark">Merkitse</string>

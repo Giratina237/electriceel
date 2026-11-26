@@ -507,6 +507,7 @@
     <string name="collaborations_desc">Um vídeo cujo canal aparece como \"X and Y\", em que X e Y são nomes de canais. Cada nome é verificado uma vez com uma pesquisa de canais sem sessão iniciada. Só em inglês.</string>
     <string name="collaborations_sections">Secções</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Colaboradores</string>
     <string name="watch_later">Ver mais tarde</string>
     <string name="watch_later_show">Mostrar</string>
     <string name="watch_later_mark">Marcar</string>
