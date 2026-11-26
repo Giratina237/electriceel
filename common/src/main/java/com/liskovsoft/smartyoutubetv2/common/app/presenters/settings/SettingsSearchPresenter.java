@@ -94,7 +94,7 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         }
 
         boolean[] isSearched = {false};
-        SimpleEditDialog.show(context, context.getString(R.string.find_setting), context.getString(R.string.find_setting_hint),
+        SimpleEditDialog.showSearch(context, context.getString(R.string.find_setting), context.getString(R.string.find_setting_hint),
                 previous != null ? previous : "", question -> {
                     if (question.trim().isEmpty()) {
                         return false;

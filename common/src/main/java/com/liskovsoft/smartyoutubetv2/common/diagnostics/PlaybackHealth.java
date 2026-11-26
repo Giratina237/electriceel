@@ -35,6 +35,10 @@ public final class PlaybackHealth {
     public static final String RESUMED_BY_PAUSE = "pause";
     public static final String RESUMED_BY_BUFFERING = "buffering";
     /**
+     * The source was prepared again past the start (see #onStarted): its decoder and its AudioTrack started over
+     */
+    public static final String RESUMED_BY_PREPARE = "prepare";
+    /**
      * The more likely to have started the audio clock over, the later: one comes before the ones it's in front of
      */
     private static final List<String> RESUME_CAUSES = Arrays.asList(RESUMED_BY_BUFFERING, RESUMED_BY_PAUSE, RESUMED_BY_SEEK);
@@ -132,6 +136,17 @@ public final class PlaybackHealth {
     private boolean mIsClockStuck;
     private long mCatchUpEndMs = -1;
     private long mCatchUpDropped = -1;
+    private long mCatchUpRendered = -1;
+    /**
+     * The drops' window row of the sample a catch-up ended at (see #isDropsAfterCatchUp), null for none
+     */
+    @Nullable
+    private long[] mCatchUpEndRow;
+    /**
+     * Of the sample just given: how long the picture had stood still when a pause ended the freeze it reported (see
+     * #getPauseFrozenMs), -1 for none
+     */
+    private long mPauseFrozenMs = -1;
     /**
      * When it was last sent elsewhere, on the samples' clock (see #onSeek), -1 for not since the format was tried
      */
@@ -200,6 +215,10 @@ public final class PlaybackHealth {
          */
         public long attempt;
         public boolean isPlaying;
+        /**
+         * Not playing as it was told not to (by the user or the app), not buffering
+         */
+        public boolean isPaused;
         public long positionMs;
         public boolean hasVideo;
         public boolean hasAudio;
@@ -220,6 +239,15 @@ public final class PlaybackHealth {
          * Samples given to the decoder
          */
         public long inputBuffers = -1;
+        /**
+         * Of the video track alone: how far past the position its samples are loaded, -1 when unknown. None and nothing given to the
+         * decoder is no samples to give it, more is a decoder that doesn't take them.
+         */
+        public long videoBufferedAheadMs = -1;
+        /**
+         * How long after it was due this sample was taken (e.g. the main thread was held up), -1 when unknown
+         */
+        public long tickLateMs = -1;
         /**
          * Of the audio clock (see AudioClockInfo), -1 when unknown
          */
@@ -383,12 +411,14 @@ public final class PlaybackHealth {
             reset(sample.attempt);
             mStartFrames = early;
 
-            if (!isSameVideo) {
+            // A prepare's resume was the format's before (see onStarted): this one never played
+            if (!isSameVideo || RESUMED_BY_PREPARE.equals(mResumedBy)) {
                 endResume();
             }
         }
 
         mVideoId = sample.videoId;
+        mPauseFrozenMs = -1;
 
         List<String> result = new ArrayList<>();
         mIsPlaying = sample.isPlaying;
@@ -412,6 +442,10 @@ public final class PlaybackHealth {
         }
 
         if (!sample.isPlaying) {
+            if (sample.isPaused && wasPlaying) {
+                checkFreezeAtPause(sample, elapsedMs, result);
+            }
+
             // Paused or buffering: the time between ticks isn't playing time
             mLastTickMs = sample.nowMs;
             mLastPositionMs = -1;
@@ -466,8 +500,7 @@ public final class PlaybackHealth {
                 mStartFrozenMs = clockStillMs;
                 mIsStartClockStill = true;
                 report(result, KIND_START_FROZEN);
-                mCatchUpEndMs = sample.nowMs + CATCH_UP_MS;
-                mCatchUpDropped = -1;
+                startCatchUp(sample.nowMs);
             } else if (!hasMoved && mClockStillMs >= START_STUCK_MS && !mReported.contains(KIND_VIDEO_FROZEN)) {
                 // The clock stood still with the picture while it played, and still does: a start freeze is reported only once it
                 // goes on (above), so one that never did wasn't (51AQC7FS: 2 frames in 10.4 s after a reload, then on and on)
@@ -506,12 +539,19 @@ public final class PlaybackHealth {
 
     private void checkDrops(Sample sample, List<String> result) {
         if (mCatchUpEndMs >= 0) {
-            // Till a sample with no new drops: the ones to come are counted from there
-            boolean isDropping = sample.droppedFrames > mCatchUpDropped && sample.nowMs < mCatchUpEndMs;
+            // Till a sample that shows frames and drops none: the ones to come are counted from there. Not one that does neither, its
+            // decoder hasn't put out a frame yet: MD8RQZM2 #1, a start resumed at 0:02, showed none and dropped none in its first
+            // 571 ms, then dropped 75 of 83 by 1.6 s, counted as frame drops.
+            boolean isCaughtUp = mCatchUpDropped >= 0 && sample.droppedFrames <= mCatchUpDropped
+                    && sample.renderedFrames > mCatchUpRendered;
+            boolean isCatchingUp = !isCaughtUp && sample.nowMs < mCatchUpEndMs;
             mCatchUpDropped = sample.droppedFrames;
-            mCatchUpEndMs = isDropping ? mCatchUpEndMs : -1;
+            mCatchUpRendered = sample.renderedFrames;
+            mCatchUpEndMs = isCatchingUp ? mCatchUpEndMs : -1;
             mFrames.clear();
-            mFrames.addLast(toFramesRow(sample));
+            long[] row = toFramesRow(sample);
+            mFrames.addLast(row);
+            mCatchUpEndRow = isCatchingUp ? null : row;
             return;
         }
 
@@ -540,6 +580,46 @@ public final class PlaybackHealth {
         }
     }
 
+    /**
+     * Paused while the picture stood still and the position went on: the freeze didn't end by itself, the pause ended it. Reported first,
+     * as one that ends, or goes on, while it plays is (see #onSample): H5B64KBE 11-21 12:00:57, still 5.2 s at the start and then paused,
+     * had none, and a freeze not reported never reaches its fix (see TunnelingFallback).
+     */
+    private void checkFreezeAtPause(Sample sample, long elapsedMs, List<String> result) {
+        // A seek since: not the picture it was
+        if (!sample.hasVideo || !sample.isVideoRendered || sample.renderedFrames < 0 || mSeekMs > mLastTickMs) {
+            return;
+        }
+
+        // Still till the pause, it played on from the sample before. A frame shown since ended it by itself, as one whose picture goes on.
+        boolean isStill = sample.renderedFrames == mLastRendered;
+        long frozenMs = isStill ? mFrozenMs + Math.min(elapsedMs, Math.max(0, sample.positionMs - mLastPositionMs)) : mFrozenMs;
+        boolean isOfStart = isFreezeOfStart(mFrozenMs);
+        String kind;
+
+        if (isStill && frozenMs >= (isOfStart ? START_STUCK_MS : FROZEN_MS)) {
+            kind = KIND_VIDEO_FROZEN;
+        } else if (isOfStart && frozenMs >= START_FROZEN_MS && !mReported.contains(KIND_VIDEO_FROZEN)) {
+            kind = KIND_START_FROZEN;
+        } else {
+            return;
+        }
+
+        if (mReported.contains(kind)) {
+            return;
+        }
+
+        mLongestFrozenMs = Math.max(mLongestFrozenMs, frozenMs);
+        mPauseFrozenMs = isStill ? frozenMs : -1;
+        report(result, kind);
+
+        if (KIND_START_FROZEN.equals(kind)) {
+            mStartFrozenMs = frozenMs;
+            // What it dropped while still is this freeze, not frames dropped on top of it
+            mFrames.clear();
+        }
+    }
+
     private static long[] toFramesRow(Sample sample) {
         return new long[]{sample.nowMs, sample.renderedFrames, sample.droppedFrames, sample.droppedToKeyframes};
     }
@@ -550,11 +630,14 @@ public final class PlaybackHealth {
 
     /**
      * {played, position, rendered, dropped, given to the decoder, dropped to a keyframe, audio timestamp state, audio playhead, audio
-     * latency}
+     * latency, video buffered ahead, sampled late by}. The last two tell a decoder given nothing for seconds that had nothing to take from
+     * one that took nothing, and a gap between rows from a main thread held up: T26RECBZ #1 had no row for 2.1 s while its decoder took
+     * no input, and neither could be told.
      */
     private static long[] toTrailRow(long playedMs, Sample sample) {
         return new long[]{playedMs, sample.positionMs, sample.renderedFrames, sample.droppedFrames, sample.inputBuffers,
-                sample.droppedToKeyframes, sample.audioTimestampState, sample.audioPlayheadMs, sample.audioLatencyMs};
+                sample.droppedToKeyframes, sample.audioTimestampState, sample.audioPlayheadMs, sample.audioLatencyMs,
+                sample.videoBufferedAheadMs, sample.tickLateMs};
     }
 
     private void addStartAudioClock(Sample sample) {
@@ -600,14 +683,42 @@ public final class PlaybackHealth {
         mNoFrameMs = 0;
         mFrozenMs = 0;
         mClockStillMs = 0;
+        // The seeks and the catch up of the source before. Not when the format tried changes (see #reset): its first sample may come
+        // after the start's seek, or after it played.
+        mSeekMs = -1;
+        mCatchUpEndMs = -1;
+        mCatchUpDropped = -1;
+        mCatchUpRendered = -1;
     }
 
     /**
-     * It plays for the first time since the player was prepared: the start (see #getStartTrail)
+     * It plays for the first time since the player was prepared: the start (see #getStartTrail). Sent to a position before (e.g. a
+     * resume, see VideoStateController#restorePosition), its decoder catches up to it as after a seek's resume (see #onResumed):
+     * YHN2G3G9 dropped 124 of 136 frames in the first 0.8 s of a start resumed at 20:20, none after. Not one sent where it was (see
+     * #onSeek): it has nothing to catch up on, the frames it drops are ones it couldn't decode in time.
+     * <p>
+     * The format tried played past its start before (e.g. the video opened again where it was left, the same format): its seconds from
+     * here are sampled as a resume's, after RESUMED_BY_PREPARE. H5B64KBE #1 froze 1 s into such a play, 816 s into the format's, and had
+     * neither trail.
+     *
+     * @return whether they are: a sample now is the resume trail's first
      */
-    public void onStarted() {
+    public boolean onStarted(long nowMs) {
         mInterruption = null;
         endResume();
+
+        if (mSeekMs >= 0) {
+            startCatchUp(nowMs);
+        }
+
+        if (mPlayedMs <= START_MS) {
+            return false;
+        }
+
+        mResumedAtMs = nowMs;
+        mResumedBy = RESUMED_BY_PREPARE;
+
+        return true;
     }
 
     /**
@@ -623,16 +734,30 @@ public final class PlaybackHealth {
         // Its decoder catches up from the new position: what the renderer drops meanwhile isn't frames it can't keep up with. 1440p60
         // VP9 dropped 44 of 76 frames in the 1.35 s after a seek's resume, 12 in the 47 s before.
         if (mSeekMs >= 0 && nowMs - mSeekMs <= SEEK_RESUME_MS) {
-            mCatchUpEndMs = nowMs + CATCH_UP_MS;
-            mCatchUpDropped = -1;
+            startCatchUp(nowMs);
         }
+    }
+
+    private void startCatchUp(long nowMs) {
+        mCatchUpEndMs = nowMs + CATCH_UP_MS;
+        mCatchUpDropped = -1;
+        mCatchUpRendered = -1;
     }
 
     /**
      * Sent elsewhere (a seek of any kind): it stopped playing for it (see #onInterrupted), and the drops of its resume are its decoder
-     * catching up (see #onResumed)
+     * catching up (see #onResumed). Not sent to where it was: ExoPlayer does nothing for that (see ExoPlayerImplInternal#seekToInternal),
+     * and VideoStateController#restorePosition makes one to 0:00 at the start of every video over 6 min with no position saved. Those
+     * starts' first-second drops were let go as a catch-up, the same of a 0:40 video, with no seek, were reported (EY23XNK9 #1).
+     *
+     * @param fromMs where it was, -1 when unknown
+     * @param toMs where it's sent
      */
-    public void onSeek(long nowMs) {
+    public void onSeek(long nowMs, long fromMs, long toMs) {
+        if (fromMs >= 0 && fromMs == toMs) {
+            return;
+        }
+
         onInterrupted(RESUMED_BY_SEEK);
         mSeekMs = nowMs;
     }
@@ -680,7 +805,8 @@ public final class PlaybackHealth {
 
     /**
      * Each sample of the start, oldest first: {played, position, rendered, dropped, given to the decoder, dropped to a keyframe, audio
-     * timestamp state, audio playhead, audio latency}. Empty past it: it doesn't tell about what happens later.
+     * timestamp state, audio playhead, audio latency, video buffered ahead, sampled late by} (see Sample). Empty past it: it doesn't tell
+     * about what happens later.
      */
     public List<long[]> getStartTrail() {
         return mPlayedMs <= START_MS ? mStartTrail : new ArrayList<>();
@@ -710,6 +836,24 @@ public final class PlaybackHealth {
         long[] last = mFrames.peekLast();
 
         return first != null && last != null && first[3] >= 0 && last[3] - first[3] == 1;
+    }
+
+    /**
+     * The frames dropped in the window (see #getDropsWindow) were counted from where a catch-up ended: a start's or a resume's decoder
+     * catching up to its position (see #onStarted, #onResumed), or a start's after its clock stood still. They went on past it.
+     */
+    public boolean isDropsAfterCatchUp() {
+        long[] first = mFrames.peekFirst();
+
+        return first != null && first == mCatchUpEndRow;
+    }
+
+    /**
+     * Of the freeze just reported as KIND_START_FROZEN or KIND_VIDEO_FROZEN: how long the picture had stood still when a pause ended it,
+     * -1 when it wasn't a pause
+     */
+    public long getPauseFrozenMs() {
+        return mPauseFrozenMs;
     }
 
     /**
@@ -785,10 +929,8 @@ public final class PlaybackHealth {
         mClockStillMs = 0;
         mIsStartClockStill = false;
         mIsClockStuck = false;
-        mCatchUpEndMs = -1;
-        mCatchUpDropped = -1;
-        mSeekMs = -1;
         mFrames.clear();
+        mCatchUpEndRow = null;
         mPlayedMs = 0;
         mSoundBuffersSilent = -1;
         mSoundBackMs = -1;

@@ -7,8 +7,11 @@ import androidx.annotation.VisibleForTesting;
 
 import com.google.android.exoplayer2.source.sabr.ValidatedNetwork;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaFormat;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
+import com.liskovsoft.mediaserviceinterfaces.data.MediaItem;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemFormatInfo;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
+import com.liskovsoft.mediaserviceinterfaces.data.PlaylistInfo;
 import com.liskovsoft.sharedutils.helpers.DateHelper;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
@@ -32,14 +35,19 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.MusicAutoplayManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.VideoCategoryManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.VideoClientPicks;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
+import com.liskovsoft.youtubeapi.service.internal.MediaServiceData;
 import com.liskovsoft.youtubeapi.videoinfo.V2.ClientAttempts;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -47,7 +55,7 @@ import io.reactivex.disposables.Disposable;
 
 public class VideoLoaderController extends BasePlayerController {
     private static final String TAG = VideoLoaderController.class.getSimpleName();
-    private static final int MIN_SHUFFLE_SIZE = 30;
+    private static final Random sRandom = new Random();
     /**
      * A live stream a client answered OK for with nothing to play it from: the clients tried for it, one after another, before it's
      * only reloaded (see processFormatInfo)
@@ -120,6 +128,20 @@ public class VideoLoaderController extends BasePlayerController {
     private String mNextPrefetchVideoId;
     private Disposable mMusicAutoplayAction;
     /**
+     * Shuffle (see applyShuffle), of the video in mShuffleVideo, from its metadata (see initShuffle): YouTube's next video, put back when
+     * another mode is picked while it plays, and the videos of its playlist when the metadata has them all (see findWholePlaylist). Null
+     * till its metadata is there.
+     */
+    private Video mShuffleVideo;
+    private MediaItem mSequentialNext;
+    @Nullable
+    private List<MediaItem> mWholePlaylist;
+    /**
+     * The random video of a playlist the metadata has part of only, fetched by its index (see shuffleNext). Not the shared action of
+     * MediaServiceManager: switching to Shuffle would cancel another load.
+     */
+    private Disposable mShuffleAction;
+    /**
      * Where the formats in use are from and how they're played (see PlayerFailure#source), of the video in mFormatVideoId
      */
     private String mFormatVideoId;
@@ -148,6 +170,16 @@ public class VideoLoaderController extends BasePlayerController {
      */
     private String mPickedClient;
     private String mPickedClientVideoId;
+    /**
+     * The video the client it was moved to before was picked for again (see applyKnownClientPick): once per opening, not on its reloads,
+     * where the error fixer may have switched past it
+     */
+    private String mKnownPickVideoId;
+    /**
+     * The client the video was moved to (see pickNextClientForVideo), remembered for it once it plays there (see confirmClientPick)
+     */
+    private String mPendingPick;
+    private String mPendingPickVideoId;
     /**
      * The formats came from another client than the one picked, said once (see showPickedClientFallback)
      */
@@ -258,7 +290,9 @@ public class VideoLoaderController extends BasePlayerController {
             mStartTrigger = null;
         }
 
-        item.isShuffled = false;
+        // A reload of the same video too: its metadata, loaded again, picks again (see onMetadata)
+        unshuffle(item);
+        resetShuffle();
 
         if (!item.fromQueue && !item.belongsToPlaybackQueue()) {
             mPlaylist.add(item);
@@ -371,6 +405,7 @@ public class VideoLoaderController extends BasePlayerController {
     @Override
     public void onPlay() {
         Video video = getVideo();
+        confirmClientPick(video);
 
         // Streams given for no longer than that: the ones fetched again would be as close to expiring, fetched again at their start, and
         // so on. Only their last minutes then, as before.
@@ -621,6 +656,7 @@ public class VideoLoaderController extends BasePlayerController {
 
         resetPickedClient(video);
         resetLiveClientSwitch(video);
+        applyKnownClientPick(video);
         // Fix no progress on next video (the engine may still buffering a bit)
         //getPlayer().showProgressBar(true);
         Utils.post(mShowProgressBar);
@@ -652,6 +688,7 @@ public class VideoLoaderController extends BasePlayerController {
 
         resetPickedClient(video);
         resetLiveClientSwitch(video);
+        applyKnownClientPick(video);
 
         // Its WebView runs on the main thread mostly: the player screen comes up first, the load of the video fetches them
         if (YouTubeServiceManager.instance().isPoTokenToMake()) {
@@ -698,8 +735,11 @@ public class VideoLoaderController extends BasePlayerController {
         VideoStarts.onFormats(getVideo().videoId, getClientName(formatInfo), formatInfo.getCreatedTimeMs());
         getVideo().sync(formatInfo);
 
+        // Of the formats before, the same video's (e.g. a reload's) or another's
+        String previousClient = getFormatClient();
         mFormatVideoId = getVideo().videoId;
         mFormatClient = getClientName(formatInfo);
+        forgetFailedClientPick(getVideo(), previousClient, mFormatClient);
         mFormatProtocol = null;
         setStreamsExpireTime(formatInfo);
         showPickedClientFallback(formatInfo);
@@ -786,6 +826,8 @@ public class VideoLoaderController extends BasePlayerController {
                 // Not started yet: a reload when it does is all there is to do
                 if (!isUpcoming(formatInfo)) {
                     failure.action("reload_video").record();
+                } else {
+                    VideoStarts.onUpcoming(getVideo().videoId);
                 }
 
                 String reason = formatInfo.getPlayabilityReason();
@@ -939,6 +981,144 @@ public class VideoLoaderController extends BasePlayerController {
         mIsPickedClientFallbackShown = false;
         YouTubeServiceManager.instance().pickClient(video.videoId, client);
         reloadVideo(0, VideoStart.REASON_PICK_CLIENT);
+    }
+
+    /**
+     * The video playing is refused by the client its formats came from (e.g. TV's SABR, see ErrorFixerController): its formats are
+     * asked of the client the order has after that one, for this video only, and remembered for when it's opened again once it plays
+     * there (see VideoClientPicks, confirmClientPick). The other videos play on the order's first client. The caller reloads it.
+     *
+     * @return the client picked, null with no other one to pick (e.g. the order has one client)
+     */
+    @Nullable
+    public String pickNextClientForVideo() {
+        Video video = getVideo();
+
+        if (video == null || video.videoId == null) {
+            return null;
+        }
+
+        List<String> order = MediaServiceData.instance().getClientOrder();
+        int index = order.indexOf(getFormatClient());
+
+        if (order.size() < 2 || index < 0) {
+            return null;
+        }
+
+        String next = order.get((index + 1) % order.size());
+        mPendingPick = next;
+        mPendingPickVideoId = video.videoId;
+        YouTubeServiceManager.instance().pickClient(video.videoId, next);
+        mKnownPickVideoId = video.videoId;
+
+        return next;
+    }
+
+    /**
+     * The video plays on the client it was moved to (see pickNextClientForVideo): remembered for it now, not as it was picked, when it
+     * may fail it too (H8ZP1GPV: TV_SAMSUNG answered 503 to every segment, and was asked first again when the video was reopened)
+     */
+    private void confirmClientPick(@Nullable Video video) {
+        if (video == null || mPendingPick == null || !Helpers.equals(video.videoId, mPendingPickVideoId)
+                || !mPendingPick.equals(getFormatClient())) {
+            return;
+        }
+
+        VideoClientPicks.remember(getContext(), video.videoId, mPendingPick);
+        mPendingPick = null;
+        mPendingPickVideoId = null;
+    }
+
+    /**
+     * The video stopped at the attestation wall on the client its formats came from (see ErrorFixerController#countWallSwitch): what it
+     * played there was the server's grace period, not the client playing it. Not remembered for it, nor confirmed when it plays there
+     * again. A remembered pick the error fixer moves on from is forgotten when the next formats come (see forgetFailedClientPick), but
+     * stopped at the wall, none come: it would be asked first for a week, signed in too (97Z1YWD3).
+     */
+    void forgetWallClientPick() {
+        Video video = getVideo();
+        String client = getFormatClient();
+
+        if (video == null || video.videoId == null || client == null) {
+            return;
+        }
+
+        if (client.equals(mPendingPick) && video.videoId.equals(mPendingPickVideoId)) {
+            mPendingPick = null;
+            mPendingPickVideoId = null;
+        }
+
+        if (client.equals(VideoClientPicks.get(getContext(), video.videoId))) {
+            Log.d(TAG, "%s stopped at the attestation wall on %s: not asked first again", video.videoId, client);
+            VideoClientPicks.forget(getContext(), video.videoId);
+        }
+    }
+
+    /**
+     * The client remembered for the video (see VideoClientPicks) failed it, and isn't asked first again: asked, it didn't give the
+     * formats (it refused it, or gave none), or the video played on it and its formats are another client's now (its segments failed,
+     * and the error fixer moved on). Not when the user picked the client for it, nor for formats of another client it wasn't asked for
+     * (e.g. fetched ahead as the next video).
+     *
+     * @param previousClient of the formats before, the video's when it's reloaded (see getFormatClient)
+     */
+    private void forgetFailedClientPick(Video video, @Nullable String previousClient, @Nullable String client) {
+        if (video.videoId == null || client == null || video.videoId.equals(mPickedClientVideoId)) {
+            return;
+        }
+
+        String remembered = VideoClientPicks.get(getContext(), video.videoId);
+
+        if (remembered == null || remembered.equals(client)) {
+            return;
+        }
+
+        if (remembered.equals(previousClient) || hasFailedOn(video.videoId, remembered)) {
+            Log.d(TAG, "%s was moved to %s before, which failed it: asked of the order's clients again", video.videoId, remembered);
+            VideoClientPicks.forget(getContext(), video.videoId);
+        }
+    }
+
+    /**
+     * The fetch of the video's formats asked the client, which didn't give them (see ClientAttempts)
+     */
+    private static boolean hasFailedOn(String videoId, String client) {
+        List<ClientAttempts.Attempt> attempts = ClientAttempts.get(videoId);
+
+        if (attempts == null) {
+            return false;
+        }
+
+        for (ClientAttempts.Attempt attempt : attempts) {
+            if (client.equals(attempt.client) && !ClientAttempts.RESULT_OK.equals(attempt.result)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Opened again, a video moved to another client before (see pickNextClientForVideo): asked of that one first, without a refusal
+     * first. Not over the client the user picked for it, nor on its reloads (the error fixer may have switched past it since).
+     */
+    private void applyKnownClientPick(Video video) {
+        if (video.videoId == null || video.videoId.equals(mKnownPickVideoId)) {
+            return;
+        }
+
+        mKnownPickVideoId = video.videoId;
+
+        if (video.videoId.equals(mPickedClientVideoId)) {
+            return;
+        }
+
+        String client = VideoClientPicks.get(getContext(), video.videoId);
+
+        if (client != null && MediaServiceData.instance().getClientOrder().contains(client)) {
+            Log.d(TAG, "%s was moved to %s before: asked of it first", video.videoId, client);
+            YouTubeServiceManager.instance().pickClient(video.videoId, client);
+        }
     }
 
     /**
@@ -1511,9 +1691,8 @@ public class VideoLoaderController extends BasePlayerController {
                     prefetchNextIfNeeded();
 
                     // The metadata came before the video was known to be music, with another mode (see onMetadata)
-                    if (Helpers.equals(item.videoId, current.videoId) && current.playlistInfo != null && !current.isShuffled &&
-                            MusicAutoplayManager.getPlaybackMode(getContext(), current) == PlayerConstants.PLAYBACK_MODE_SHUFFLE) {
-                        initRandomNext();
+                    if (Helpers.equals(item.videoId, current.videoId)) {
+                        applyShuffle();
                     }
                 });
     }
@@ -1609,57 +1788,242 @@ public class VideoLoaderController extends BasePlayerController {
 
     @Override
     public void onMetadata(MediaItemMetadata metadata) {
-        initRandomNext();
+        initShuffle(metadata);
         resolveMusicCategory(mSuggestionsController.getNext());
         prefetchNextIfNeeded();
     }
 
-    private void initRandomNext() {
-        MediaServiceManager.instance().disposeActions();
+    /**
+     * The playback mode was changed in the player (its button, its dialog) while the video plays: Shuffle picks the next video now,
+     * another mode goes back to YouTube's next one (see applyShuffle)
+     */
+    public void onPlaybackModeChanged() {
+        applyShuffle();
+    }
 
-        PlaybackView player = getPlayer();
-        PlayerData playerData = getPlayerData();
+    /**
+     * The metadata of the video playing was just synced (see SuggestionsController.syncCurrentVideo): its next video is YouTube's
+     */
+    private void initShuffle(MediaItemMetadata metadata) {
         Video current = getVideo();
 
-        if (player == null || playerData == null || current == null || current.playlistInfo == null ||
-                MusicAutoplayManager.getPlaybackMode(getContext(), current) != PlayerConstants.PLAYBACK_MODE_SHUFFLE) {
+        resetShuffle();
+
+        if (current == null) {
             return;
         }
 
-        // NOTE: Shuffle only user created playlists (size != -1)
-        if (current.playlistInfo.getSize() > MIN_SHUFFLE_SIZE) {
-            Video video = new Video();
-            video.playlistId = current.playlistId;
-            video.playlistIndex = Utils.getRandomIndex(current.playlistInfo.getCurrentIndex(), current.playlistInfo.getSize());
-            MediaServiceManager.instance().loadMetadata(video, randomMetadata -> {
-                if (randomMetadata.getNextVideo() == null) {
-                    return;
-                }
+        current.isShuffled = false;
+        mShuffleVideo = current;
+        mSequentialNext = current.nextMediaItem;
+        PlaylistInfo playlistInfo = current.playlistInfo;
 
-                current.nextMediaItem = SimpleMediaItem.from(randomMetadata);
-                current.isShuffled = true;
-                player.setNextTitle(Video.from(current.nextMediaItem));
-            });
+        if (playlistInfo != null) {
+            mWholePlaylist = findWholePlaylist(metadata.getSuggestions(), getShufflePlaylistId(current), current.videoId,
+                    playlistInfo.getSize());
         }
-        //else {
-        //    VideoGroup topRow = player.getSuggestionsByIndex(0); // the playlist row
-        //
-        //    if (topRow != null && topRow.isChapters()) {
-        //        topRow = player.getSuggestionsByIndex(1);
-        //    }
-        //
-        //    if (topRow != null) {
-        //        int currentIdx = topRow.indexOf(current);
-        //        int randomIndex = Utils.getRandomIndex(currentIdx, topRow.getSize());
-        //
-        //        if (randomIndex != -1) {
-        //            Video nextVideo = topRow.get(randomIndex);
-        //            current.nextMediaItem = SimpleMediaItem.from(nextVideo);
-        //            current.isShuffled = true;
-        //            player.setNextTitle(nextVideo);
-        //        }
-        //    }
-        //}
+
+        applyShuffle();
+    }
+
+    /**
+     * Shuffle: the next video is a random one of the playlist of the video playing, never the one playing. Another mode goes on with
+     * YouTube's next one. Only a playlist that has a size: YouTube gives none (-1) for a mix or another list it makes, which it orders
+     * itself. The queue and a group of Shorts still come first (see SuggestionsController.getNextInt).<br/>
+     * Applied once the video's metadata is there (see initShuffle).
+     */
+    private void applyShuffle() {
+        Video current = getVideo();
+
+        if (getPlayer() == null || current == null || current != mShuffleVideo) {
+            return;
+        }
+
+        if (MusicAutoplayManager.getPlaybackMode(getContext(), current) != PlayerConstants.PLAYBACK_MODE_SHUFFLE) {
+            RxHelper.disposeActions(mShuffleAction);
+
+            if (current.isShuffled) {
+                unshuffle(current);
+                onNextChanged();
+            }
+        } else if (!current.isShuffled && !RxHelper.isAnyActionRunning(mShuffleAction)) {
+            shuffleNext(current);
+        }
+    }
+
+    /**
+     * The random video is of the playlist's videos when the metadata has them all, without another request. Of a bigger one, fetched by
+     * its index: the metadata has only about 20 videos of the playlist around the one playing (e.g. from the 10th of 11, the last 7).
+     */
+    private void shuffleNext(Video current) {
+        PlaylistInfo playlistInfo = current.playlistInfo;
+
+        if (playlistInfo == null || playlistInfo.getSize() <= 1) {
+            return;
+        }
+
+        if (mWholePlaylist != null) {
+            MediaItem next = pickRandomOther(mWholePlaylist, current.videoId, sRandom);
+
+            if (next != null) {
+                setShuffledNext(current, next);
+            }
+
+            return;
+        }
+
+        String playlistId = getShufflePlaylistId(current);
+        int index = pickRandomIndex(playlistInfo.getCurrentIndex(), playlistInfo.getSize(), sRandom);
+
+        if (playlistId == null || index < 0) {
+            return;
+        }
+
+        mShuffleAction = RxHelper.execute(getShuffleObserve(playlistId, index),
+                metadata -> {
+                    // Another video or another mode meanwhile (its metadata loaded again disposes it, see initShuffle)
+                    if (current != getVideo() || current != mShuffleVideo || current.isShuffled ||
+                            MusicAutoplayManager.getPlaybackMode(getContext(), current) != PlayerConstants.PLAYBACK_MODE_SHUFFLE) {
+                        return;
+                    }
+
+                    // Not the playlist's, or the one playing (its index unknown)
+                    if (metadata.getNextVideo() == null || metadata.getVideoId() == null ||
+                            metadata.getVideoId().equals(current.videoId)) {
+                        return;
+                    }
+
+                    setShuffledNext(current, SimpleMediaItem.from(metadata));
+                },
+                error -> Log.e(TAG, "Can't fetch the random video of the playlist: %s", error.getMessage()));
+    }
+
+    /**
+     * The video of the playlist at the index, which YouTube honours without the video's id (e.g. 2000 of 4779 uploads)
+     */
+    @VisibleForTesting
+    Observable<MediaItemMetadata> getShuffleObserve(String playlistId, int index) {
+        return YouTubeServiceManager.instance().getMediaItemService().getMetadataObserve(null, playlistId, index, null);
+    }
+
+    private void setShuffledNext(Video current, MediaItem next) {
+        current.nextMediaItem = next;
+        current.isShuffled = true;
+        onNextChanged();
+    }
+
+    /**
+     * YouTube's next video is the next one again, of a video Shuffle picked another one for (see applyShuffle)
+     */
+    private void unshuffle(Video video) {
+        if (video.isShuffled && video == mShuffleVideo) {
+            video.nextMediaItem = mSequentialNext;
+        }
+
+        video.isShuffled = false;
+    }
+
+    private void resetShuffle() {
+        RxHelper.disposeActions(mShuffleAction);
+        mShuffleVideo = null;
+        mSequentialNext = null;
+        mWholePlaylist = null;
+    }
+
+    private void onNextChanged() {
+        if (getPlayer() == null) {
+            return;
+        }
+
+        getPlayer().setNextTitle(mSuggestionsController.getNext());
+        prefetchNextIfNeeded();
+    }
+
+    /**
+     * Of the playlist YouTube says the video is in, whose size and index its metadata gives
+     */
+    @Nullable
+    private static String getShufflePlaylistId(Video video) {
+        String playlistId = video.playlistInfo != null ? video.playlistInfo.getPlaylistId() : null;
+
+        return playlistId != null ? playlistId : video.getPlaylistId();
+    }
+
+    /**
+     * The videos of the playlist, when a group of the suggestions has them all: the group of the videos of the playlist that has the one
+     * playing (not by its position: the chapters or the queue may come first). The first group of YouTube's is a window of about 20 videos
+     * of the playlist around the one playing, the whole playlist for a short one only. Null when the group has part of it only.
+     *
+     * @param playlistSize as YouTube gives it (see PlaylistInfo.getSize), -1 for none
+     */
+    @VisibleForTesting
+    @Nullable
+    static List<MediaItem> findWholePlaylist(@Nullable List<MediaGroup> groups, @Nullable String playlistId, @Nullable String videoId,
+                                             int playlistSize) {
+        if (groups == null || playlistId == null || videoId == null || playlistSize <= 1) {
+            return null;
+        }
+
+        for (MediaGroup group : groups) {
+            List<MediaItem> items = group != null ? group.getMediaItems() : null;
+
+            if (items == null) {
+                continue;
+            }
+
+            List<MediaItem> playlist = new ArrayList<>();
+            boolean hasCurrent = false;
+
+            for (MediaItem item : items) {
+                if (item != null && item.getVideoId() != null && playlistId.equals(item.getPlaylistId())) {
+                    playlist.add(item);
+                    hasCurrent |= videoId.equals(item.getVideoId());
+                }
+            }
+
+            if (hasCurrent) {
+                return playlist.size() >= playlistSize ? playlist : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A random one of the videos, never the one playing (nor its other entries, in the playlist twice) nor one that's yet to start. Null
+     * when there's no other.
+     */
+    @VisibleForTesting
+    @Nullable
+    static MediaItem pickRandomOther(List<MediaItem> items, @Nullable String videoId, Random random) {
+        List<MediaItem> others = new ArrayList<>();
+
+        for (MediaItem item : items) {
+            if (!Helpers.equals(item.getVideoId(), videoId) && !item.isUpcoming()) {
+                others.add(item);
+            }
+        }
+
+        return others.isEmpty() ? null : others.get(random.nextInt(others.size()));
+    }
+
+    /**
+     * A random index of the playlist, never the one playing: -1 for a playlist of one video, or of no known size. Any index when the
+     * current one isn't known.
+     */
+    @VisibleForTesting
+    static int pickRandomIndex(int currentIndex, int playlistSize, Random random) {
+        if (playlistSize <= 1) {
+            return -1;
+        }
+
+        if (currentIndex < 0 || currentIndex >= playlistSize) {
+            return random.nextInt(playlistSize);
+        }
+
+        int index = random.nextInt(playlistSize - 1);
+
+        return index >= currentIndex ? index + 1 : index;
     }
 
     private int getPlaybackMode() {

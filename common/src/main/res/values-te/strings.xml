@@ -509,6 +509,7 @@
     <string name="collaborations_desc">ఛానెల్ \"X and Y\"గా చూపబడే వీడియో, ఇక్కడ X మరియు Y రెండూ ఛానెల్ పేర్లు. ప్రతి పేరు సైన్ ఇన్ చేయని ఛానెల్ శోధనతో ఒకసారి తనిఖీ చేయబడుతుంది. ఇంగ్లీష్ మాత్రమే.</string>
     <string name="collaborations_sections">విభాగాలు</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">సహకారులు</string>
     <string name="watch_later">తర్వాత చూడండి</string>
     <string name="watch_later_show">చూపించు</string>
     <string name="watch_later_mark">గుర్తించు</string>
@@ -689,10 +690,10 @@
     <string name="pressing_home_back">HOME లేదా BACK నొక్కడం ద్వారా</string>
     <string name="pressing_back">BACK నొక్కడం ద్వారా</string>
     <string name="player_number_key_seek">సంఖ్య కీలతో సీక్ చేయండి</string>
-    <string name="save_remove_playlist">ప్లేలిస్ట్‌ల విభాగానికి ప్లేలిస్ట్‌ను జోడించండి/నుండి తీసివేయండి</string>
+    <string name="add_delete_playlist">ప్లేలిస్ట్‌ల విభాగానికి జోడించండి/ప్లేలిస్ట్‌ను తొలగించండి</string>
     <string name="save_playlist">ప్లేలిస్ట్‌ల విభాగానికి ప్లేలిస్ట్‌ను జోడించండి</string>
-    <string name="remove_playlist">ప్లేలిస్ట్‌ల విభాగం నుండి ప్లేలిస్ట్‌ను శాశ్వతంగా తీసివేయండి</string>
-    <string name="remove_playlist_fmt">%s ను శాశ్వతంగా తీసివేయాలా?</string>
+    <string name="delete_playlist">ప్లేలిస్ట్‌ను తొలగించండి</string>
+    <string name="delete_playlist_fmt">ప్లేలిస్ట్ %s ను తొలగించాలా?</string>
     <string name="removed_from_playlists">ప్లేలిస్ట్‌ల విభాగం నుండి తీసివేయబడింది</string>
     <string name="saved_to_playlists">ప్లేలిస్ట్‌ల విభాగానికి జోడించబడింది</string>
     <string name="create_playlist">ప్లేలిస్ట్‌ను సృష్టించండి</string>
@@ -706,6 +707,9 @@
     <string name="copy_playlist_to_youtube">YouTubeకు కాపీ చేయండి</string>
     <string name="copied_to_youtube">YouTubeకు కాపీ చేయబడింది</string>
     <string name="export_playlists">ప్లేజాబితాలను ఎగుమతి చేయండి</string>
+    <string name="playlists_on_youtube">YouTubeలోని ప్లేజాబితాలు</string>
+    <string name="playlists_on_this_device">ఈ పరికరంలోని ప్లేజాబితాలు</string>
+    <string name="on_this_device">ఈ పరికరంలో</string>
     <string name="import_playlists">ప్లేజాబితాలను దిగుమతి చేయండి</string>
     <string name="import_to_device">ఈ పరికరానికి దిగుమతి చేయండి</string>
     <string name="import_to_youtube">YouTubeకు దిగుమతి చేయండి</string>

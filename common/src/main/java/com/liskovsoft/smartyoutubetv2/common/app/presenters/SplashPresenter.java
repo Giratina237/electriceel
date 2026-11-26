@@ -103,7 +103,6 @@ public class SplashPresenter extends BasePresenter<SplashView> {
     private void runOnceTasks() {
         if (!sRunOnce) {
             sRunOnce = true;
-            RxHelper.setupGlobalErrorHandler();
             initGlobalPrefs();
             initLocaleData();
             initHideContentData();
@@ -290,6 +289,17 @@ public class SplashPresenter extends BasePresenter<SplashView> {
                 Video video = new Video();
                 video.playlistId = playlistId;
                 ChannelUploadsPresenter.instance(getContext()).openChannel(video);
+                return true;
+            }
+
+            return false;
+        });
+
+        // A sign-in page with its code (e.g. the app's own sign-in QR code, opened on this device): the code is entered or approved on
+        // another device, the sign-in screen shows a new one to do it with (4Z0TV6X2 #1, #2: two codes were played as videos)
+        mIntentChain.add(intent -> {
+            if (IntentExtractor.isSignInUrl(intent)) {
+                YTSignInPresenter.instance(getContext()).start();
                 return true;
             }
 

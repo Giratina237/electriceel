@@ -6,6 +6,8 @@ import android.content.Context;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import com.google.android.exoplayer2.Format;
+
 import com.liskovsoft.mediaserviceinterfaces.data.MediaFormat;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
@@ -152,7 +154,16 @@ public final class FormatAttempts {
     }
 
     private static final class Attempt {
-        final String video;
+        /**
+         * As the player's tracks told it (see #onTracks), null when they didn't: what tells another attempt from this one
+         */
+        @Nullable
+        final String trackVideo;
+        /**
+         * The one reported: the tracks', else the video decoder's input (see #onVideoFormat)
+         */
+        @Nullable
+        String video;
         final String audio;
         /**
          * Where its formats are from and how they're played, when it was tried (see #onSource): after a switch, another client's
@@ -222,6 +233,7 @@ public final class FormatAttempts {
         String reason = REASON_FIRST;
 
         Attempt(@Nullable String video, @Nullable String audio) {
+            this.trackVideo = video;
             this.video = video;
             this.audio = audio;
             client = sClient;
@@ -229,7 +241,7 @@ public final class FormatAttempts {
         }
 
         boolean isSameFormats(Attempt other) {
-            return Helpers.equals(video, other.video) && Helpers.equals(audio, other.audio);
+            return Helpers.equals(trackVideo, other.trackVideo) && Helpers.equals(audio, other.audio);
         }
     }
 
@@ -389,6 +401,24 @@ public final class FormatAttempts {
         }
     }
 
+    /**
+     * The format the video decoder was given: the one tried last's, when the player's tracks didn't tell it (C4JB8CZX: a VISIONOS DASH
+     * play recorded "video -" next to its VP9 decoder, and 3 plays counted as "- + mp4a")
+     */
+    public static void onVideoFormat(@Nullable Format format) {
+        Attempt last = getLast();
+
+        if (last == null || last.video != null || format == null) {
+            return;
+        }
+
+        last.video = PlayerFailure.describeVideo(format);
+
+        if (last.videoBitrateKbps <= 0 && format.bitrate > 0) {
+            last.videoBitrateKbps = format.bitrate / 1_000;
+        }
+    }
+
     public static void onDroppedFrames(int count) {
         Attempt last = getLast();
 
@@ -437,7 +467,8 @@ public final class FormatAttempts {
 
     /**
      * What a long stall (see ErrorFixerController#onLongBuffering) came from: which track ran out, and whether the connection is too slow
-     * for the format or its request hangs. Of the format tried.
+     * for the format or its request hangs. Of the format tried. A health "stalls" failure and a source's engine error have them too (see
+     * ErrorFixerController#onHealthFailure, #addSourceErrorDetails).
      */
     public static void addStallDetails(PlayerFailure failure, long positionMs) {
         Attempt last = getLast();

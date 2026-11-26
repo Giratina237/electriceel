@@ -90,6 +90,26 @@ public class FormatAttemptsTest {
     }
 
     /**
+     * The tracks didn't tell the video (C4JB8CZX: a VISIONOS DASH play recorded "video -" next to its VP9 decoder): the decoder's input
+     * format is the one reported, and a track change that still tells none isn't another attempt
+     */
+    @Test
+    public void aVideoTheTracksDidntTellIsTheDecoders() throws Exception {
+        FormatAttempts.onNewVideo(getContext(), "video");
+        FormatAttempts.onTracks(null, FormatItem.AUDIO_HQ_MP4A);
+
+        FormatAttempts.onVideoFormat(com.google.android.exoplayer2.Format.createVideoSampleFormat(null, "video/x-vnd.on2.vp9", "vp9",
+                1_400_000, -1, 1280, 720, 60f, null, null));
+        FormatAttempts.onTracks(null, FormatItem.AUDIO_HQ_MP4A);
+
+        failure("video").record();
+
+        org.json.JSONObject formats = mLog.readAll().get(0).getJSONObject("formats");
+        assertEquals(1, formats.getJSONArray("attempted").length());
+        assertEquals("1280x720 vp9 60fps", formats.getJSONArray("attempted").getJSONObject(0).getString("video"));
+    }
+
+    /**
      * Nothing known yet isn't a buffer of 0
      */
     @Test

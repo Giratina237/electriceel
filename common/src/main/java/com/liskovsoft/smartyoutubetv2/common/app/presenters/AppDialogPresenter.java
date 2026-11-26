@@ -39,6 +39,8 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     private boolean mIsReplace;
     private ItemMatcher mFocusedItemMatcher;
     private CharSequence mNextTitlePrefix;
+    private CharSequence mTitleRoot;
+    private CharSequence mBackupTitleRoot;
 
     /**
      * A row of a dialog built by someone else, e.g. a setting the settings search opens
@@ -108,6 +110,7 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
         mBackupIsOverlay = mIsOverlay;
         mBackupTitlePrefix = mTitlePrefix;
         mBackupIsNestedTitlesEnabled = mIsNestedTitlesEnabled;
+        mBackupTitleRoot = mTitleRoot;
         mBackupFocusedItem = mFocusedItem;
         mBackupIsReplace = mIsReplace;
     }
@@ -121,6 +124,7 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
         mTitle = null;
         mFocusedItem = null;
         mIsReplace = false;
+        mTitleRoot = null;
     }
 
     @Override
@@ -151,15 +155,14 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     public void showDialog(CharSequence dialogTitle, Runnable onFinish) {
-        // Looked through by the settings search instead: not shown, its onFinish isn't kept
+        // Looked through by the settings search instead: not shown, closed after (onFinish runs then)
         if (SettingsCapture.offerPanel(dialogTitle, mCategories)) {
+            SettingsCapture.offerOnClose(onFinish);
             resetData();
             return;
         }
 
-        if (mNextTitlePrefix != null && dialogTitle != null) {
-            dialogTitle = String.format("%s - %s", mNextTitlePrefix, dialogTitle);
-        }
+        mTitleRoot = mNextTitlePrefix;
 
         if (mFocusedItem == null && mFocusedItemMatcher != null) {
             mFocusedItem = findItem(mCategories, mFocusedItemMatcher);
@@ -217,8 +220,9 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     /**
-     * The next dialog is titled "<prefix> - <title>", also when it opens over another one (unlike {@link #setTitlePrefix}):
-     * e.g. "Player - Video" for the Video card opened from the results of the settings search
+     * The next dialog is titled "<prefix> - <title>", also when it opens over another one (unlike {@link #setTitlePrefix}),
+     * and the lists opened in it "<parent> - <title>": e.g. "Player - Video" for the Video card opened from the results of the
+     * settings search, as from the Player section
      */
     public void setNextTitlePrefix(CharSequence prefix) {
         mNextTitlePrefix = prefix;
@@ -285,6 +289,14 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
      */
     public CharSequence getTitlePrefix() {
         return mBackupTitlePrefix;
+    }
+
+    /**
+     * Of the dialog shown: titled "<root> - <title>", its lists "<parent> - <title>", also over another dialog (see
+     * {@link #setNextTitlePrefix}). Null for none.
+     */
+    public CharSequence getTitleRoot() {
+        return mBackupTitleRoot;
     }
 
     /**
@@ -396,7 +408,7 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     public void setOnStart(Runnable onStart) {
-        // Of a dialog that isn't shown (see SettingsCapture)
+        // Of a dialog that isn't shown (see SettingsCapture): it doesn't start
         if (SettingsCapture.isActive()) {
             return;
         }
@@ -405,7 +417,8 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     public void setOnFinish(Runnable onFinish) {
-        if (SettingsCapture.isActive()) {
+        // Of a dialog that isn't shown: run as it's closed, after it's looked through
+        if (SettingsCapture.offerOnClose(onFinish)) {
             return;
         }
 

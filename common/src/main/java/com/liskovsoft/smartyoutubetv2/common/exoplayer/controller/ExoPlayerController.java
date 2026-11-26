@@ -40,6 +40,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.RendererWaits;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.SilenceDetector;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
@@ -49,6 +50,7 @@ import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.LiveSegmentsGone;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CensoredWords.Range;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.FrameStepper;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.KeyframeResume;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.RangeMuter;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.VolumeBooster;
@@ -97,6 +99,15 @@ public class ExoPlayerController implements Player.EventListener {
     private AudioClockInfo mAudioClockInfo;
     private final Runnable mHealthCheck = this::checkHealth;
     /**
+     * When the next check of the playback is due ({@link SystemClock#elapsedRealtime()}), -1 for none: one that runs later tells how
+     * late (see #postHealthCheck)
+     */
+    private long mHealthCheckDueMs = -1;
+    /**
+     * Where the player was when the seeks going on began (see AnalyticsListener#onSeekStarted), -1 when unknown. Main thread only.
+     */
+    private long mSeekFromMs = -1;
+    /**
      * It played since the player was prepared with its source: playing again is a resume (see PlaybackHealth#onResumed), not the start
      */
     private boolean mHasPlayedSource;
@@ -115,10 +126,6 @@ public class ExoPlayerController implements Player.EventListener {
     @Nullable
     private DebugInfoMediaCodecVideoRenderer mVideoRenderer;
     /**
-     * A keyframe closer than this to a resume's position isn't gone back to: its frames are decoded quickly
-     */
-    private static final long MIN_RESUME_KEYFRAME_GAP_MS = 500;
-    /**
      * Of the resume going on (see #setResumePositionMs), till it goes back to its keyframe or another seek is made: -1 for none.
      * Main thread only.
      */
@@ -127,6 +134,12 @@ public class ExoPlayerController implements Player.EventListener {
      * An audio segment finished loading since the resume's seek (see #maybeResumeFromKeyframe). Main thread only.
      */
     private boolean mIsAudioLoadedSinceResume;
+    /**
+     * The keyframe a resume didn't go back to while its audio loaded (see #maybeResumeFromKeyframe), and the resume's position: gone
+     * back to once the audio is in, if the decoder is still short of the position. -1 for none. Main thread only.
+     */
+    private long mPendingKeyframeMs = -1;
+    private long mPendingKeyframeResumeMs = -1;
     /**
      * A live stream's segments answer 404 on both tracks, none loaded since (see #onHttpError). Main thread only.
      */
@@ -149,6 +162,14 @@ public class ExoPlayerController implements Player.EventListener {
         }
 
         @Override
+        public void onDecoderInputFormatChanged(EventTime eventTime, int trackType, Format format) {
+            // What the decoder plays, when the tracks didn't tell it (see FormatAttempts#onTracks)
+            if (trackType == C.TRACK_TYPE_VIDEO) {
+                FormatAttempts.onVideoFormat(format);
+            }
+        }
+
+        @Override
         public void onDecoderInitialized(EventTime eventTime, int trackType, String decoderName, long initializationDurationMs) {
             if (trackType == C.TRACK_TYPE_VIDEO || trackType == C.TRACK_TYPE_AUDIO) {
                 FormatAttempts.onDecoder(trackType == C.TRACK_TYPE_VIDEO, decoderName);
@@ -159,6 +180,15 @@ public class ExoPlayerController implements Player.EventListener {
         @Override
         public void onDroppedVideoFrames(EventTime eventTime, int droppedFrames, long elapsedMs) {
             FormatAttempts.onDroppedFrames(droppedFrames);
+        }
+
+        /**
+         * Before the seek's discontinuity (see #onPositionDiscontinuity), once till it's processed: a seek made meanwhile is from here
+         * too
+         */
+        @Override
+        public void onSeekStarted(EventTime eventTime) {
+            mSeekFromMs = eventTime.currentPlaybackPositionMs;
         }
 
         @Override
@@ -180,6 +210,7 @@ public class ExoPlayerController implements Player.EventListener {
             if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA
                     && (mediaLoadData.trackType == C.TRACK_TYPE_AUDIO || mediaLoadData.trackType == C.TRACK_TYPE_DEFAULT)) {
                 mIsAudioLoadedSinceResume = true;
+                maybeResumeFromPendingKeyframe();
             }
 
             if (mediaLoadData.dataType == C.DATA_TYPE_MEDIA) {
@@ -198,6 +229,19 @@ public class ExoPlayerController implements Player.EventListener {
 
             if (isTimedLoad(mediaLoadData)) {
                 VideoStarts.onLoad(mediaLoadData.dataType == C.DATA_TYPE_MEDIA_INITIALIZATION, isVideoLoad(mediaLoadData),
+                        mediaLoadData.trackType == C.TRACK_TYPE_AUDIO, loadEventInfo.elapsedRealtimeMs - loadEventInfo.loadDurationMs,
+                        loadEventInfo.elapsedRealtimeMs, loadEventInfo.bytesLoaded);
+            }
+        }
+
+        /**
+         * A load cut off while the video starts, e.g. by a seek: the start's row for it (2M1DY5CD -BwLZBMKW4g: nothing was recorded
+         * loading between a live start's init chunks and its third jump to the live end, whose media loads then needed new connections)
+         */
+        @Override
+        public void onLoadCanceled(EventTime eventTime, LoadEventInfo loadEventInfo, MediaLoadData mediaLoadData) {
+            if (isTimedLoad(mediaLoadData)) {
+                VideoStarts.onLoadCanceled(mediaLoadData.dataType == C.DATA_TYPE_MEDIA_INITIALIZATION, isVideoLoad(mediaLoadData),
                         mediaLoadData.trackType == C.TRACK_TYPE_AUDIO, loadEventInfo.elapsedRealtimeMs - loadEventInfo.loadDurationMs,
                         loadEventInfo.elapsedRealtimeMs, loadEventInfo.bytesLoaded);
             }
@@ -249,6 +293,11 @@ public class ExoPlayerController implements Player.EventListener {
         mTrackFormatter.enableBitrate(PlayerTweaksData.instance(context).isQualityInfoBitrateEnabled());
         mTrackErrorFixer = new TrackErrorFixer(mTrackSelectorManager);
         mTrackErrorFixer.setOnHttpError(this::onHttpError);
+        mTrackErrorFixer.setLiveCheck(() -> {
+            // Held weakly: read once
+            Video video = getVideo();
+            return video != null && video.isLive;
+        });
         mFrameStepper = new FrameStepper(this::onFramePositionChanged);
         mRangeMuter = new RangeMuter(this::onMuteChanged);
 
@@ -328,9 +377,12 @@ public class ExoPlayerController implements Player.EventListener {
         try {
             PlaybackHealth.Sample sample = new PlaybackHealth.Sample();
             sample.nowMs = SystemClock.elapsedRealtime();
+            sample.tickLateMs = mHealthCheckDueMs >= 0 ? Math.max(0, sample.nowMs - mHealthCheckDueMs) : -1;
             sample.attempt = FormatAttempts.getAttemptId();
             sample.videoId = FormatAttempts.getVideoId();
             sample.isPlaying = mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_READY;
+            // Not buffering: a freeze it ends is the user's doing, or the app's (see PlaybackHealth#onSample)
+            sample.isPaused = !mPlayer.getPlayWhenReady() && mPlayer.getPlaybackState() == Player.STATE_READY;
             sample.positionMs = mPlayer.getCurrentPosition();
             // Not shown, the video isn't checked
             sample.hasVideo = mPlayer.getVideoFormat() != null && mHasSurface;
@@ -369,6 +421,7 @@ public class ExoPlayerController implements Player.EventListener {
 
             // For the failures recorded elsewhere and the fixes that depend on it (e.g. a long stall's, see ErrorFixerController)
             DebugInfoMediaCodecVideoRenderer renderer = mVideoRenderer;
+            sample.videoBufferedAheadMs = getVideoBufferedAheadMs(renderer, sample.positionMs);
             boolean isTunneling = renderer != null && renderer.isTunneling();
             VideoDecoderState.onSample(sample.inputBuffers, sample.renderedFrames, isTunneling,
                     renderer != null ? renderer.getTunneledFrames() : null);
@@ -398,9 +451,36 @@ public class ExoPlayerController implements Player.EventListener {
             Log.e(TAG, "Can't check the playback: " + e.getMessage());
         } finally {
             if (mPlayer != null) {
-                Utils.postDelayed(mHealthCheck, mHealth.getTickMs());
+                postHealthCheck(mHealth.getTickMs());
             }
         }
+    }
+
+    /**
+     * The next check of the playback (see #checkHealth), in that long: when it's due, for it to tell how late it ran. 500 ms apart at
+     * the start, T26RECBZ #1 had no sample for 2.1 s: the main thread was held up, and nothing said so.
+     */
+    private void postHealthCheck(long delayMs) {
+        mHealthCheckDueMs = SystemClock.elapsedRealtime() + delayMs;
+        Utils.postDelayed(mHealthCheck, delayMs);
+    }
+
+    /**
+     * Of the video track alone, how far past the position its samples are loaded (see
+     * DebugInfoMediaCodecVideoRenderer#getBufferedAheadUs): the player's buffered position is the least of its tracks. -1 when unknown.
+     */
+    private long getVideoBufferedAheadMs(@Nullable DebugInfoMediaCodecVideoRenderer renderer, long positionMs) {
+        long aheadUs = renderer != null ? renderer.getBufferedAheadUs() : C.TIME_UNSET;
+
+        if (aheadUs == C.TIME_END_OF_SOURCE) {
+            // Loaded to its end
+            long durationMs = getDurationMs();
+
+            return durationMs >= 0 ? Math.max(0, durationMs - positionMs) : -1;
+        }
+
+        // Behind the position is none ahead
+        return aheadUs != C.TIME_UNSET ? Math.max(0, aheadUs / 1_000) : -1;
     }
 
     private void recordHealthFailure(String kind, PlaybackHealth.Sample sample) {
@@ -431,6 +511,14 @@ public class ExoPlayerController implements Player.EventListener {
         if (isClockStuck) {
             failure.detail("frozenMs", mHealth.getClockStillMs());
             failure.detail("clockStill", true);
+        }
+
+        // Paused on a picture standing still: it didn't end by itself, the pause ended it (see PlaybackHealth#getPauseFrozenMs)
+        long pauseFrozenMs = mHealth.getPauseFrozenMs();
+
+        if (pauseFrozenMs >= 0 && (PlaybackHealth.KIND_START_FROZEN.equals(kind) || PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind))) {
+            failure.detail("frozenMs", pauseFrozenMs);
+            failure.detail("endedByPause", true);
         }
 
         // A frozen picture whose clock moved on has them too: 7 freezes of a tunneled decoder had none, nothing told whether the frames
@@ -465,6 +553,9 @@ public class ExoPlayerController implements Player.EventListener {
             // all of them one skip)
             failure.detail("oneSkip", mHealth.isDropsOneSkip());
             failure.detail("dropsWindow", toJson(mHealth.getDropsWindow(sample.nowMs)));
+            // Counted from where a start's or a resume's decoder caught up to its position: drops that went on past it, not of it
+            // (MD8RQZM2 #1: a catch-up ended too soon, its drops were counted)
+            failure.detail("afterCatchUp", mHealth.isDropsAfterCatchUp());
         }
 
         // A tunneled decoder shows the frames itself: where it's at against the position (see TunneledFrames)
@@ -499,16 +590,19 @@ public class ExoPlayerController implements Player.EventListener {
     private void onHealthPlaying() {
         if (!mHasPlayedSource) {
             mHasPlayedSource = true;
-            mHealth.onStarted();
-            return;
-        }
 
-        mHealth.onResumed(SystemClock.elapsedRealtime());
+            // Prepared again past the start of the format, its seconds from here are a resume's (see PlaybackHealth#onStarted)
+            if (!mHealth.onStarted(SystemClock.elapsedRealtime())) {
+                return;
+            }
+        } else {
+            mHealth.onResumed(SystemClock.elapsedRealtime());
+        }
 
         if (mPlayer != null) {
             // Where it is as it plays again: the trail's first sample
             Utils.removeCallbacks(mHealthCheck);
-            Utils.postDelayed(mHealthCheck, 0);
+            postHealthCheck(0);
         }
     }
 
@@ -604,6 +698,7 @@ public class ExoPlayerController implements Player.EventListener {
 
     private void openMediaSource(MediaSource mediaSource) {
         mResumePositionMs = -1; // the previous source's
+        mPendingKeyframeMs = -1;
         mFrameStepper.reset();
         mRangeMuter.reset();
         resetPlayerState(); // fixes occasional video artifacts and problems with quality switching
@@ -615,17 +710,22 @@ public class ExoPlayerController implements Player.EventListener {
         Video video = getVideo();
         // Each controller's part, of those that take long (see PlaybackPresenter#onSourceChanged)
         VideoStarts.timeOpenStep(VideoStarts.STAGE_SOURCE_CHANGED, null, () -> mEventListener.onSourceChanged(video));
-        VideoStarts.onPrepare();
+        // The engine its factory was built with: the settings may give another by now (see ExoMediaSourceFactory#getBuiltEngine)
+        VideoStarts.onPrepare(mMediaSourceFactory.getBuiltEngine());
         FormatAttempts.onPrepare();
-        LoadErrors.onPrepare();
+        // The same video again (a reload) goes on with the loads that failed before it
+        LoadErrors.onPrepare(video != null ? video.videoId : null);
+        RendererWaits.onPrepare();
         Connections.onPrepare();
         mHealth.onPrepare();
         mHasPlayedSource = false;
         mSabrManifest = mediaSource instanceof SabrMediaSource ? ((SabrMediaSource) mediaSource).getManifest() : null;
         mPlayer.prepare(mediaSource);
+        // Where its seeks are from till one is told (see AnalyticsListener#onSeekStarted): one of the source before may not be done
+        mSeekFromMs = mPlayer.getCurrentPosition();
         // Its first seconds are looked at closely: the check may be 2 s away, past its first frame
         Utils.removeCallbacks(mHealthCheck);
-        Utils.postDelayed(mHealthCheck, PlaybackHealth.START_TICK_MS);
+        postHealthCheck(PlaybackHealth.START_TICK_MS);
     }
 
     public long getPositionMs() {
@@ -644,11 +744,25 @@ public class ExoPlayerController implements Player.EventListener {
      */
     public void setPositionMs(long positionMs) {
         mResumePositionMs = -1; // another seek: the resume's is done with
+        mPendingKeyframeMs = -1;
 
         // Url list videos at load stage has undefined (-1) length. So, we need to remove length check.
         if (canSeekTo(positionMs)) {
             PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, positionMs);
-            VideoStarts.onSeek(positionMs);
+            // A live one's says where it was and the live end, which a jump to the end went by (2M1DY5CD -BwLZBMKW4g): the end as the
+            // player's screen gives it (see PlaybackFragment#getDurationMs), the video's live duration for a SABR window longer than a
+            // day, not the window's 48 h
+            Video video = getVideo();
+            boolean isLive = video != null && video.isLive;
+            long liveEndMs = -1;
+
+            if (isLive) {
+                long durationMs = getDurationMs();
+                long liveDurationMs = video.getLiveDurationMs();
+                liveEndMs = durationMs > Video.MAX_LIVE_DURATION_MS && liveDurationMs != 0 ? liveDurationMs : durationMs;
+            }
+
+            VideoStarts.onSeek(positionMs, isLive ? mPlayer.getCurrentPosition() : -1, liveEndMs);
             mPlayer.seekTo(positionMs);
         }
     }
@@ -657,7 +771,8 @@ public class ExoPlayerController implements Player.EventListener {
      * A resume (see VideoStateController): played from the keyframe before the position, once it's known (see #onDecodedFromKeyframe).
      * Before, every frame from that keyframe to the position was decoded unseen first (AWHPECZK zTkEMVxv6F8: 1661 ms for 210 frames
      * of a 4K stream on a Shield). Its keyframes aren't known before the seek (SABR has no segment index, DASH loads it later), so
-     * SeekParameters.PREVIOUS_SYNC can't do it, and a global one would make SponsorBlock skip again and again.
+     * SeekParameters.PREVIOUS_SYNC can't do it, and a global one would make SponsorBlock skip again and again. Only when the decoder
+     * would take longer to get to the position than going back costs (see #maybeResumeFromKeyframe).
      */
     public void setResumePositionMs(long positionMs) {
         mIsAudioLoadedSinceResume = false;
@@ -683,8 +798,14 @@ public class ExoPlayerController implements Player.EventListener {
     private void maybeResumeFromKeyframe(long keyframeUs, long positionUs) {
         long resumeMs = mResumePositionMs;
 
-        // Decoded to another position: not the resume's (e.g. the video track enabled later, where a resume had none)
-        if (resumeMs < 0 || Math.abs(positionUs / 1_000 - resumeMs) > 1) {
+        if (resumeMs < 0) {
+            return;
+        }
+
+        // Decoded to another position: not the resume's (e.g. the video track enabled later, where a resume had none). Its start says
+        // so: a resume's decision went to the log only (see VideoStarts#onKeyframeResume).
+        if (Math.abs(positionUs / 1_000 - resumeMs) > 1) {
+            VideoStarts.onKeyframeResume(VideoStarts.KEYFRAME_OTHER_POSITION);
             return;
         }
 
@@ -692,7 +813,11 @@ public class ExoPlayerController implements Player.EventListener {
         // At or just past it, in ms: a seek before it would find no keyframe in the buffer, and load the segment again
         long keyframeMs = (keyframeUs + 999) / 1_000;
 
-        if (mPlayer == null || keyframeUs < 0 || resumeMs - keyframeMs < MIN_RESUME_KEYFRAME_GAP_MS) {
+        if (mPlayer == null || keyframeUs < 0 || resumeMs <= keyframeMs) {
+            return;
+        }
+
+        if (!isKeyframeWorthGoingBack(resumeMs, keyframeMs, false)) {
             return;
         }
 
@@ -700,7 +825,12 @@ public class ExoPlayerController implements Player.EventListener {
         // for it, the start took 4.6 s, where the other resumes played 54-116 ms after their seek). The decoder goes on to the position.
         // A segment's times don't tell where the audio starts: SABR's are of the segment before, or none, till one comes.
         if (!mIsAudioLoadedSinceResume) {
-            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms: its audio is still loading", resumeMs, keyframeMs);
+            // Gone back to once it's in, if the decoder hasn't reached the position by then (V9H5DRS0 20:21:31: the audio came 333 ms
+            // later, then 1.9 s more went to 228 4K frames; F0SVV9N8 18:32:49: 4 ms later, then 1.5 s)
+            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms yet: its audio is still loading", resumeMs, keyframeMs);
+            VideoStarts.onKeyframeResume(VideoStarts.KEYFRAME_AUDIO_LOADING);
+            mPendingKeyframeMs = keyframeMs;
+            mPendingKeyframeResumeMs = resumeMs;
             return;
         }
 
@@ -708,6 +838,71 @@ public class ExoPlayerController implements Player.EventListener {
         PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, keyframeMs);
         VideoStarts.onSeek(keyframeMs);
         mPlayer.seekTo(keyframeMs);
+        // After its seek, which ends the decision before
+        VideoStarts.onKeyframeResume(VideoStarts.KEYFRAME_GONE_BACK);
+    }
+
+    /**
+     * The audio of a resume came in after its keyframe was known (see #maybeResumeFromKeyframe): back to the keyframe, if the decoder is
+     * still on its way to the position. Not once the player is ready there: its first frame is up.
+     */
+    private void maybeResumeFromPendingKeyframe() {
+        long keyframeMs = mPendingKeyframeMs;
+        long resumeMs = mPendingKeyframeResumeMs;
+        mPendingKeyframeMs = -1;
+        mPendingKeyframeResumeMs = -1;
+
+        if (mPlayer == null || keyframeMs < 0 || mPlayer.getPlaybackState() == Player.STATE_READY
+                || Math.abs(mPlayer.getCurrentPosition() - resumeMs) > 1) {
+            return;
+        }
+
+        // Asked again now: the decoder went on while the audio loaded, and may be at the position or nearly
+        if (!isKeyframeWorthGoingBack(resumeMs, keyframeMs, true)) {
+            return;
+        }
+
+        Log.d(TAG, "Resume from the keyframe at %s ms, not %s ms, its audio in", keyframeMs, resumeMs);
+        PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, keyframeMs);
+        VideoStarts.onSeek(keyframeMs);
+        mPlayer.seekTo(keyframeMs);
+        VideoStarts.onKeyframeResume(VideoStarts.describeKeyframeDecision(VideoStarts.KEYFRAME_GONE_BACK, true));
+    }
+
+    /**
+     * Going back to the keyframe gets the resume's first frame up sooner than the decoder's way to the position (see KeyframeResume):
+     * not once the decoder is there. Why not goes to the start too (see VideoStarts#onKeyframeResume).
+     *
+     * @param isAfterAudio asked again once the resume's audio came in (see #maybeResumeFromPendingKeyframe)
+     */
+    private boolean isKeyframeWorthGoingBack(long resumeMs, long keyframeMs, boolean isAfterAudio) {
+        DebugInfoMediaCodecVideoRenderer renderer = mVideoRenderer;
+
+        // This runs after the main thread's other work, and the decoder went on meanwhile: 292 ms later, the 58 frames to the position
+        // were decoded and its frame shown. Going back then threw it away, showed 1:19 after 1:20, and played 282 ms later (6EZTNXBF).
+        if (renderer != null && renderer.hasReachedPosition()) {
+            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms: the decoder is there", resumeMs, keyframeMs);
+            VideoStarts.onKeyframeResume(VideoStarts.describeKeyframeDecision(VideoStarts.KEYFRAME_DECODER_THERE, isAfterAudio));
+            return false;
+        }
+
+        Format format = mPlayer.getVideoFormat();
+        long skipStartMs = renderer != null ? renderer.getSkipStartMs() : -1;
+        long gapMs = resumeMs - keyframeMs;
+        float frameRate = format != null ? format.frameRate : Format.NO_VALUE;
+        int height = format != null ? format.height : Format.NO_VALUE;
+        int decodedFrames = renderer != null ? renderer.getSkippedToPosition() : 0;
+        long decodingMs = skipStartMs >= 0 ? SystemClock.elapsedRealtime() - skipStartMs : 0;
+
+        // A keyframe the decoder gets to the position from sooner than going back costs isn't gone back to (see KeyframeResume)
+        if (!KeyframeResume.isWorthIt(gapMs, frameRate, height, decodedFrames, decodingMs)) {
+            Log.d(TAG, "Resume at %s ms, not from the keyframe at %s ms: the decoder gets there sooner", resumeMs, keyframeMs);
+            VideoStarts.onKeyframeResume(VideoStarts.describeKeyframeNotWorthIt(
+                    KeyframeResume.getRemainingMs(gapMs, frameRate, height, decodedFrames, decodingMs), isAfterAudio));
+            return false;
+        }
+
+        return true;
     }
 
     public long getBufferedPositionMs() {
@@ -776,7 +971,7 @@ public class ExoPlayerController implements Player.EventListener {
         // Set by the view after this (see onSurfaceSizeChanged)
         mHasSurface = false;
         player.addAnalyticsListener(mDiagnosticsListener);
-        Utils.postDelayed(mHealthCheck, mHealth.getTickMs());
+        postHealthCheck(mHealth.getTickMs());
         mRangeMuter.setPlayer(player);
     }
 
@@ -834,7 +1029,7 @@ public class ExoPlayerController implements Player.EventListener {
 
         // Not after it froze the picture or stalled the player in this run (see TunnelingFallback)
         if (mContext != null && trackSelector != null && PlayerTweaksData.instance(mContext).isTunneledPlaybackEnabled()
-                && !TunnelingFallback.isOff()) {
+                && !TunnelingFallback.isOff(mContext)) {
             // Enable tunneling if supported by the current media and device configuration.
             if (VERSION.SDK_INT >= 21) {
                 trackSelector.setParameters(trackSelector.buildUponParameters().setTunnelingAudioSessionId(C.generateAudioSessionIdV21(mContext)));
@@ -999,7 +1194,8 @@ public class ExoPlayerController implements Player.EventListener {
             mFrameStepper.onSeek();
             // Any seek (SponsorBlock, chapters, remote, not only the UI's): its buffering comes before onSeekProcessed and isn't a stall
             FormatAttempts.onSeek();
-            mHealth.onSeek(SystemClock.elapsedRealtime());
+            // Where it's sent, as the player tells it till the seek is done
+            mHealth.onSeek(SystemClock.elapsedRealtime(), mSeekFromMs, mPlayer.getCurrentPosition());
         }
 
         mRangeMuter.onSeek();

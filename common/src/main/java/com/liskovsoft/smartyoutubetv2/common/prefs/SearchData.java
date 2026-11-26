@@ -192,7 +192,7 @@ public class SearchData implements ProfileChangeListener {
         mIsSearchHistoryDisabled = Helpers.parseBoolean(split, 8, false);
         mIsPopularSearchesDisabled = Helpers.parseBoolean(split, 9, false);
         mIsKeyboardFixEnabled = Helpers.parseBoolean(split, 10, false);
-        mIsTypingCorrectionDisabled = Helpers.parseBoolean(split, 11, false);
+        mIsTypingCorrectionDisabled = Helpers.parseBoolean(split, 11, true);
     }
 
     private void persistData() {

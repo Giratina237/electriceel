@@ -481,6 +481,7 @@
     <string name="collaborations_desc">Video čiji je kanal prikazan kao \"X and Y\", gdje su X i Y nazivi kanala. Svaki se naziv jednom provjerava pretraživanjem kanala bez prijave. Samo na engleskom.</string>
     <string name="collaborations_sections">Odjeljci</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Suradnici</string>
     <string name="watch_later">Pogledaj kasnije</string>
     <string name="watch_later_show">Prikaži</string>
     <string name="watch_later_mark">Označi</string>
@@ -648,8 +649,7 @@
     <string name="pressing_home">Pritiskom na HOME</string>
     <string name="pressing_home_back">Pritiskom na HOME ili BACK</string>
     <string name="player_number_key_seek">Premotavaj s brojčanim tipkama</string>
-    <string name="save_remove_playlist">Dodaj/Obriši popis izvođenja iz odjeljka Zbirka</string>
-    <string name="remove_playlist">Obriši trajno popis izvođenja iz odjeljka Zbirka</string>
+    <string name="add_delete_playlist">Dodaj u Zbirku/obriši popis izvođenja</string>
     <string name="removed_from_playlists">Obrisano iz odjeljka Zbirka</string>
     <string name="saved_to_playlists">Dodano u odjeljak Zbirka</string>
     <string name="create_playlist">Stvori popis izvođenja</string>
@@ -662,6 +662,9 @@
     <string name="copy_playlist_to_youtube">Kopiraj na YouTube</string>
     <string name="copied_to_youtube">Kopirano na YouTube</string>
     <string name="export_playlists">Izvezi popise izvođenja</string>
+    <string name="playlists_on_youtube">Popisi za reprodukciju na YouTubeu</string>
+    <string name="playlists_on_this_device">Popisi za reprodukciju na ovom uređaju</string>
+    <string name="on_this_device">Na ovom uređaju</string>
     <string name="import_playlists">Uvezi popise izvođenja</string>
     <string name="import_to_device">Uvezi na ovaj uređaj</string>
     <string name="import_to_youtube">Uvezi na YouTube</string>
@@ -810,7 +813,8 @@
     <string name="remember_position_of_live_videos">Zapamti položaj streama uživo</string>
     <string name="pressing_back">pritiskom na BACK</string>
     <string name="save_playlist">Dodaj popis za reprodukciju u odjeljak Popisi za reprodukciju</string>
-    <string name="remove_playlist_fmt">Trajno ukloniti %s?</string>
+    <string name="delete_playlist">Obriši popis izvođenja</string>
+    <string name="delete_playlist_fmt">Obrisati popis izvođenja %s?</string>
     <string name="create_playlist_note">NAPOMENA: Neće se vidjeti u aplikaciji YouTube</string>
     <string name="skip_shorts">Preskoči Shorts</string>
     <string name="suggestions">Prijedlozi</string>

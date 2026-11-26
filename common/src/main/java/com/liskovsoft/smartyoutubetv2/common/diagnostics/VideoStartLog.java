@@ -106,7 +106,15 @@ public final class VideoStartLog {
      * To the start of that time, recorded before. Written in the background.
      */
     public void addFrames(long ts, JSONObject frames) {
-        mExecutor.execute(() -> writeFrames(ts, frames));
+        mExecutor.execute(() -> put(ts, "frames", frames));
+    }
+
+    /**
+     * To the start of that time, recorded before: how its play went on (see Plays). Told again as it goes on, the last one stands.
+     * Written in the background.
+     */
+    public void addPlay(long ts, JSONObject play) {
+        mExecutor.execute(() -> put(ts, "play", play));
     }
 
     /**
@@ -152,7 +160,10 @@ public final class VideoStartLog {
         }
     }
 
-    private void writeFrames(long ts, JSONObject frames) {
+    /**
+     * @param key of what's added to the start of that time, e.g. "frames"
+     */
+    private void put(long ts, String key, JSONObject value) {
         List<String> lines = readLines();
 
         for (int i = lines.size() - 1; i >= 0; i--) {
@@ -160,7 +171,7 @@ public final class VideoStartLog {
                 JSONObject start = new JSONObject(lines.get(i));
 
                 if (start.optLong("ts") == ts) {
-                    start.put("frames", frames);
+                    start.put(key, value);
                     lines.set(i, start.toString());
                     rewrite(lines);
                     return;

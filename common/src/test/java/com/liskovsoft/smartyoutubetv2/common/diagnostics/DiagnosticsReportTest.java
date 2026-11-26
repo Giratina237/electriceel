@@ -1,12 +1,14 @@
 package com.liskovsoft.smartyoutubetv2.common.diagnostics;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 
 import com.liskovsoft.googlecommon.common.locale.LocaleManager;
 import com.liskovsoft.mediaserviceinterfaces.oauth.Account;
 import com.liskovsoft.sharedutils.locale.LocaleUpdater;
 import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AppPrefs;
@@ -245,6 +247,28 @@ public class DiagnosticsReportTest {
         assertTrue(settings.getJSONObject("autoFrameRate").has("enabled"));
     }
 
+    /**
+     * H5B64KBE to Y1D66CNW: the user set tunneled playback again while it was suspended, which only tunneledPlaybackOff and the decoder's
+     * name told. When it was, null for never.
+     */
+    @Test
+    public void aSuspendedTunnelingSetAgainSaysWhen() throws Exception {
+        SharedPreferences prefs = getContext().getSharedPreferences("tunneling_fallback", Context.MODE_PRIVATE);
+        prefs.edit().clear().commit();
+
+        assertTrue(getVideoSettings().isNull("tunneledPlaybackResetAt"));
+
+        prefs.edit().putBoolean("suspended", true).commit();
+        TunnelingFallback.reset(getContext());
+
+        assertTrue(getVideoSettings().getString("tunneledPlaybackResetAt").matches("\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ"));
+        prefs.edit().clear().commit();
+    }
+
+    private static JSONObject getVideoSettings() throws Exception {
+        return build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings").getJSONObject("video");
+    }
+
     @Test
     public void theLanguageAndCountryAreTheOnesInUse() throws Exception {
         setLocale("ru", "US");
@@ -295,6 +319,80 @@ public class DiagnosticsReportTest {
         }
     }
 
+    /**
+     * QYZPW0FN: pauses came through the media session, and nothing said whether the player had one (Disable playback notifications
+     * turns it off)
+     */
+    @Test
+    public void theMediaSessionIsSaidOnOrOff() throws Exception {
+        PlayerTweaksData tweaksData = PlayerTweaksData.instance(getContext());
+        boolean savedDisabled = tweaksData.isPlaybackNotificationsDisabled();
+
+        try {
+            tweaksData.setPlaybackNotificationsDisabled(false);
+            assertTrue(build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings").getBoolean("mediaSession"));
+
+            tweaksData.setPlaybackNotificationsDisabled(true);
+            assertFalse(build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings").getBoolean("mediaSession"));
+        } finally {
+            tweaksData.setPlaybackNotificationsDisabled(savedDisabled);
+        }
+    }
+
+    /**
+     * NVHZS7YS played 1080p on a 720p screen over a slow link, XF9KYTK1 AV1 on a software decoder: nothing said whether that was the
+     * format asked for, nor whether the user had picked it
+     */
+    @Test
+    public void theFormatsAskedForAreSaidAndWhetherTheDefault() throws Exception {
+        PlayerData playerData = PlayerData.instance(getContext());
+        FormatItem savedVideo = playerData.getFormat(FormatItem.TYPE_VIDEO);
+        FormatItem savedAudio = playerData.getFormat(FormatItem.TYPE_AUDIO);
+
+        try {
+            playerData.setFormat(ExoFormatItem.fromVideoSpec("1920,1080,60,av01", false));
+            playerData.setFormat(FormatItem.AUDIO_51_EC3);
+            JSONObject settings = build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings");
+
+            assertEquals("1920x1080 av01 60fps", settings.getJSONObject("video").getString("requestedFormat"));
+            assertFalse(settings.getJSONObject("video").getBoolean("requestedFormatDefault"));
+            assertEquals("ec-3", settings.getJSONObject("audio").getString("requestedFormat"));
+            assertFalse(settings.getJSONObject("audio").getBoolean("requestedFormatDefault"));
+
+            playerData.setFormat(playerData.getDefaultVideoFormat());
+            playerData.setFormat(playerData.getDefaultAudioFormat());
+            settings = build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings");
+
+            assertEquals(PlayerFailure.describeVideo(playerData.getDefaultVideoFormat()),
+                    settings.getJSONObject("video").getString("requestedFormat"));
+            assertTrue(settings.getJSONObject("video").getBoolean("requestedFormatDefault"));
+            assertTrue(settings.getJSONObject("audio").getBoolean("requestedFormatDefault"));
+        } finally {
+            playerData.setFormat(savedVideo);
+            playerData.setFormat(savedAudio);
+        }
+    }
+
+    /**
+     * 2M1DY5CD and MD8RQZM2: a live start sent to the end of its window again and again was taken for one placed 15 s behind it, the
+     * buffer on streams' off not known
+     */
+    @Test
+    public void theBufferOnStreamsIsSaidOnOrOff() throws Exception {
+        PlayerTweaksData tweaksData = PlayerTweaksData.instance(getContext());
+        boolean savedDisabled = tweaksData.isBufferOnStreamsDisabled();
+
+        try {
+            tweaksData.setBufferOnStreamsDisabled(true);
+            assertTrue(getVideoSettings().getBoolean("bufferOnStreamsDisabled"));
+
+            tweaksData.setBufferOnStreamsDisabled(false);
+            assertFalse(getVideoSettings().getBoolean("bufferOnStreamsDisabled"));
+        } finally {
+            tweaksData.setBufferOnStreamsDisabled(savedDisabled);
+        }
+    }
+
     @Test
     public void theCurrentClientIsNamed() throws Exception {
         JSONObject settings = build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings");
@@ -338,6 +436,32 @@ public class DiagnosticsReportTest {
         // The rest of each failure stays, and of each start
         assertEquals("format_error", failures.getJSONObject(0).getString("kind"));
         assertEquals(2_500, report.getJSONArray("videoStarts").getJSONObject(0).getLong("totalMs"));
+    }
+
+    @Test
+    public void videoIdsNamedInTheRecordsAreLeftOutWhenNotIncluded() throws Exception {
+        // A lock wait names the video whose fetch it waited for, one no start was recorded for too (SKCS2PB6)
+        VideoStartLog.useForTesting(mFolder.getRoot()).record(new VideoStart(NOW, "aaaaaaaaaaa", VideoStart.TRIGGER_OPEN, true, 5_000,
+                "TV", "sabr", false, 2_500, Arrays.asList(
+                        new VideoStart.Stage("lock wait", "fetch 06cF1xPpRYY, 103 ms in", 1, 0, 103),
+                        new VideoStart.Stage("lock wait", "next video's prefetch -MFigmQupa8, abandoned, 9 ms in", 1, 103, 112),
+                        new VideoStart.Stage("lock wait", "fetch bbbbbbbbbbb, 40 ms in", 1, 112, 152),
+                        new VideoStart.Stage("player JS", "translation languages", 1, 152, 200))));
+        getDebuggingData().setVideoIdsIncluded(false);
+
+        JSONObject report = build(null, 0, failures("bbbbbbbbbbb"));
+        JSONArray stages = report.getJSONArray("videoStarts").getJSONObject(0).getJSONArray("stages");
+        String json = report.toString();
+
+        for (String id : Arrays.asList("aaaaaaaaaaa", "bbbbbbbbbbb", "06cF1xPpRYY", "-MFigmQupa8")) {
+            assertFalse(id + " in " + json, json.contains(id));
+        }
+
+        assertEquals("fetch <video>, 103 ms in", stages.getJSONObject(0).getString("detail"));
+        assertEquals("next video's prefetch <video>, abandoned, 9 ms in", stages.getJSONObject(1).getString("detail"));
+        assertEquals("fetch <video>, 40 ms in", stages.getJSONObject(2).getString("detail"));
+        // Not an id: no record has it and no lock holder's before it
+        assertEquals("translation languages", stages.getJSONObject(3).getString("detail"));
     }
 
     @Test

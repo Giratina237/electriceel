@@ -508,6 +508,7 @@
     <string name="collaborations_desc">Kanalı \"X and Y\" kimi göstərilən və X ilə Y-nin hər ikisinin kanal adı olduğu video. Hər ad hesaba daxil olmadan kanal axtarışı ilə bir dəfə yoxlanılır. Yalnız ingiliscə.</string>
     <string name="collaborations_sections">Bölmələr</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Əməkdaşlar</string>
     <string name="watch_later">Sonra izlə</string>
     <string name="watch_later_show">Göstər</string>
     <string name="watch_later_mark">İşarələ</string>
@@ -688,10 +689,10 @@
     <string name="pressing_home_back">Ev və ya Geri düyməsinə basaraq</string>
     <string name="pressing_back">Geri düyməsinə basaraq</string>
     <string name="player_number_key_seek">Rəqəm düymələri ilə irəli/geri çək</string>
-    <string name="save_remove_playlist">Pleylistlər bölməsindən pleylist əlavə et / sil</string>
+    <string name="add_delete_playlist">Pleylistlərə əlavə et/pleylisti sil</string>
     <string name="save_playlist">Pleylistlər bölməsinə pleylist əlavə et</string>
-    <string name="remove_playlist">Pleylistlər bölməsindən pleylisti həmişəlik sil</string>
-    <string name="remove_playlist_fmt">%s həmişəlik silinsinmi?</string>
+    <string name="delete_playlist">Pleylisti sil</string>
+    <string name="delete_playlist_fmt">%s pleylisti silinsin?</string>
     <string name="removed_from_playlists">Pleylistlər bölməsindən silindi</string>
     <string name="saved_to_playlists">Pleylistlər bölməsinə əlavə olundu</string>
     <string name="create_playlist">Pleylist yarat</string>
@@ -705,6 +706,9 @@
     <string name="copy_playlist_to_youtube">YouTube-a köçür</string>
     <string name="copied_to_youtube">YouTube-a köçürüldü</string>
     <string name="export_playlists">Pleylistləri ixrac et</string>
+    <string name="playlists_on_youtube">YouTube-dakı pleylistlər</string>
+    <string name="playlists_on_this_device">Bu cihazdakı pleylistlər</string>
+    <string name="on_this_device">Bu cihazda</string>
     <string name="import_playlists">Pleylistləri idxal et</string>
     <string name="import_to_device">Bu cihaza idxal et</string>
     <string name="import_to_youtube">YouTube-a idxal et</string>

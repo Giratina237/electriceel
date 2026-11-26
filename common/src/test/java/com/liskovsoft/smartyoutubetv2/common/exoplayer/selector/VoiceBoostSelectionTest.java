@@ -11,6 +11,7 @@ import com.google.android.exoplayer2.trackselection.TrackSelection.Definition;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.TrackErrorFixer;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack;
 
@@ -115,8 +116,9 @@ public class VoiceBoostSelectionTest {
         assertSame(opus, select(saved("251", "opus", 200_000, false, false), opus, aacVoiceBoost, aac));
 
         TrackErrorFixer fixer = new TrackErrorFixer(mManager);
-        boolean isFixed = fixer.fixError(new InvalidResponseCodeException(503, Collections.emptyMap(),
-                new DataSpec(Uri.parse("https://example.com/videoplayback/mime/audio"))));
+        // A live stream's segment not there: another codec (a regular video's 503 isn't one, every format fails it)
+        boolean isFixed = fixer.fixError(new InvalidResponseCodeException(404, Collections.emptyMap(),
+                new DataSpec(Uri.parse("https://example.com/videoplayback/mime/audio"))), PlayerFailure.TRACK_AUDIO);
 
         assertTrue(isFixed);
         MediaTrack selected = mManager.getSelectedTrack(TrackSelectorManager.RENDERER_INDEX_AUDIO);

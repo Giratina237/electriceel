@@ -88,6 +88,65 @@ public class DebuggingDataTest {
         assertEquals(1_792_000_100_000L, getData().getLastSubmissionTime());
     }
 
+    /**
+     * XF9KYTK1, a tablet restored from a TV box's backup, named the box's YNM4W0VE as its previous submission: the restored settings
+     * are taken, the history of submissions stays this install's
+     */
+    @Test
+    public void aRestoredBackupKeepsThisInstallsSubmissions() {
+        String key = DebuggingData.class.getSimpleName();
+        // The other install's, as its backup has it
+        getData().setAutoSubmitEnabled(true);
+        getData().setVideoIdsIncluded(false);
+        getData().setLastSubmission("YNM4W0VE", 9_000, 9_100, 9_200);
+        getData().setLastAppExitTs(9_300);
+        ShadowLooper.shadowMainLooper().idle();
+        String backup = getPrefs().getData(key);
+        clearSaved();
+
+        getData().setLastSubmission("K7M2QX9P", 1_000, 1_100, 1_200);
+        getData().setLastAppExitTs(1_300);
+        ShadowLooper.shadowMainLooper().idle();
+        DebuggingData thisInstall = getData();
+        // BackupAndRestoreManager's copy of the backup's files
+        getPrefs().setData(key, backup);
+        thisInstall.onBackupRestored(RuntimeEnvironment.getApplication());
+        // The app is killed and starts again
+        DebuggingData.resetInstanceForTesting();
+
+        assertTrue(getData().isAutoSubmitEnabled());
+        assertFalse(getData().isVideoIdsIncluded());
+        assertEquals("K7M2QX9P", getData().getLastSubmissionId());
+        assertEquals(1_000, getData().getLastSubmittedFailureTs());
+        assertEquals(1_100, getData().getLastSubmittedStartTs());
+        assertEquals(1_200, getData().getLastSubmissionTime());
+        assertEquals(1_300, getData().getLastAppExitTs());
+    }
+
+    /**
+     * Nothing submitted here yet: none of the other install's either
+     */
+    @Test
+    public void aRestoredBackupOnANewInstallHasNoSubmissions() {
+        String key = DebuggingData.class.getSimpleName();
+        getData().setLastSubmission("YNM4W0VE", 9_000, 9_100, 9_200);
+        getData().setLastAppExitTs(9_300);
+        ShadowLooper.shadowMainLooper().idle();
+        String backup = getPrefs().getData(key);
+        clearSaved();
+
+        DebuggingData thisInstall = getData();
+        getPrefs().setData(key, backup);
+        thisInstall.onBackupRestored(RuntimeEnvironment.getApplication());
+        DebuggingData.resetInstanceForTesting();
+
+        assertNull(getData().getLastSubmissionId());
+        assertEquals(0, getData().getLastSubmittedFailureTs());
+        assertEquals(0, getData().getLastSubmittedStartTs());
+        assertEquals(0, getData().getLastSubmissionTime());
+        assertEquals(0, getData().getLastAppExitTs());
+    }
+
     @Test
     public void theSameForEveryAccount() {
         AppPrefs prefs = getPrefs();

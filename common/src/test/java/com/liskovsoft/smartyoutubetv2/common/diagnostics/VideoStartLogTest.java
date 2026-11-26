@@ -48,6 +48,28 @@ public class VideoStartLogTest {
         assertEquals("first", starts.get(0).getString("videoId"));
     }
 
+    /**
+     * How its play went on (see Plays), told again as it goes on: the last one stands, next to its frames
+     */
+    @Test
+    public void thePlayIsAddedToItsStart() throws Exception {
+        VideoStartLog log = new VideoStartLog(mFolder.getRoot());
+        VideoStart first = start("first", 2500);
+        log.record(first);
+        log.addFrames(first.ts, new JSONObject().put("rendered", 90));
+        log.addPlay(first.ts, new JSONObject().put("playedMs", 29_234));
+        log.addPlay(first.ts, new JSONObject().put("playedMs", 44_213).put("end", Plays.END_BACKGROUND));
+        log.addPlay(first.ts + 1, new JSONObject().put("playedMs", 5));
+        assertEquals(1, log.readAll().size()); // written
+
+        List<JSONObject> starts = new VideoStartLog(mFolder.getRoot()).readAll();
+
+        assertEquals(1, starts.size());
+        assertEquals(44_213, starts.get(0).getJSONObject("play").getLong("playedMs"));
+        assertEquals(Plays.END_BACKGROUND, starts.get(0).getJSONObject("play").getString("end"));
+        assertEquals(90, starts.get(0).getJSONObject("frames").getInt("rendered"));
+    }
+
     @Test
     public void keepsTheStartsOverRestarts() throws Exception {
         VideoStartLog log = new VideoStartLog(mFolder.getRoot());

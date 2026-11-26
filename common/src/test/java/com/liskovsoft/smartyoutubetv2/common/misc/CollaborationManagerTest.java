@@ -7,6 +7,7 @@ import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.BrowseSection;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
+import com.liskovsoft.smartyoutubetv2.common.misc.CollaborationManager.Answer;
 import com.liskovsoft.smartyoutubetv2.common.misc.CollaborationManager.Verdict;
 import com.liskovsoft.smartyoutubetv2.common.prefs.CollaborationsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.FilterExclusionData;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -58,7 +60,11 @@ public class CollaborationManagerTest {
     private CollaborationManager mManager;
     private CollaborationsData mData;
     private final List<String> mSearches = new ArrayList<>();
+    // What the search finds now, a test can change it (e.g. a channel too new to be found)
+    private final Map<String, List<String>> mResults = new HashMap<>(SEARCH_RESULTS);
+    private final Map<String, PublishSubject<List<String>>> mHeldSearches = new HashMap<>();
     private boolean mIsSearchFailing;
+    private long mNowMs = 1_700_000_000_000L;
 
     @Before
     public void setUp() {
@@ -70,7 +76,7 @@ public class CollaborationManagerTest {
         mData.setSectionEnabled(MediaGroup.TYPE_SUBSCRIPTIONS, true);
         mData.setSectionEnabled(MediaGroup.TYPE_GAMING, false);
         mManager = CollaborationManager.instance(context);
-        mManager.resetForTesting(this::search);
+        mManager.resetForTesting(this::search, () -> mNowMs);
     }
 
     @After
@@ -346,14 +352,143 @@ public class CollaborationManagerTest {
         assertTrue(mSearches.isEmpty()); // the group only reads the cache
     }
 
+    /**
+     * A channel days old isn't found by its name yet (e.g. "Will Tenny" in its first collaboration), later it is
+     */
+    @Test
+    public void newChannelIsFoundOnceItsAnswerIsStale() {
+        mResults.put("Jesser", Arrays.asList("Jesser Gaming", "Team Jesser"));
+        learn(COLLABORATION);
+        assertEquals(Boolean.FALSE, mManager.getCachedResult(COLLABORATION));
+        mResults.put("Jesser", SEARCH_RESULTS.get("Jesser"));
+
+        mNowMs += CollaborationManager.RECHECK_MS - 1;
+        assertTrue(resolve(COLLABORATION));
+        assertTrue(mSearches.isEmpty());
+
+        mNowMs += 1;
+        assertTrue(resolve(COLLABORATION));
+
+        // The "not a channel" answers the verdict read
+        assertEquals(Arrays.asList(COLLABORATION, "Jesser"), mSearches);
+        assertEquals(Boolean.TRUE, mManager.getCachedResult(COLLABORATION));
+
+        // Fresh again
+        assertTrue(resolve(COLLABORATION));
+        assertEquals(2, mSearches.size());
+    }
+
+    @Test
+    public void staleAnswersAreSearchedAgainOneAtATimeAfterTheCardsAreShown() {
+        mResults.put("Jesser", Collections.singletonList("Jesser Gaming"));
+        learn(COLLABORATION);
+        mResults.put("Jesser", SEARCH_RESULTS.get("Jesser"));
+        mNowMs += CollaborationManager.RECHECK_MS;
+        PublishSubject<List<String>> wholeSearch = hold(COLLABORATION);
+
+        // The cards don't wait, a second load doesn't add a search
+        assertTrue(resolve(COLLABORATION));
+        assertTrue(resolve(COLLABORATION));
+        assertEquals(Boolean.FALSE, mManager.getCachedResult(COLLABORATION));
+        assertEquals(Collections.singletonList(COLLABORATION), mSearches);
+
+        wholeSearch.onNext(SEARCH_RESULTS.get(COLLABORATION));
+        wholeSearch.onComplete();
+
+        assertEquals(Arrays.asList(COLLABORATION, "Jesser"), mSearches);
+        assertEquals(Boolean.TRUE, mManager.getCachedResult(COLLABORATION));
+    }
+
+    @Test
+    public void channelIsNotSearchedAgain() {
+        learn(COLLABORATION);
+        mNowMs += 10 * CollaborationManager.RECHECK_MS;
+
+        assertTrue(resolve(COLLABORATION));
+
+        // Only the whole name, not a channel
+        assertEquals(Collections.singletonList(COLLABORATION), mSearches);
+        assertEquals(Boolean.TRUE, mManager.getCachedResult(COLLABORATION));
+    }
+
+    @Test
+    public void failedSearchKeepsTheStaleAnswer() {
+        mResults.put("Jesser", Collections.singletonList("Jesser Gaming"));
+        learn(COLLABORATION);
+        mNowMs += CollaborationManager.RECHECK_MS;
+        mIsSearchFailing = true;
+
+        assertTrue(resolve(COLLABORATION));
+        assertTrue(resolve(COLLABORATION));
+
+        // Each once this session, the queue goes on after a failure
+        assertEquals(Arrays.asList(COLLABORATION, "Jesser"), mSearches);
+        assertEquals(Boolean.FALSE, mManager.getCachedResult(COLLABORATION));
+    }
+
+    @Test
+    public void answersAreSavedWithTheirTime() {
+        Map<String, Answer> answers = new LinkedHashMap<>();
+        answers.put("sidemen", new Answer(true, 5));
+        answers.put("jesser", new Answer(false, 7));
+
+        String content = CollaborationManager.writeNames(answers);
+        assertEquals("sidemen\t1\t5\njesser\t0\t7\n", content);
+
+        Map<String, Answer> read = new LinkedHashMap<>();
+        read.put("jesser", new Answer(true, 9)); // searched while the file was read
+        CollaborationManager.readNames(content, read);
+
+        assertEquals(Arrays.asList("jesser", "sidemen"), new ArrayList<>(read.keySet()));
+        assertTrue(read.get("sidemen").isChannel);
+        assertEquals(5, read.get("sidemen").checkedMs);
+        assertTrue(read.get("jesser").isChannel);
+        assertEquals(9, read.get("jesser").checkedMs);
+    }
+
+    /**
+     * Saved before the answers had a time, or with a broken one: its "not a channel" is searched again
+     */
+    @Test
+    public void answerWithoutItsTimeIsStale() {
+        Map<String, Answer> read = new LinkedHashMap<>();
+        CollaborationManager.readNames("will tenny\t0\nwill tennyson\t1\nbroken\t0\tsoon\nunknown\t2\t5\n\n", read);
+
+        assertTrue(read.get("will tenny").isStale(mNowMs));
+        assertFalse(read.get("will tennyson").isStale(mNowMs));
+        assertTrue(read.get("broken").isStale(mNowMs));
+        assertNull(read.get("unknown"));
+    }
+
+    @Test
+    public void answerFromTheFutureIsStale() {
+        assertTrue(new Answer(false, mNowMs + 1).isStale(mNowMs));
+        assertFalse(new Answer(false, mNowMs).isStale(mNowMs));
+        assertFalse(new Answer(true, 0).isStale(mNowMs));
+    }
+
+    /**
+     * The search of the name ends when the test says
+     */
+    private PublishSubject<List<String>> hold(String query) {
+        PublishSubject<List<String>> search = PublishSubject.create();
+        mHeldSearches.put(query, search);
+        return search;
+    }
+
     private Observable<List<String>> search(String query) {
         mSearches.add(query);
+        PublishSubject<List<String>> held = mHeldSearches.get(query);
+
+        if (held != null) {
+            return held;
+        }
 
         if (mIsSearchFailing) {
             return Observable.error(new IllegalStateException("No network"));
         }
 
-        List<String> names = SEARCH_RESULTS.get(query);
+        List<String> names = mResults.get(query);
 
         return Observable.just(names != null ? names : Collections.emptyList());
     }

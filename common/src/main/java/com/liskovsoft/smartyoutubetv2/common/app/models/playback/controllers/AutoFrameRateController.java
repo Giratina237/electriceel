@@ -2,6 +2,10 @@ package com.liskovsoft.smartyoutubetv2.common.app.models.playback.controllers;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.SharedPreferences;
+
+import androidx.annotation.VisibleForTesting;
+
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.R;
@@ -36,6 +40,15 @@ public class AutoFrameRateController extends BasePlayerController implements Aut
     private static final long SHORTS_DURATION_MAX_MS = 61 * 1_000;
     /** The longest wait for the display to report a mode switch */
     private static final long MODE_SWITCH_TIMEOUT_MS = 5_000;
+    /**
+     * The wait on a display that didn't report UNCONFIRMED_SWITCHES switches running: as long as the stall the hold is for (see
+     * holdPlayback), not the whole timeout each time (DBRPJG76: 12 starts held 5.5 s, none reported)
+     */
+    private static final long UNCONFIRMED_MODE_SWITCH_TIMEOUT_MS = 2_000;
+    @VisibleForTesting
+    static final int UNCONFIRMED_SWITCHES = 2;
+    private static final String PREFS = "afr_mode_switches";
+    private static final String KEY_UNCONFIRMED = "unconfirmed";
     private final AutoFrameRateHelper mAutoFrameRateHelper;
     private final ModeSyncManager mModeSyncManager;
     private final Runnable mApplyAfr = this::applyAfr;
@@ -43,7 +56,7 @@ public class AutoFrameRateController extends BasePlayerController implements Aut
     private boolean mIsPlay;
     private boolean mIsHeld;
     private boolean mIsHeldPlay;
-    private final Runnable mReleasePlayback = this::releasePlayback;
+    private final Runnable mReleasePlayback = () -> releasePlayback(VideoStarts.MODE_SWITCH_TIMED_OUT);
     private VideoStateController mStateController;
     private HQDialogController mHQDialogController;
     private final Runnable mPlaybackResumeHandler = () -> {
@@ -105,6 +118,7 @@ public class AutoFrameRateController extends BasePlayerController implements Aut
         if (getPlayerData().getAfrPauseMs() == 0) {
             holdPlayback();
         }
+        VideoStarts.onModeSwitchRequested(UhdHelper.toResolution(newMode));
         getPlayerData().setAfrSwitchTimeMs(System.currentTimeMillis());
     }
 
@@ -121,23 +135,23 @@ public class AutoFrameRateController extends BasePlayerController implements Aut
         // Seems that the device doesn't support direct mode switching.
         // Use tvQuickActions instead.
         maybePausePlayback();
-        releasePlayback();
+        releasePlayback("error");
     }
 
     @Override
     public void onModeCancel() {
         restorePlayback();
-        releasePlayback();
+        releasePlayback("cancelled");
     }
 
     @Override
     public void onModeEnd() {
-        releasePlayback();
+        releasePlayback(VideoStarts.MODE_SWITCH_REPORTED);
     }
 
     @Override
     public void onEngineReleased() {
-        releasePlayback();
+        releasePlayback("engine released");
 
         if (getPlayerData().isAfrEnabled()) {
             applyAfrStopDelayed();
@@ -261,10 +275,15 @@ public class AutoFrameRateController extends BasePlayerController implements Aut
         }
 
         Utils.removeCallbacks(mReleasePlayback);
-        Utils.postDelayed(mReleasePlayback, MODE_SWITCH_TIMEOUT_MS); // the display may never report it
+        // The display may never report it: on one that didn't for the last switches, no longer than the stall it holds for
+        Utils.postDelayed(mReleasePlayback, getUnconfirmedSwitches() >= UNCONFIRMED_SWITCHES ? UNCONFIRMED_MODE_SWITCH_TIMEOUT_MS
+                : MODE_SWITCH_TIMEOUT_MS);
     }
 
-    private void releasePlayback() {
+    /**
+     * @param how why it ends, e.g. VideoStarts#MODE_SWITCH_REPORTED
+     */
+    private void releasePlayback(String how) {
         Utils.removeCallbacks(mReleasePlayback);
 
         if (!mIsHeld) {
@@ -273,11 +292,35 @@ public class AutoFrameRateController extends BasePlayerController implements Aut
 
         mIsHeld = false;
         mStateController.blockPlay(false);
-        VideoStarts.onModeSwitchEnd();
+        VideoStarts.onModeSwitchEnd(how);
+        countModeSwitch(how);
 
         if (getPlayer() != null) {
             getPlayer().setPlayWhenReady(mIsHeldPlay);
         }
+    }
+
+    /**
+     * The switches running the display didn't report (see holdPlayback): kept over the app's runs, as the display is the same
+     */
+    private int getUnconfirmedSwitches() {
+        return getContext() != null ? getPrefs().getInt(KEY_UNCONFIRMED, 0) : 0;
+    }
+
+    private void countModeSwitch(String how) {
+        if (getContext() == null) {
+            return;
+        }
+
+        if (VideoStarts.MODE_SWITCH_REPORTED.equals(how)) {
+            getPrefs().edit().putInt(KEY_UNCONFIRMED, 0).apply();
+        } else if (VideoStarts.MODE_SWITCH_TIMED_OUT.equals(how)) {
+            getPrefs().edit().putInt(KEY_UNCONFIRMED, getUnconfirmedSwitches() + 1).apply();
+        }
+    }
+
+    private SharedPreferences getPrefs() {
+        return getContext().getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     private void savePlayback() {

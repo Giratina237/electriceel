@@ -77,6 +77,11 @@ public class SabrProcessor {
     private final Map<Integer, SabrContextUpdate> sabrContextUpdates;
     private final Set<Integer> sabrContextsToSend;
     private final Map<Integer, MediaHeader> initializedFormats;
+    /**
+     * Of a live stream, the newest media segment's header of each format as soon as it's read, its media still to come, with its
+     * start and duration (estimated when the header has none). Cleared by a reset (a seek). See getNewestLiveHeader.
+     */
+    private final Map<Integer, MediaHeader> newestLiveHeaders = new java.util.concurrent.ConcurrentHashMap<>();
     private final FormatSelector emptySelector;
 
     public SabrProcessor(
@@ -222,6 +227,16 @@ public class SabrProcessor {
         if (durationMs == NO_VALUE) {
             throw new SabrStreamError(
                     String.format("Cannot determine duration of segment %s (media_header=%s)", sequenceNumber, mediaHeader));
+        }
+
+        // Known before its media: a live seek's prefetch goes on from it at once (initializedFormats has it only at its MEDIA_END)
+        boolean hasStart = mediaHeader.hasStartMs() || timeRange != null && timeRange.hasStartTicks() && timeRange.hasTimescale();
+
+        if (isLive() && !isInitSegment && hasStart) {
+            newestLiveHeaders.put(mediaHeader.getItag(), mediaHeader.toBuilder()
+                    .setStartMs(startMs)
+                    .setDurationMs(durationMs)
+                    .build());
         }
 
         long estimatedContentLength = NO_VALUE;
@@ -795,7 +810,17 @@ public class SabrProcessor {
         return initializedFormats;
     }
 
+    /**
+     * Of a live stream, the newest media segment's header read for the format since the last reset, its media maybe still to come;
+     * null for none
+     */
+    @Nullable
+    public MediaHeader getNewestLiveHeader(int iTag) {
+        return newestLiveHeaders.get(iTag);
+    }
+
     public void reset(int iTag) {
+        newestLiveHeaders.remove(iTag);
         MediaHeader mediaHeader = initializedFormats.get(iTag);
 
         if (mediaHeader != null) {

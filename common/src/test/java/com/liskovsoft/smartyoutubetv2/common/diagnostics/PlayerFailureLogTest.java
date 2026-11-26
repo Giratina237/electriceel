@@ -209,6 +209,30 @@ public class PlayerFailureLogTest {
         assertEquals(0, events.get(3).optInt("repeats"));
     }
 
+    /**
+     * The clients went round at the attestation wall: each one's failure is a line of its own, not the first client's repeated
+     */
+    @Test
+    public void theSameFailureOnAnotherClientIsNotCounted() throws Exception {
+        PlayerFailureLog log = newLog("1.0", 10);
+
+        for (String client : new String[]{"WEB", "WEB_SAFARI", "MWEB", "WEB"}) {
+            log.record(failure(PlayerFailure.KIND_ENGINE_ERROR, "video").source(client, PlayerFailure.PROTOCOL_SABR));
+            tick(5_000);
+        }
+
+        List<JSONObject> events = log.readAll();
+
+        assertEquals(4, events.size());
+        assertEquals("WEB", events.get(0).getJSONObject("player").optString("client"));
+        assertEquals("WEB_SAFARI", events.get(1).getJSONObject("player").optString("client"));
+        assertEquals("MWEB", events.get(2).getJSONObject("player").optString("client"));
+        // WEB's again within its minute: counted with the first, written when read
+        assertEquals("WEB", events.get(3).getJSONObject("player").optString("client"));
+        assertEquals(0, events.get(3).optInt("repeats"));
+        assertEquals(1_000_000 + 15_000, events.get(3).optLong("ts"));
+    }
+
     @Test
     public void readingWritesTheCountSoFarAndTheMinuteGoesOn() {
         PlayerFailureLog log = newLog("1.0", 10);

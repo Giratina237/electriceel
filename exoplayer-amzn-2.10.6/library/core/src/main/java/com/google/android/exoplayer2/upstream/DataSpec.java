@@ -48,7 +48,8 @@ public final class DataSpec {
         FLAG_ALLOW_GZIP,
         FLAG_ALLOW_ICY_METADATA,
         FLAG_DONT_CACHE_IF_LENGTH_UNKNOWN,
-        FLAG_ALLOW_CACHE_FRAGMENTATION
+        FLAG_ALLOW_CACHE_FRAGMENTATION,
+        FLAG_INITIALIZATION
       })
   public @interface Flags {}
   /**
@@ -74,6 +75,11 @@ public final class DataSpec {
    * whilst writing another).
    */
   public static final int FLAG_ALLOW_CACHE_FRAGMENTATION = 1 << 3; // 8
+  /**
+   * A stream's initialization data (e.g. a DASH init chunk): small, and a start waits for it. A source may ask for it again on another
+   * connection when the first doesn't answer soon (see the app's HedgedDataSource).
+   */
+  public static final int FLAG_INITIALIZATION = 1 << 4; // 16
 
   /**
    * The set of HTTP methods that are supported by ExoPlayer {@link HttpDataSource}s. One of {@link

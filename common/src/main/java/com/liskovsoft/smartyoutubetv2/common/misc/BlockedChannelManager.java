@@ -10,10 +10,12 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 import com.liskovsoft.smartyoutubetv2.common.prefs.BlockedChannelData;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,7 +29,9 @@ import io.reactivex.Observable;
  * renamed channel are found by the id their new name has. A name can be two channels', so a card that would be hidden is then
  * looked up by its video (a watch-next request), before it's shown (see HiddenVideoResolver). Only while a channel is blocked
  * with its id.<br/>
- * A failed lookup hides the card by its name, as before the ids.
+ * A failed lookup hides the card by its name, as before the ids.<br/>
+ * A collaboration ("X and Y") goes when any of its channels is blocked (e.g. from the Collaborators panel, see CollaboratorsPresenter):
+ * by the ids its video was found to have, otherwise by the ones its name was.
  */
 public class BlockedChannelManager {
     private static final String TAG = BlockedChannelManager.class.getSimpleName();
@@ -38,10 +42,11 @@ public class BlockedChannelManager {
     private static BlockedChannelManager sInstance;
     private final Context mContext;
     private AiSListManager.HandleLookup mLookup;
-    // Video id -> its channel's id, the uploader's for a collaboration. Access order, so the least recently seen video goes first.
-    private final Map<String, String> mChannelIdByVideoId = new LinkedHashMap<String, String>(16, 0.75f, true) {
+    // Video id -> its channels' ids or nulls, the uploader's first: one per channel of a collaboration. Access order, so the least
+    // recently seen video goes first.
+    private final Map<String, List<String>> mChannelIdsByVideoId = new LinkedHashMap<String, List<String>>(16, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<String, List<String>> eldest) {
             return size() > MAX_VIDEOS;
         }
     };
@@ -78,6 +83,14 @@ public class BlockedChannelManager {
     }
 
     /**
+     * A video card that might be a collaboration's ("X and Y"), with its uploader's id or without (search has it, Home doesn't):
+     * its other channels are found by its video too
+     */
+    public static boolean isCollaborationCandidate(Video video) {
+        return VideoGroup.isHideableCard(video) && CollaborationManager.isCandidate(video.getAuthor());
+    }
+
+    /**
      * Holds until the cards that would be hidden are known by their video (see HiddenVideoResolver), once the channel ids
      * of their names are (see AiSListManager.resolveHandles). Completes once every lookup is done, the failed ones too.
      */
@@ -86,7 +99,7 @@ public class BlockedChannelManager {
         Set<String> videoIds = new LinkedHashSet<>();
 
         for (Video video : videos) {
-            if (isCandidate(video) && !isFound(video.videoId) && data.mayContainChannel(getNameChannelId(video), video.getAuthor())) {
+            if ((isCandidate(video) || isCollaborationCandidate(video)) && !isFound(video.videoId) && mayBeBlocked(data, video)) {
                 videoIds.add(video.videoId);
             }
         }
@@ -119,7 +132,17 @@ public class BlockedChannelManager {
             return true;
         }
 
-        return !BlockedChannelData.isChannelId(channelId) && isCandidate(video) && data.containsChannel(getNameChannelId(video), null);
+        if (!BlockedChannelData.isChannelId(channelId) && isCandidate(video) && data.containsChannel(getNameChannelId(video), null)) {
+            return true;
+        }
+
+        for (String collaboratorId : getCollaboratorIds(video)) {
+            if (data.containsChannel(collaboratorId, null)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -151,6 +174,10 @@ public class BlockedChannelManager {
         if (!BlockedChannelData.isChannelId(channelId) && isCandidate(video)) {
             getData().removeChannel(getNameChannelId(video), null);
         }
+
+        for (String collaboratorId : getCollaboratorIds(video)) {
+            getData().removeChannel(collaboratorId, null);
+        }
     }
 
     /**
@@ -162,13 +189,65 @@ public class BlockedChannelManager {
             return video.channelId;
         }
 
-        String found;
+        List<String> found;
 
-        synchronized (mChannelIdByVideoId) {
-            found = mChannelIdByVideoId.get(video.videoId);
+        synchronized (mChannelIdsByVideoId) {
+            found = mChannelIdsByVideoId.get(video.videoId);
         }
 
-        return found != null ? found : video.channelId;
+        // The uploader's
+        String channelId = found != null && !found.isEmpty() ? found.get(0) : null;
+
+        return BlockedChannelData.isChannelId(channelId) ? channelId : video.channelId;
+    }
+
+    /**
+     * The ids of a collaboration's channels (a card of "X and Y"): the ones its video was found to have (see resolve), otherwise
+     * the ones its name was (see AiSListManager.resolveHandles). Empty for any other card.
+     */
+    private List<String> getCollaboratorIds(Video video) {
+        if (!isCollaborationCandidate(video)) {
+            return Collections.emptyList();
+        }
+
+        List<String> found;
+
+        synchronized (mChannelIdsByVideoId) {
+            found = mChannelIdsByVideoId.get(video.videoId);
+        }
+
+        List<String> result = new ArrayList<>();
+
+        // Its lookup failed: by the name, as a card of one channel is
+        for (String channelId : found != null && !found.isEmpty() ? found : getNameChannelIds(video)) {
+            if (BlockedChannelData.isChannelId(channelId)) {
+                result.add(channelId);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * A channel blocked with its id that the card might be of: by its name or the id found for it (see BlockedChannelData.mayContainChannel),
+     * or a collaboration's by the id found for any of its channels. Its video tells.
+     */
+    private boolean mayBeBlocked(BlockedChannelData data, Video video) {
+        if (data.mayContainChannel(getNameChannelId(video), video.getAuthor())) {
+            return true;
+        }
+
+        if (!CollaborationManager.isCandidate(video.getAuthor())) {
+            return false;
+        }
+
+        for (String channelId : getNameChannelIds(video)) {
+            if (data.mayContainChannel(channelId, null)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -178,9 +257,16 @@ public class BlockedChannelManager {
         return AiSListManager.instance(mContext).getCachedChannelId(AiSListManager.getLookupKey(video));
     }
 
+    /**
+     * The ids found for the card's channel name: one per channel of a collaboration (see AiSListManager.resolveHandles)
+     */
+    private List<String> getNameChannelIds(Video video) {
+        return AiSListManager.instance(mContext).getCachedChannelIds(AiSListManager.getLookupKey(video));
+    }
+
     private boolean isFound(String videoId) {
-        synchronized (mChannelIdByVideoId) {
-            return mChannelIdByVideoId.containsKey(videoId);
+        synchronized (mChannelIdsByVideoId) {
+            return mChannelIdsByVideoId.containsKey(videoId);
         }
     }
 
@@ -194,12 +280,9 @@ public class BlockedChannelManager {
                     return NO_HANDLES;
                 })
                 .doOnNext(handles -> {
-                    // The uploader first
-                    String channelId = !handles.isEmpty() ? handles.values().iterator().next() : null;
-
-                    // Not found either: not looked up again for the rows (see resolve)
-                    synchronized (mChannelIdByVideoId) {
-                        mChannelIdByVideoId.put(videoId, BlockedChannelData.isChannelId(channelId) ? channelId : null);
+                    // The uploader first. Not found either: not looked up again for the rows (see resolve).
+                    synchronized (mChannelIdsByVideoId) {
+                        mChannelIdsByVideoId.put(videoId, new ArrayList<>(handles.values()));
                     }
                 })
                 .doFinally(() -> mRunningLookups.remove(videoId))
@@ -217,8 +300,8 @@ public class BlockedChannelManager {
         mLookup = lookup;
         mRunningLookups.clear();
 
-        synchronized (mChannelIdByVideoId) {
-            mChannelIdByVideoId.clear();
+        synchronized (mChannelIdsByVideoId) {
+            mChannelIdsByVideoId.clear();
         }
     }
 }
