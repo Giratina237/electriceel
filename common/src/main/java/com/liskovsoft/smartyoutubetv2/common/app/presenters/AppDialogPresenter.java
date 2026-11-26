@@ -151,8 +151,9 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     public void showDialog(CharSequence dialogTitle, Runnable onFinish) {
-        // Looked through by the settings search instead: not shown, its onFinish isn't kept
+        // Looked through by the settings search instead: not shown, closed after (onFinish runs then)
         if (SettingsCapture.offerPanel(dialogTitle, mCategories)) {
+            SettingsCapture.offerOnClose(onFinish);
             resetData();
             return;
         }
@@ -396,7 +397,7 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     public void setOnStart(Runnable onStart) {
-        // Of a dialog that isn't shown (see SettingsCapture)
+        // Of a dialog that isn't shown (see SettingsCapture): it doesn't start
         if (SettingsCapture.isActive()) {
             return;
         }
@@ -405,7 +406,8 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     public void setOnFinish(Runnable onFinish) {
-        if (SettingsCapture.isActive()) {
+        // Of a dialog that isn't shown: run as it's closed, after it's looked through
+        if (SettingsCapture.offerOnClose(onFinish)) {
             return;
         }
 

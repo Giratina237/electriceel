@@ -12,6 +12,8 @@ import java.util.List;
  * (see AppDialogPresenter.showDialog, SettingsCardsPresenter.show and ViewManager.startView).<br/>
  * A panel that loads what it shows in the background (e.g. Accounts) isn't looked through: it checks {@link #isActive()} and
  * shows nothing. The card that opens it is found all the same.<br/>
+ * A panel looked through is closed as well: what runs as it closes runs then (e.g. Backup lets its auto-backups run again only
+ * then, see BackupSettingsPresenter.unhold). Still looked through: what it would show isn't shown.<br/>
  * On the main thread only.
  */
 public final class SettingsCapture {
@@ -25,6 +27,7 @@ public final class SettingsCapture {
         SettingsCardsPresenter.Cards cards;
         CharSequence panelTitle;
         List<OptionCategory> panel;
+        final List<Runnable> onClose = new ArrayList<>();
 
         boolean isEmpty() {
             return cards == null && panel == null;
@@ -53,7 +56,14 @@ public final class SettingsCapture {
         try {
             open.run();
         } finally {
-            sResult = previous;
+            try {
+                // Closed as it was opened, still looked through
+                for (Runnable onClose : result.onClose) {
+                    onClose.run();
+                }
+            } finally {
+                sResult = previous;
+            }
         }
 
         return result;
@@ -91,6 +101,23 @@ public final class SettingsCapture {
         if (sResult.isEmpty()) {
             sResult.panelTitle = title;
             sResult.panel = new ArrayList<>(categories);
+        }
+
+        return true;
+    }
+
+    /**
+     * From AppDialogPresenter: what runs as a panel looked through closes, run after it's looked through
+     *
+     * @return taken
+     */
+    public static boolean offerOnClose(Runnable onClose) {
+        if (sResult == null) {
+            return false;
+        }
+
+        if (onClose != null) {
+            sResult.onClose.add(onClose);
         }
 
         return true;
