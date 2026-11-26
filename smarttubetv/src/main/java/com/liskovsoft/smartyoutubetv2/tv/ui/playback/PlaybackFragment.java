@@ -64,6 +64,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStart;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.controller.ExoPlayerController;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CensoredWords.Range;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.DebugInfoManager;
@@ -672,6 +673,9 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             public boolean dispatchSeekTo(Player player, int windowIndex, long positionMs) {
                 // E.g. a play of an ended video goes to its start (C.TIME_UNSET: the default position)
                 PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, positionMs != C.TIME_UNSET ? positionMs : 0);
+                // And for a start: the user's skips while it loads (e.g. 4 of 10 s to 0:40) told nothing, its only seek row said 0:00
+                // (0HCC641V qydG9Ntm-zM, kaPymkALErM)
+                VideoStarts.onSeek(positionMs != C.TIME_UNSET ? positionMs : 0);
 
                 return super.dispatchSeekTo(player, windowIndex, positionMs);
             }
@@ -877,6 +881,7 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             public boolean dispatchSeekTo(Player player, int windowIndex, long positionMs) {
                 // E.g. a play of an ended video goes to its start (C.TIME_UNSET: the default position)
                 PlayerCommands.onSeek(PlayerCommands.SOURCE_MEDIA_SESSION, positionMs != C.TIME_UNSET ? positionMs : 0);
+                VideoStarts.onSeek(positionMs != C.TIME_UNSET ? positionMs : 0);
 
                 return super.dispatchSeekTo(player, windowIndex, positionMs);
             }

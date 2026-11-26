@@ -45,6 +45,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.Plays;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackSpeed;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.SilenceDetector;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
@@ -201,9 +202,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     private String mDecoderErrorVideoId;
     private FormatItem mVideoFallback;
     /**
-     * Dropping frames on this many videos on a codec, the next ones try another (see onHealthFailure)
+     * Dropping frames on this many videos on a codec at a rate, the next ones try another (see onHealthFailure, applySpeedCodec)
      */
     private static final int FRAME_DROP_VIDEOS = 2;
+    /**
+     * The video whose codec was picked for the playback speed (see applySpeedCodec): once a video, the user's pick after it stays
+     */
+    @Nullable
+    private String mSpeedCodecVideoId;
     private FormatItem mAudioFallback;
     /**
      * Refused AudioTracks on the video in mDecoderErrorVideoId, since its sound last played
@@ -559,14 +565,17 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return;
         }
 
-        // A codec the decoder declares for this frame rate, dropping frames on video after video: another one of the same size, for
-        // this video only (27XPFNZC: AV1 1080p50 dropped 168 frames in 33 s on one video, 48 in 2.4 s on the next; VP9 1080p50 had
-        // dropped none in 21 min on that device). A first video's drops may be its own (436Q6MET: a 4K60 start dropped 151 frames in
-        // its first 10 s, then none in 32 min). The drops of a decoder catching up to where a seek or a resume sent it are left out by
-        // PlaybackHealth, only the ones that went on past its catch-up are reported (see PlaybackHealth#isDropsAfterCatchUp): MD8RQZM2
-        // #1's start resumed at 0:02 dropped 75 of 83 frames 1.1-1.6 s in, on a device whose AV1 2160p60 had played 69 times with no
-        // failure, and two such would have sent its 4K60 to VP9. A start from where the player was has nothing to catch up on: its drops
-        // are the codec's (EY23XNK9: VP9 60fps starts dropped 48-57 frames in their first 10 s, AV1 0-1).
+        // A codec the decoder declares for this frame rate, dropping frames on video after video at the rate it's decoded at (the video's
+        // times the speed, see FrameDropCodecs): another one of the same size, for this video only (0HCC641V #2: AVC 1080p50 at 1.5x
+        // dropped 80 of 120 frames, the second such video; VP9 at 1.5x then dropped 9 of 808 in its first 10 s, 150 in 13m44s). The rate
+        // isn't the decoder's declared one: VP9 kept up with 75 frames a second where every decoder there declares 1080p60, and the quality
+        // lowered to 720p (see isBeyondDecoder) would have been the worse fix. A first video's drops may be its own (436Q6MET: a 4K60 start
+        // dropped 151 frames in its first 10 s, then none in 32 min). The drops of a decoder catching up to where a seek or a resume sent
+        // it are left out by PlaybackHealth, only the ones that went on past its catch-up are reported (see
+        // PlaybackHealth#isDropsAfterCatchUp): MD8RQZM2 #1's start resumed at 0:02 dropped 75 of 83 frames 1.1-1.6 s in, on a device whose
+        // AV1 2160p60 had played 69 times with no failure, and two such would have sent its 4K60 to VP9. A start from where the player was
+        // has nothing to catch up on: its drops are the codec's (EY23XNK9: VP9 60fps starts dropped 48-57 frames in their first 10 s,
+        // AV1 0-1).
         // Not a card's preview: its drops on a small surface over the UI say nothing of the codec in the player
         String otherCodec = PlaybackHealth.KIND_FRAME_DROPS.equals(kind) && !isBeyondDecoder && !isEmbedPlayer()
                 && isDroppingOnVideoAfterVideo(video) ? applyOtherVideoCodec(video) : null;
@@ -593,25 +602,86 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
-     * Of a video format with the codec: e.g. "av1 1080p50" (see FrameDropCodecs), null when its codec or size isn't known
+     * Of a video format with the codec, at the rate it's decoded at: e.g. "av1 1080p75" for 1080p50 at 1.5x (see FrameDropCodecs), null
+     * when its codec or size isn't known
      */
     @Nullable
-    private static String getFrameDropKind(@Nullable FormatItem format, @Nullable String codec) {
+    private String getFrameDropKind(@Nullable FormatItem format, @Nullable String codec) {
+        return getFrameDropKind(format, codec, getPlayer() != null ? getPlayer().getSpeed() : 1);
+    }
+
+    /**
+     * @param speed the playback's: the player's own reads the speed before the last set till its playback thread takes it (see
+     *              #onSpeedChanged)
+     */
+    @Nullable
+    private static String getFrameDropKind(@Nullable FormatItem format, @Nullable String codec, float speed) {
         int size = format != null ? Math.min(format.getWidth(), format.getHeight()) : -1;
 
-        return codec != null && size > 0 ? FrameDropCodecs.kindOf(codec, size, format.getFrameRate()) : null;
+        return codec != null && size > 0 ? FrameDropCodecs.kindOf(codec, size, format.getFrameRate(), speed) : null;
+    }
+
+    /**
+     * Faster than 1x, the codec playing dropped frames at the rate it's decoded at on FRAME_DROP_VIDEOS other videos (see
+     * FrameDropCodecs): another one of the same size that hasn't, from the start, as onHealthFailure picks after the drops and an engine
+     * restart. 0HCC641V: each 1080p50 video at 1.5x played AV1 for 13-20 s of drops (6-14 % of its frames) till the user picked AVC in
+     * the menu, which dropped too; VP9 kept up at that rate (9 of 808 frames in its first 10 s). At 1x the same codecs dropped none
+     * (27XPFNZC), so not at 1x. Once a video (see #mSpeedCodecVideoId): the user's pick after it stays. Not a card's preview.
+     */
+    private void applySpeedCodec(float speed) {
+        Video video = getVideo();
+
+        if (getPlayer() == null || video == null || video.videoId == null || isEmbedPlayer() || speed <= 1
+                || video.videoId.equals(mSpeedCodecVideoId)) {
+            return;
+        }
+
+        FormatItem playing = getPlayer().getVideoFormat();
+        String kind = getFrameDropKind(playing, getCodecName(playing), speed);
+
+        if (kind == null || FrameDropCodecs.count(getContext(), kind) < FRAME_DROP_VIDEOS) {
+            return;
+        }
+
+        FormatItem other = findOtherVideoCodec(playing, speed);
+
+        // Every other one dropped frames at its rate too: the one picked stays
+        if (other == null || FrameDropCodecs.hasDropped(getContext(), getFrameDropKind(other, getCodecName(other), speed))) {
+            return;
+        }
+
+        mSpeedCodecVideoId = video.videoId;
+
+        if (applyVideoCodecLimit(other)) {
+            Log.d(TAG, "%s drops frames at %sx: %s instead", kind, speed, getCodecName(other));
+            FormatAttempts.onSelected(FormatAttempts.REASON_SPEED_CODEC);
+            PlayerCommands.onFormat(PlayerCommands.SOURCE_APP, getPlayer().getPositionMs());
+            getPlayer().setFormat(other);
+        }
     }
 
     /**
      * Another codec than the one playing, of the same size, for this video only (see lowerVideoQuality): the first of the list, as it
-     * prefers, that hasn't dropped frames on the device at its size and frame rate (see FrameDropCodecs). Every other one has: the
-     * first of them. A limit, as the quality lowered is. 27XPFNZC and Y36K953Z: AV1 and AVC 1080p50 both dropped frames, VP9 none; with
-     * AVC preferred over VP9, AV1's other codec was AVC.
+     * prefers, that hasn't dropped frames on the device at its size and the rate it's decoded at (see FrameDropCodecs). Every other one
+     * has: the first of them. A limit, as the quality lowered is. 0HCC641V #2: with AVC preferred over VP9, AV1's other codec at 1.5x
+     * was AVC, which dropped frames too; once it had on two videos, AVC's was VP9.
      *
      * @return the codec's name, null for none of that size
      */
     @Nullable
     private String applyOtherVideoCodec(@Nullable FormatItem playing) {
+        FormatItem other = findOtherVideoCodec(playing, getPlayer() != null ? getPlayer().getSpeed() : 1);
+
+        return other != null && applyVideoCodecLimit(other) ? getCodecName(other) : null;
+    }
+
+    /**
+     * The format of another codec than the one playing, of the same size (see #applyOtherVideoCodec), null for none
+     *
+     * @param speed the playback's, of the rates the drops are of (see FrameDropCodecs)
+     */
+    @Nullable
+    private FormatItem findOtherVideoCodec(@Nullable FormatItem playing, float speed) {
         String codec = getCodecName(playing);
 
         if (getPlayer() == null || codec == null) {
@@ -638,7 +708,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 other = format;
             }
 
-            String kind = getFrameDropKind(format, otherCodec);
+            String kind = getFrameDropKind(format, otherCodec, speed);
 
             if (kind == null || !FrameDropCodecs.hasDropped(getContext(), kind)) {
                 other = format;
@@ -646,22 +716,27 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             }
         }
 
-        if (other == null) {
-            return null;
-        }
+        return other;
+    }
 
-        String otherCodec = getCodecName(other);
+    /**
+     * The video plays at most the format's size, of its codec, for this video only: kept through its reloads (see
+     * #reapplyDecoderErrorFallback)
+     *
+     * @return false when the limit couldn't be made
+     */
+    private boolean applyVideoCodecLimit(FormatItem other) {
         FormatItem limit = ExoFormatItem.fromVideoSpec(String.format(Locale.US, "%d,%d,60,%s", other.getWidth(), other.getHeight(),
-                otherCodec), false);
+                getCodecName(other)), false);
 
         if (limit == null) {
-            return null;
+            return false;
         }
 
         getPlayerData().setTempVideoFormat(limit);
         mVideoFallback = limit;
 
-        return otherCodec;
+        return true;
     }
 
     /**
@@ -899,6 +974,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mDnsFixFrom = -1;
         // It came: stuck again another time (e.g. opened again), it's reloaded again
         mStuckLoadVideoId = null;
+        // Of the player that plays: another (e.g. a card's preview) may have played at its own speed since
+        if (getPlayer() != null) {
+            PlaybackSpeed.onChanged(getPlayer().getSpeed());
+        }
+
         FormatAttempts.onPlaying(true);
         Plays.onPlaying(true, getPositionMs());
         Video video = getVideo();
@@ -971,6 +1051,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             mAudioInitErrorCount = 0;
             mVideoFallback = null;
             mAudioFallback = null;
+            mSpeedCodecVideoId = null;
         }
     }
 
@@ -1034,6 +1115,19 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             // Diagnostics only: the playback goes on without them
             Log.e(TAG, "Can't read the formats tried: %s", e.getMessage());
         }
+
+        // The video's codec is known now: one that drops frames at this speed is swapped before it plays (the speed may be set before)
+        applySpeedCodec(getPlayer().getSpeed());
+    }
+
+    /**
+     * Faster now, the codec playing may drop frames at the rate (see #applySpeedCodec): its tracks may be known before. The speed told,
+     * not the player's: it reads the one before till its playback thread takes it (ExoPlayerImpl#getPlaybackParameters), and the
+     * switch didn't come at 1.5x on the emulator.
+     */
+    @Override
+    public void onSpeedChanged(float speed) {
+        applySpeedCodec(speed);
     }
 
     @Override

@@ -7,6 +7,8 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionCatego
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack;
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil;
@@ -99,6 +101,9 @@ public class HQDialogController extends BasePlayerController {
         }
 
         FormatItem formatItem = UiOptionItem.toFormat(option);
+        // The user's pick: the formats it changes to aren't a fallback of the app's (see FormatAttempts#REASON_USER_SELECTED)
+        FormatAttempts.onSelected(FormatAttempts.REASON_USER_SELECTED);
+        PlayerCommands.onFormat(PlayerCommands.SOURCE_APP, getPlayer().getPositionMs());
         getPlayer().setFormat(formatItem);
         persistFormat(formatItem);
 
