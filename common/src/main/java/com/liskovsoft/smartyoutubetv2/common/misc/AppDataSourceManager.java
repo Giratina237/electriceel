@@ -12,7 +12,6 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.DebuggingSe
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.MainUISectionSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.PlayerSectionSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.SearchSectionSettingsPresenter;
-import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.SettingsSearchPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.SystemSectionSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.UpdatesSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
@@ -39,17 +38,10 @@ public class AppDataSourceManager {
     }
 
     /**
-     * The cards of the Settings section: Find a setting, then the settings themselves
+     * The cards of the Settings section. Searched from the search bar above them (see SettingsCatalog).
      */
     public List<SettingsItem> getSettingItems(Context context) {
-        List<SettingsItem> settingItems = new ArrayList<>();
-
-        settingItems.add(new SettingsItem(
-                context.getString(R.string.find_setting), () -> SettingsSearchPresenter.instance(context).show(), R.drawable.settings_find)
-                .setDescription(context.getString(R.string.card_desc_find_setting)));
-        settingItems.addAll(getSettingSections(context));
-
-        return settingItems;
+        return getSettingSections(context);
     }
 
     /**

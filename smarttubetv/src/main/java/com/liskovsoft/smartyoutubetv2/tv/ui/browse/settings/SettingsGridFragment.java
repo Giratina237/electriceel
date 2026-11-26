@@ -29,13 +29,15 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.common.LeanbackActivity;
 import com.liskovsoft.smartyoutubetv2.tv.ui.common.UriBackgroundManager;
 import com.liskovsoft.smartyoutubetv2.tv.ui.mod.fragments.GridFragment;
 import com.liskovsoft.smartyoutubetv2.tv.ui.settingscards.SettingsCardsLayout;
+import com.liskovsoft.smartyoutubetv2.tv.ui.settingscards.SettingsSearchBar;
 import com.liskovsoft.smartyoutubetv2.tv.util.ViewUtil;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The Settings section: its cards under its title, like a settings section on its own screen (see SettingsCardsLayout).
+ * The Settings section: its cards under its title, like a settings section on its own screen (see SettingsCardsLayout), and a
+ * search bar at the end of the title's line (see SettingsSearchBar).
  * The title of Browse is hidden over it (see BrowseFragment).
  */
 public class SettingsGridFragment extends GridFragment implements SettingsSection {
@@ -45,6 +47,7 @@ public class SettingsGridFragment extends GridFragment implements SettingsSectio
     private UriBackgroundManager mBackgroundManager;
     private final List<SettingsGroup> mPendingUpdates = new ArrayList<>();
     private SettingsCardsLayout mCardsLayout;
+    private SettingsSearchBar mSearchBar;
     private String mTitle;
 
     @Override
@@ -72,9 +75,13 @@ public class SettingsGridFragment extends GridFragment implements SettingsSectio
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        GridFragmentHelper.enableDownToShorterRow(getBrowseGrid(), getGridPresenter().getNumberOfColumns());
         mCardsLayout = SettingsCardsLayout.attach(view, getBrowseGrid());
         mCardsLayout.setTitle(mTitle);
+        mSearchBar = SettingsSearchBar.attach(view);
+        int columns = getGridPresenter().getNumberOfColumns();
+        // Up from the first row goes to the search bar
+        GridFragmentHelper.enableDownToShorterRow(getBrowseGrid(), columns, event -> mSearchBar != null
+                && mSearchBar.onGridKey(event, getBrowseGrid().getSelectedPosition() < columns));
     }
 
     @Override
@@ -82,6 +89,11 @@ public class SettingsGridFragment extends GridFragment implements SettingsSectio
         if (mCardsLayout != null) {
             mCardsLayout.detach();
             mCardsLayout = null;
+        }
+
+        if (mSearchBar != null) {
+            mSearchBar.detach();
+            mSearchBar = null;
         }
 
         super.onDestroyView();
