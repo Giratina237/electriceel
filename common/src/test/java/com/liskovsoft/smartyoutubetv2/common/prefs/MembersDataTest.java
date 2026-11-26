@@ -10,6 +10,11 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowLooper;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -25,6 +30,8 @@ public class MembersDataTest {
      * No section: e.g. the player's suggestions (see VideoGroup.getFilterSectionId)
      */
     private static final int NO_SECTION = -1;
+    private static final String CHANNEL = "UCFLwN7vRu8M057qJF8TsBaA";
+    private static final String OTHER_CHANNEL = "UCother";
 
     @Before
     public void setUp() {
@@ -121,6 +128,154 @@ public class MembersDataTest {
         getData();
 
         assertEquals(ShowsData.MODE_SHOW, ShowsData.instance(RuntimeEnvironment.getApplication()).getMode());
+    }
+
+    /**
+     * Any membership shows them all, and the setting says so
+     */
+    @Test
+    public void membershipShowsThem() {
+        MembersData data = getData();
+
+        assertTrue(data.onMembershipsRead(Collections.singletonList(CHANNEL)));
+
+        assertEquals(MembersData.MODE_SHOW, data.getMode());
+        assertEquals(Collections.singleton(CHANNEL), data.getMemberships());
+    }
+
+    @Test
+    public void noMembershipKeepsThemHidden() {
+        MembersData data = getData();
+
+        assertFalse(data.onMembershipsRead(Collections.emptyList()));
+
+        assertEquals(MembersData.MODE_HIDE, data.getMode());
+        assertFalse(data.isModePicked());
+    }
+
+    /**
+     * A member of none when first read, of a channel joined since when read again
+     */
+    @Test
+    public void channelJoinedLaterShowsThem() {
+        MembersData data = getData();
+        data.onMembershipsRead(Collections.emptyList());
+
+        assertTrue(data.onMembershipsRead(Collections.singletonList(CHANNEL)));
+
+        assertEquals(MembersData.MODE_SHOW, data.getMode());
+    }
+
+    /**
+     * Picked in the settings before they were ever read: the memberships then are known, the mode stays
+     */
+    @Test
+    public void hidePickedBeforeTheyWereReadStays() {
+        MembersData data = getData();
+        data.setMode(MembersData.MODE_HIDE);
+
+        assertFalse(data.onMembershipsRead(Collections.singletonList(CHANNEL)));
+
+        assertEquals(MembersData.MODE_HIDE, data.getMode());
+        assertEquals(Collections.singleton(CHANNEL), data.getMemberships());
+    }
+
+    /**
+     * Shown for a membership, then Hide picked: it stays, as long as the memberships are the same
+     */
+    @Test
+    public void hidePickedAgainStays() {
+        MembersData data = getData();
+        data.onMembershipsRead(Collections.singletonList(CHANNEL));
+        data.setMode(MembersData.MODE_HIDE);
+
+        assertFalse(data.onMembershipsRead(Collections.singletonList(CHANNEL)));
+
+        assertEquals(MembersData.MODE_HIDE, data.getMode());
+    }
+
+    @Test
+    public void channelJoinedAfterHideWasPickedAgainShowsThem() {
+        MembersData data = getData();
+        data.onMembershipsRead(Collections.singletonList(CHANNEL));
+        data.setMode(MembersData.MODE_HIDE);
+
+        assertTrue(data.onMembershipsRead(Arrays.asList(CHANNEL, OTHER_CHANNEL)));
+
+        assertEquals(MembersData.MODE_SHOW, data.getMode());
+        assertEquals(new HashSet<>(Arrays.asList(CHANNEL, OTHER_CHANNEL)), data.getMemberships());
+    }
+
+    /**
+     * A membership left and joined again isn't new
+     */
+    @Test
+    public void membershipsAreNeverForgotten() {
+        MembersData data = getData();
+        data.onMembershipsRead(Collections.singletonList(CHANNEL));
+        data.setMode(MembersData.MODE_HIDE);
+        data.onMembershipsRead(Collections.emptyList());
+
+        assertFalse(data.onMembershipsRead(Collections.singletonList(CHANNEL)));
+
+        assertEquals(MembersData.MODE_HIDE, data.getMode());
+    }
+
+    @Test
+    public void markIsLeftAlone() {
+        MembersData data = getData();
+        data.setMode(MembersData.MODE_MARK);
+
+        assertFalse(data.onMembershipsRead(Collections.singletonList(CHANNEL)));
+
+        assertEquals(MembersData.MODE_MARK, data.getMode());
+    }
+
+    /**
+     * A later value saved first leaves the mode unpicked (saved as "null"): still the default
+     */
+    @Test
+    public void otherValuesSavedFirstLeaveTheModeUnpicked() {
+        MembersData data = getData();
+        data.setMarkColor(AiSListFilterData.MARK_COLOR_RED);
+
+        assertTrue(data.onMembershipsRead(Collections.singletonList(CHANNEL)));
+
+        assertEquals(MembersData.MODE_SHOW, data.getMode());
+    }
+
+    @Test
+    public void membershipsSurviveRestart() {
+        getData().onMembershipsRead(Arrays.asList(CHANNEL, OTHER_CHANNEL));
+        getData().setMode(MembersData.MODE_HIDE);
+        ShadowLooper.shadowMainLooper().idle(); // saved right away
+        MembersData.resetInstanceForTesting();
+
+        MembersData restored = getData();
+
+        assertEquals(new HashSet<>(Arrays.asList(CHANNEL, OTHER_CHANNEL)), restored.getMemberships());
+        assertFalse(restored.onMembershipsRead(Collections.singletonList(CHANNEL)));
+        assertEquals(MembersData.MODE_HIDE, restored.getMode());
+    }
+
+    /**
+     * Each account has its own memberships, and its own mode
+     */
+    @Test
+    public void eachAccountHasItsMemberships() {
+        getPrefs().onAccountChanged(TestAccounts.FIRST);
+        getData().onMembershipsRead(Collections.singletonList(CHANNEL));
+        ShadowLooper.shadowMainLooper().idle(); // saved before the account changes
+
+        getPrefs().onAccountChanged(TestAccounts.SECOND);
+
+        assertEquals(MembersData.MODE_HIDE, getData().getMode());
+        assertTrue(getData().getMemberships().isEmpty());
+
+        getPrefs().onAccountChanged(TestAccounts.FIRST);
+
+        assertEquals(MembersData.MODE_SHOW, getData().getMode());
+        assertEquals(Collections.singleton(CHANNEL), getData().getMemberships());
     }
 
     /**

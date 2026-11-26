@@ -7,6 +7,7 @@ import android.view.KeyEvent;
 import com.liskovsoft.googlecommon.common.helpers.ServiceHelper;
 import com.liskovsoft.mediaserviceinterfaces.MediaItemService;
 import com.liskovsoft.mediaserviceinterfaces.ServiceManager;
+import com.liskovsoft.mediaserviceinterfaces.data.Collaborator;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItem;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
@@ -29,6 +30,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.CollaboratorsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter.VideoMenuCallback;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.AutoFrameRateSettingsPresenter;
@@ -68,6 +70,10 @@ public class PlayerUIController extends BasePlayerController {
     private boolean mEngineReady;
     private boolean mDebugViewEnabled;
     private boolean mIsMetadataLoaded;
+    private int mRatingCount; // the like and dislike presses
+    private int mFailedRating; // the latest of the presses that failed
+    private MediaItemMetadata mMetadata; // the player video's
+    private int mConfirmedLikeStatus = -1; // the last rating YouTube took since the metadata came, -1 none
     private long mOverlayHideTimeMs;
     private final Runnable mSuggestionsResetHandler = () -> {
         if (getPlayer() == null) {
@@ -386,7 +392,7 @@ public class PlayerUIController extends BasePlayerController {
 
         getPlayer().setButtonState(R.id.action_thumbs_up, PlayerUI.BUTTON_OFF);
         getPlayer().setButtonState(R.id.action_thumbs_down, PlayerUI.BUTTON_OFF);
-        getPlayer().setChannelIcon(null);
+        getPlayer().setChannelIcons(null);
         getPlayer().setButtonState(R.id.action_playlist_add, PlayerUI.BUTTON_OFF);
         getPlayer().setButtonState(R.id.lb_control_closed_captioning, PlayerUI.BUTTON_OFF);
         getPlayer().setButtonState(R.id.action_video_speed, PlayerUI.BUTTON_OFF);
@@ -412,10 +418,11 @@ public class PlayerUIController extends BasePlayerController {
         if (getPlayerData().getSeekPreviewMode() != PlayerData.SEEK_PREVIEW_NONE) {
             getPlayer().loadStoryboard();
         }
-        getPlayer().setButtonState(R.id.action_thumbs_up, metadata.getLikeStatus() == MediaItemMetadata.LIKE_STATUS_LIKE ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
-        getPlayer().setButtonState(R.id.action_thumbs_down, metadata.getLikeStatus() == MediaItemMetadata.LIKE_STATUS_DISLIKE ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
+        mMetadata = metadata;
+        mConfirmedLikeStatus = -1;
+        setLikeButtons(metadata.getLikeStatus());
         if (getPlayerTweaksData().isRealChannelIconEnabled()) {
-            getPlayer().setChannelIcon(metadata.getAuthorImageUrl());
+            getPlayer().setChannelIcons(getChannelIconUrls(metadata));
         }
         setPlaylistAddButtonStateCached();
         setSubtitleButtonState();
@@ -482,9 +489,9 @@ public class PlayerUIController extends BasePlayerController {
         }
 
         if (!dislike) {
-            callMediaItemObservable(mMediaItemService::setDislikeObserve);
+            rate(mMediaItemService::setDislikeObserve, MediaItemMetadata.LIKE_STATUS_DISLIKE);
         } else {
-            callMediaItemObservable(mMediaItemService::removeDislikeObserve);
+            rate(mMediaItemService::removeDislikeObserve, MediaItemMetadata.LIKE_STATUS_INDIFFERENT);
         }
     }
 
@@ -509,10 +516,72 @@ public class PlayerUIController extends BasePlayerController {
         }
 
         if (!like) {
-            callMediaItemObservable(mMediaItemService::setLikeObserve);
+            rate(mMediaItemService::setLikeObserve, MediaItemMetadata.LIKE_STATUS_LIKE);
         } else {
-            callMediaItemObservable(mMediaItemService::removeLikeObserve);
+            rate(mMediaItemService::removeLikeObserve, MediaItemMetadata.LIKE_STATUS_INDIFFERENT);
         }
+    }
+
+    /**
+     * Sends the rating the buttons show now (likeStatus). Once the last press failed, the buttons show the rating YouTube has, as
+     * each press still sent is answered. Not after another video came.
+     */
+    private void rate(MediaItemObservable request, int likeStatus) {
+        Video video = getVideo();
+
+        if (video == null) {
+            Log.e(TAG, "Seems that video isn't initialized yet. Cancelling...");
+            return;
+        }
+
+        int rating = ++mRatingCount;
+        String videoId = video.videoId;
+
+        RxHelper.execute(request.call(video.mediaItem != null ? video.mediaItem : video.toMediaItem()), error -> {
+            Log.e(TAG, "Can't rate the video: %s", error.getMessage());
+
+            if (isPlayerVideo(videoId)) {
+                mFailedRating = Math.max(mFailedRating, rating);
+
+                if (mFailedRating == mRatingCount) {
+                    setYouTubeLikeButtons(videoId);
+                }
+            }
+
+            MessageHelpers.showLongMessage(getContext(), error.getMessage());
+        }, () -> {
+            if (!isPlayerVideo(videoId)) {
+                return;
+            }
+
+            mConfirmedLikeStatus = likeStatus;
+
+            // The last press failed before this one was answered
+            if (mFailedRating == mRatingCount) {
+                setYouTubeLikeButtons(videoId);
+            }
+        });
+    }
+
+    /**
+     * The rating YouTube has: the last one it took since the metadata came, otherwise the metadata's. That one has the ratings
+     * still sent and none that failed (see MediaItemMetadataImpl of MediaServiceCore), even when it came while one was sent.
+     */
+    private void setYouTubeLikeButtons(String videoId) {
+        if (mConfirmedLikeStatus != -1) {
+            setLikeButtons(mConfirmedLikeStatus);
+        } else if (mMetadata != null && Helpers.equals(mMetadata.getVideoId(), videoId)) {
+            setLikeButtons(mMetadata.getLikeStatus());
+        }
+    }
+
+    private boolean isPlayerVideo(String videoId) {
+        return getPlayer() != null && getVideo() != null && Helpers.equals(getVideo().videoId, videoId);
+    }
+
+    private void setLikeButtons(int likeStatus) {
+        getPlayer().setButtonState(R.id.action_thumbs_up, likeStatus == MediaItemMetadata.LIKE_STATUS_LIKE ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
+        getPlayer().setButtonState(R.id.action_thumbs_down, likeStatus == MediaItemMetadata.LIKE_STATUS_DISLIKE ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
     }
 
     private void onSeekInterval() {
@@ -726,7 +795,13 @@ public class PlayerUIController extends BasePlayerController {
         } else if (buttonId == R.id.action_repeat) {
             applyRepeatMode(buttonState);
         } else if (buttonId == R.id.action_channel) {
-            openChannel();
+            Video video = getVideo();
+
+            if (video != null && video.hasCollaborators()) {
+                showCollaborators(video);
+            } else {
+                openChannel();
+            }
         } else if (buttonId == R.id.action_playback_queue) {
             AppDialogUtil.showPlaybackQueueDialog(getContext(), item -> {
                 VideoStarts.start(item.videoId, VideoStart.TRIGGER_QUEUE);
@@ -1183,6 +1258,7 @@ public class PlayerUIController extends BasePlayerController {
         }
 
         getVideo().isSubscribed = buttonState == PlayerUI.BUTTON_OFF;
+        syncCollaboratorSubscription(getVideo());
         getPlayer().setButtonState(R.id.action_subscribe, buttonState == PlayerUI.BUTTON_OFF ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
     }
 
@@ -1243,6 +1319,18 @@ public class PlayerUIController extends BasePlayerController {
         // The mode of the music videos in a music video, with Music autoplay on
         MusicAutoplayManager.setPlaybackMode(getContext(), getVideo(), nextMode);
         getPlayer().setButtonState(R.id.action_repeat, nextMode);
+        onPlaybackModeChanged();
+    }
+
+    /**
+     * The next video of the video playing goes with the mode now, not from the video after it (SmartTube #6437): Shuffle picks a random one
+     */
+    private void onPlaybackModeChanged() {
+        VideoLoaderController loader = getController(VideoLoaderController.class);
+
+        if (loader != null) {
+            loader.onPlaybackModeChanged();
+        }
     }
 
     private void showPlaybackModeDialog() {
@@ -1252,7 +1340,13 @@ public class PlayerUIController extends BasePlayerController {
 
         OptionCategory category = AppDialogUtil.createPlaybackModeCategory(
                 getContext(), getVideo(), () -> {
+                    // Picked later: the player may be gone (e.g. the opaque dialog of Android 8 stops it)
+                    if (getPlayer() == null) {
+                        return;
+                    }
+
                     getPlayer().setButtonState(R.id.action_repeat, MusicAutoplayManager.getPlaybackMode(getContext(), getVideo()));
+                    onPlaybackModeChanged();
                 });
 
         AppDialogPresenter settingsPresenter = getAppDialogPresenter();
@@ -1303,8 +1397,15 @@ public class PlayerUIController extends BasePlayerController {
             items.add(UiOptionItem.from(item.getTitle(), optionItem -> {
                 if (optionItem.isSelected()) {
                     MediaServiceManager.instance().setNotificationState(item, error -> MessageHelpers.showMessage(getContext(), error.getLocalizedMessage()));
-                    getVideo().isSubscribed = true;
-                    getPlayer().setButtonState(R.id.action_subscribe, PlayerUI.BUTTON_ON);
+                    // The player may be gone by the time a row is picked (the video is held weakly, see PlaybackPresenter.getVideo)
+                    Video video = getVideo();
+                    if (video != null) {
+                        video.isSubscribed = true;
+                        syncCollaboratorSubscription(video);
+                    }
+                    if (getPlayer() != null) {
+                        getPlayer().setButtonState(R.id.action_subscribe, PlayerUI.BUTTON_ON);
+                    }
                 }
             }, item.isSelected()));
         }
@@ -1349,13 +1450,73 @@ public class PlayerUIController extends BasePlayerController {
     }
 
     private void openChannel() {
-        Video video = getVideo();
+        openChannel(getVideo());
+    }
 
+    /**
+     * @param item the video, or a channel of its collaboration (see Video.collaborators)
+     */
+    private void openChannel(Video item) {
         // Child mode keeps to the subscribed channels. Checked before the player goes to the background.
-        ChildModeManager.instance(getContext()).checkChannel(getContext(), video != null ? video.channelId : null, () -> {
+        ChildModeManager.instance(getContext()).checkChannel(getContext(), item != null ? item.channelId : null, () -> {
             startTempBackgroundMode(ChannelPresenter.class);
-            ChannelPresenter.instance(getContext()).openChannel(video);
+            ChannelPresenter.instance(getContext()).openChannel(item);
         });
+    }
+
+    /**
+     * The channels of the collaboration, as YouTube's Collaborators panel: each one opened, subscribed to or blocked
+     */
+    private void showCollaborators(Video video) {
+        CollaboratorsPresenter.instance(getContext()).show(video.collaborators, new CollaboratorsPresenter.Listener() {
+            @Override
+            public void onOpenChannel(Video channel) {
+                openChannel(channel);
+            }
+
+            @Override
+            public void onSubscriptionChanged(Video channel) {
+                // The Subscribe button is the uploader's
+                if (getPlayer() != null && video == getVideo() && Helpers.equals(channel.channelId, video.channelId)) {
+                    video.isSubscribed = channel.isSubscribed;
+                    getPlayer().setButtonState(R.id.action_subscribe, video.isSubscribed ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
+                }
+            }
+        });
+    }
+
+    /**
+     * The uploader's row of the Collaborators panel follows the Subscribe button
+     */
+    private static void syncCollaboratorSubscription(Video video) {
+        for (Video channel : video.collaborators) {
+            if (Helpers.equals(channel.channelId, video.channelId)) {
+                channel.isSubscribed = video.isSubscribed;
+            }
+        }
+    }
+
+    /**
+     * The uploader's avatar, or the first two of a collaboration's channels
+     */
+    private static List<String> getChannelIconUrls(MediaItemMetadata metadata) {
+        List<String> urls = new ArrayList<>();
+
+        for (Collaborator collaborator : metadata.getCollaborators()) {
+            if (collaborator.getAvatarUrl() != null) {
+                urls.add(collaborator.getAvatarUrl());
+            }
+        }
+
+        if (urls.size() < 2) {
+            urls.clear();
+
+            if (metadata.getAuthorImageUrl() != null) {
+                urls.add(metadata.getAuthorImageUrl());
+            }
+        }
+
+        return urls;
     }
 
     private void showDebugInfo() {

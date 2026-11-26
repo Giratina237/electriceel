@@ -498,6 +498,7 @@
   <string name="collaborations_desc">频道显示为“X and Y”的视频，其中 X 和 Y 都是频道名称。每个名称都会以未登录状态的频道搜索查找一次。仅限英语。</string>
   <string name="collaborations_sections">分区</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">合作者</string>
   <string name="watch_later">稍后观看</string>
   <string name="watch_later_show">显示</string>
   <string name="watch_later_mark">标记</string>
@@ -670,9 +671,10 @@
   <string name="pressing_home_back">按主页或返回键</string>
   <string name="pressing_back">按返回键</string>
   <string name="player_number_key_seek">使用数字键快进</string>
-  <string name="save_remove_playlist">添加播放列表至播放列表分区或从中移除</string>
+  <string name="add_delete_playlist">添加至播放列表分区/删除播放列表</string>
   <string name="save_playlist">添加播放列表至播放列表分区</string>
-  <string name="remove_playlist">从播放列表分区永久移除播放列表</string>
+  <string name="delete_playlist">删除播放列表</string>
+  <string name="delete_playlist_fmt">删除播放列表 %s？</string>
   <string name="removed_from_playlists">已从播放列表分区移除</string>
   <string name="saved_to_playlists">已添加至播放列表分区</string>
   <string name="create_playlist">新建播放列表</string>
@@ -685,6 +687,9 @@
   <string name="copy_playlist_to_youtube">复制到 YouTube</string>
   <string name="copied_to_youtube">已复制到 YouTube</string>
   <string name="export_playlists">导出播放列表</string>
+  <string name="playlists_on_youtube">YouTube 上的播放列表</string>
+  <string name="playlists_on_this_device">此设备上的播放列表</string>
+  <string name="on_this_device">此设备上</string>
   <string name="import_playlists">导入播放列表</string>
   <string name="import_to_device">导入到此设备</string>
   <string name="import_to_youtube">导入到 YouTube</string>
@@ -994,7 +999,6 @@
   <string name="hide_shorts_from_gaming">在游戏中隐藏短视频</string>
   <string name="hide_shorts_from_news">在新闻中隐藏短视频</string>
   <string name="hide_shorts_from_music">在音乐中隐藏短视频</string>
-  <string name="remove_playlist_fmt">永久移除 %s ？</string>
   <string name="create_playlist_note">注意：此项不会显示在 YouTube 应用中</string>
   <string name="play_from_start">从头开始播放</string>
   <string name="auto_backup_category">自动备份</string>

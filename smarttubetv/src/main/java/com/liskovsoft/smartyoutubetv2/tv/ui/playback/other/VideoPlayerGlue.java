@@ -57,9 +57,11 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.VideoLinksAction;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.VideoSpeedAction;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.VideoStatsAction;
 import com.liskovsoft.smartyoutubetv2.tv.ui.playback.actions.VideoZoomAction;
+import com.liskovsoft.smartyoutubetv2.tv.util.ChannelAvatars;
 import com.liskovsoft.smartyoutubetv2.tv.util.ViewUtil;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -92,6 +94,8 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
     private final PlayerTweaksData mPlayerTweaksData;
     private final GeneralData mGeneralData;
     private int mPreviousAction = KeyEvent.ACTION_UP;
+    // A load started for an earlier video doesn't replace the avatar of the next one
+    private int mChannelIconRequest;
 
     public VideoPlayerGlue(
             Context context,
@@ -330,32 +334,53 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
         setActionIndex(mActions.get(buttonId), buttonState);
     }
 
-    public void setChannelIcon(String iconUrl) {
+    /**
+     * A collaboration's first two channels as a group, of the size of one avatar (see ChannelAvatars)
+     */
+    public void setChannelIcons(List<String> iconUrls) {
         ChannelAction channelAction = (ChannelAction) mActions.get(R.id.action_channel);
 
         if (channelAction == null) {
             return;
         }
 
-        if (iconUrl == null) {
+        int request = ++mChannelIconRequest;
+
+        if (iconUrls == null || iconUrls.isEmpty()) {
             channelAction.setIcon(ContextCompat.getDrawable(getContext(), R.drawable.action_channel));
             invalidateUi(channelAction);
             return;
         }
 
         Drawable originIcon = channelAction.getIcon();
+
+        if (iconUrls.size() > 1) {
+            ChannelAvatars.loadGroup(getContext(), iconUrls, Math.min(originIcon.getIntrinsicWidth(), originIcon.getIntrinsicHeight()), avatar -> {
+                if (avatar != null && request == mChannelIconRequest) {
+                    setChannelIcon(channelAction, avatar);
+                }
+            });
+            return;
+        }
+
         Glide.with(getContext())
-                .load(iconUrl)
+                .load(iconUrls.get(0))
                 .apply(ViewUtil.glideOptions())
                 .circleCrop() // resize image
                 .into(new SimpleTarget<Drawable>(originIcon.getIntrinsicWidth(), originIcon.getIntrinsicHeight()) {
                     @Override
                     public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
-                        channelAction.setIcon(resource);
-                        channelAction.setPadding(3);
-                        invalidateUi(channelAction);
+                        if (request == mChannelIconRequest) {
+                            setChannelIcon(channelAction, resource);
+                        }
                     }
                 });
+    }
+
+    private void setChannelIcon(ChannelAction channelAction, Drawable avatar) {
+        channelAction.setIcon(avatar);
+        channelAction.setPadding(3);
+        invalidateUi(channelAction);
     }
 
     public void setNextTitle(CharSequence title) {

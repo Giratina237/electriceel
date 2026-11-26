@@ -256,11 +256,15 @@ public class AppPreferenceManager {
 
         if (category.options.size() == 1) {
             OptionItem item = category.options.get(0);
-            Preference preference = new ButtonPreference(mContext);
+            ButtonPreference preference = new ButtonPreference(mContext);
             preference.setPersistent(false);
             preference.setTitle(item.getTitle());
             // A second line in a smaller font, e.g. why the button is greyed out
             preference.setSummary(item.getDescription());
+            // E.g. a channel's avatar
+            if (item.getIconUrl() != null) {
+                preference.setAvatarUrl(item.getIconUrl());
+            }
             // Changed while it's shown, e.g. a check's results as they come: the row's bound again, in place
             item.setOnDescriptionChange(() -> preference.setSummary(item.getDescription()));
             preference.setEnabled(item.isEnabled());

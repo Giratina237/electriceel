@@ -71,7 +71,7 @@ public class AiSListReportPresenter extends BasePresenter<Void> {
                             if (handles.isEmpty()) {
                                 MessageHelpers.showMessage(getContext(), R.string.aislist_report_no_handle);
                             } else if (handles.size() == 1) {
-                                confirm(video, handles.keySet().iterator().next(), onBlocked);
+                                confirm(video, handles.keySet().iterator().next(), video, onBlocked);
                             } else {
                                 pickChannel(video, handles, onBlocked);
                             }
@@ -88,7 +88,7 @@ public class AiSListReportPresenter extends BasePresenter<Void> {
         List<OptionItem> options = new ArrayList<>();
 
         for (String handle : handles.keySet()) {
-            options.add(UiOptionItem.from(handle, option -> confirm(video, handle, onBlocked)));
+            options.add(UiOptionItem.from(handle, option -> confirm(video, handle, getBlockedChannel(video, handles, handle), onBlocked)));
         }
 
         String title = getContext().getString(R.string.aislist_report_pick_channel);
@@ -96,7 +96,37 @@ public class AiSListReportPresenter extends BasePresenter<Void> {
         dialogPresenter.showDialog(title);
     }
 
-    private void confirm(Video video, String handle, Runnable onBlocked) {
+    /**
+     * What block on report blocks: the video's channel, as Block the channel does, or another channel of a collaboration than
+     * its uploader by that channel's id (the collaborations it's in go too, see BlockedChannelManager.isBlocked).
+     * @param handles the uploader's first
+     * @return null when the channel's id isn't known
+     */
+    private Video getBlockedChannel(Video video, Map<String, String> handles, String handle) {
+        if (handle.equals(handles.keySet().iterator().next())) {
+            return video;
+        }
+
+        String channelId = handles.get(handle);
+
+        if (!BlockedChannelData.isChannelId(channelId)) {
+            return null;
+        }
+
+        // The name of the Blocked channels section, the handle when the channel was never seen alone
+        String name = mManager.getCachedChannelName(handle);
+        Video channel = new Video();
+        channel.channelId = channelId;
+        channel.title = name != null ? name : handle;
+        channel.author = channel.title;
+
+        return channel;
+    }
+
+    /**
+     * @param blockedChannel the channel block on report blocks, null for none (see getBlockedChannel)
+     */
+    private void confirm(Video video, String handle, Video blockedChannel, Runnable onBlocked) {
         if (mManager.isBlocklisted(handle)) {
             MessageHelpers.showMessage(getContext(), R.string.aislist_report_blocklisted, handle);
             return;
@@ -110,17 +140,17 @@ public class AiSListReportPresenter extends BasePresenter<Void> {
         String username = getUsername();
 
         AppDialogUtil.showConfirmationDialog(getContext(), getContext().getString(R.string.aislist_report_confirm, handle, username),
-                () -> send(video, handle, username, onBlocked));
+                () -> send(video, handle, blockedChannel, username, onBlocked));
     }
 
-    private void send(Video video, String handle, String username, Runnable onBlocked) {
+    private void send(Video video, String handle, Video blockedChannel, String username, Runnable onBlocked) {
         // Like Block the channel: the menu is closed at once, the answer comes as a message
         AppDialogPresenter.instance(getContext()).closeDialog();
 
         RxHelper.disposeActions(mAction);
         mAction = mItemService.reportAiSListChannelObserve(handle, String.format(VIDEO_URL, video.videoId), username)
                 .subscribe(
-                        report -> onReport(video, handle, report, onBlocked),
+                        report -> onReport(handle, blockedChannel, report, onBlocked),
                         error -> {
                             Log.e(TAG, "Can't report %s: %s", handle, error.getMessage());
                             MessageHelpers.showMessage(getContext(), R.string.aislist_report_offline);
@@ -128,7 +158,7 @@ public class AiSListReportPresenter extends BasePresenter<Void> {
                 );
     }
 
-    private void onReport(Video video, String handle, AiSListReport report, Runnable onBlocked) {
+    private void onReport(String handle, Video blockedChannel, AiSListReport report, Runnable onBlocked) {
         if (!report.isAccepted()) {
             MessageHelpers.showMessage(getContext(), getErrorMessage(report));
             return;
@@ -138,7 +168,7 @@ public class AiSListReportPresenter extends BasePresenter<Void> {
 
         String message = report.getMessage() != null ? report.getMessage() : getContext().getString(R.string.aislist_report_sent, handle);
 
-        if (mFilterData.isBlockOnReportEnabled() && block(video)) {
+        if (mFilterData.isBlockOnReportEnabled() && blockedChannel != null && block(blockedChannel)) {
             message += "\n" + getContext().getString(R.string.channel_blocked);
 
             if (onBlocked != null) {

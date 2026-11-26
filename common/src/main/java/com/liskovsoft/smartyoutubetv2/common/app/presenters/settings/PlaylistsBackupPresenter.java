@@ -85,6 +85,9 @@ public class PlaylistsBackupPresenter extends BasePresenter<Void> {
                 () -> showExportDialog(playlists));
     }
 
+    /**
+     * The playlists on YouTube and the ones kept on this device apart: they're separate playlists, also when one of each has one title
+     */
     private void showExportDialog(List<MediaItem> playlists) {
         if (playlists.isEmpty()) {
             MessageHelpers.showMessage(getContext(), R.string.nothing_found);
@@ -93,12 +96,23 @@ public class PlaylistsBackupPresenter extends BasePresenter<Void> {
 
         AppDialogPresenter dialogPresenter = AppDialogPresenter.instance(getContext());
         boolean[] picked = new boolean[playlists.size()];
+        List<OptionItem> onYouTube = new ArrayList<>();
+        List<OptionItem> onDevice = new ArrayList<>();
 
         for (int i = 0; i < playlists.size(); i++) {
             MediaItem playlist = playlists.get(i);
             int index = i;
-            dialogPresenter.appendSingleSwitch(UiOptionItem.from(playlist.getTitle(), playlist.getBadgeText(),
-                    option -> picked[index] = option.isSelected(), false));
+            OptionItem option = UiOptionItem.from(playlist.getTitle(), playlist.getBadgeText(),
+                    optionItem -> picked[index] = optionItem.isSelected(), false);
+            (YouTubeMediaItemService.instance().isKeptOnDevice(playlist) ? onDevice : onYouTube).add(option);
+        }
+
+        if (!onYouTube.isEmpty()) {
+            dialogPresenter.appendCheckedCategory(getContext().getString(R.string.playlists_on_youtube), onYouTube);
+        }
+
+        if (!onDevice.isEmpty()) {
+            dialogPresenter.appendCheckedCategory(getContext().getString(R.string.playlists_on_this_device), onDevice);
         }
 
         dialogPresenter.appendSingleButton(UiOptionItem.from(getContext().getString(R.string.export_playlists), option -> {

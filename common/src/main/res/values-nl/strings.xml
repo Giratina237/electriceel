@@ -503,6 +503,7 @@
   <string name="collaborations_desc">Een video waarvan het kanaal wordt getoond als \"X and Y\", met X en Y allebei kanaalnamen. Elke naam wordt één keer opgezocht zonder inloggen. Alleen Engels.</string>
   <string name="collaborations_sections">Secties</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Medewerkers</string>
   <string name="watch_later">Later bekijken</string>
   <string name="watch_later_show">Tonen</string>
   <string name="watch_later_mark">Markeren</string>
@@ -673,9 +674,10 @@
   <string name="pressing_home">door op HOME te drukken</string>
   <string name="pressing_home_back">door op HOME of BACK te drukken</string>
   <string name="player_number_key_seek">Zoeken met cijfertoetsen</string>
-  <string name="save_remove_playlist">Afspeellijst toevoegen/verwijderen uit het gedeelte Afspeellijsten</string>
+  <string name="add_delete_playlist">Toevoegen aan Afspeellijsten/afspeellijst verwijderen</string>
   <string name="save_playlist">Afspeellijst toevoegen aan Afspeellijsten gedeelte</string>
-  <string name="remove_playlist">Afspeellijst permanent verwijderen uit het gedeelte Afspeellijsten</string>
+  <string name="delete_playlist">Afspeellijst verwijderen</string>
+  <string name="delete_playlist_fmt">Afspeellijst %s verwijderen?</string>
   <string name="removed_from_playlists">Verwijderd uit het gedeelte Afspeellijsten</string>
   <string name="saved_to_playlists">Toegevoegd aan het gedeelte Afspeellijsten</string>
   <string name="create_playlist">Maak afspeellijst</string>
@@ -688,6 +690,9 @@
   <string name="copy_playlist_to_youtube">Naar YouTube kopiëren</string>
   <string name="copied_to_youtube">Naar YouTube gekopieerd</string>
   <string name="export_playlists">Afspeellijsten exporteren</string>
+  <string name="playlists_on_youtube">Afspeellijsten op YouTube</string>
+  <string name="playlists_on_this_device">Afspeellijsten op dit apparaat</string>
+  <string name="on_this_device">Op dit apparaat</string>
   <string name="import_playlists">Afspeellijsten importeren</string>
   <string name="import_to_device">Naar dit apparaat importeren</string>
   <string name="import_to_youtube">Naar YouTube importeren</string>
@@ -1010,7 +1015,6 @@
   <string name="player_toggle_speed">Snelheid in-/uitschakelen</string>
   <string name="search_exit_shortcut">Zoeken verlaten</string>
   <string name="player_unexpected_error">Onverwachte afspeelfout</string>
-  <string name="remove_playlist_fmt">%s definitief verwijderen?</string>
   <string name="create_playlist_note">OPMERKING: Dit is niet zichtbaar in de YouTube-app</string>
   <string name="video_flip">Spiegelen</string>
   <string name="remove_from_search_history">Verwijderen uit zoekgeschiedenis</string>

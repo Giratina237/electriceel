@@ -161,6 +161,8 @@
     <dimen name="keyword_word_text_size">18sp</dimen>
     <!-- A QR code in a side panel row, e.g. in About (see qr_code_preference) -->
     <dimen name="qr_code_preference_size">200dp</dimen>
+    <!-- A channel's avatar at the start of a side panel row, e.g. in Collaborators (see ButtonPreference) -->
+    <dimen name="preference_avatar_size">32dp</dimen>
     <!-- The QR code of Share link (QR code) on the whole screen (see qr_code.xml). As large as the one of api.qrserver.com was. -->
     <dimen name="qr_code_size">250dp</dimen>
     <dimen name="qr_code_url_margin_top">16dp</dimen>

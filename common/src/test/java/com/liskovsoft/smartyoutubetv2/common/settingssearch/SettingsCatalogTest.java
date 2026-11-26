@@ -3,6 +3,7 @@ package com.liskovsoft.smartyoutubetv2.common.settingssearch;
 import android.app.Application;
 
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.BackupSettingsPresenter;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -38,6 +39,30 @@ public class SettingsCatalogTest {
         assertEquals(0, ShadowToast.shownToastCount());
         assertTrue(AppDialogPresenter.instance(app).isEmpty());
         assertTrue("Only " + catalog.getEntries().size(), catalog.getEntries().size() > 150);
+    }
+
+    /**
+     * Each panel is closed as it would be: what it does as it closes is done (e.g. Backup lets the auto-backups run again, they
+     * wait while it's held)
+     */
+    @Test
+    public void build_closesThePanels() {
+        Application app = RuntimeEnvironment.getApplication();
+
+        SettingsCatalog.build(app);
+
+        assertFalse(BackupSettingsPresenter.hasInstance());
+        assertFalse(SettingsCapture.isActive());
+    }
+
+    /**
+     * A question of words about no setting alone is searched all the same
+     */
+    @Test
+    public void search_onlyCommonWords() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+
+        assertFalse(SettingsSearch.find(catalog.getEntries(), "like", 10).isEmpty());
     }
 
     @Test

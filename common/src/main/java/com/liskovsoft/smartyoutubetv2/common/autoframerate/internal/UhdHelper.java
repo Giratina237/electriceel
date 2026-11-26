@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat;
 
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.autoframerate.internal.DisplayHolder.Mode;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -105,14 +106,19 @@ public class UhdHelper {
      */
     private class WorkHandler extends Handler {
         private int mRequestedModeId;
+        /**
+         * Of mRequestedModeId, null when not known
+         */
+        private Mode mRequestedMode;
         private UhdHelperListener mCallbackListener;
 
         public WorkHandler(Looper looper) {
             super(looper);
         }
 
-        public void setExpectedMode(int modeId) {
+        public void setExpectedMode(int modeId, Mode mode) {
             mRequestedModeId = modeId;
+            mRequestedMode = mode;
         }
 
         private void setCallbackListener(UhdHelperListener listener) {
@@ -128,7 +134,12 @@ public class UhdHelper {
                         Log.w(TAG, "Mode query returned null after onDisplayChanged callback");
                         return;
                     }
-                    if (mode.getModeId() == mRequestedModeId) {
+                    // The requested size and rate under another id is the switch done too (DBRPJG76: none of 12 switches was reported
+                    // as the id asked for, each start held 5.5 s)
+                    boolean isExpected = mode.getModeId() == mRequestedModeId || isSameMode(mode, mRequestedMode);
+                    VideoStarts.onDisplayModeReported(toResolution(mode) + " id " + mode.getModeId(), isExpected);
+
+                    if (isExpected) {
                         Log.i(TAG, "Callback for expected change Id= " + mRequestedModeId);
                         maybeDoACallback(mode);
                         doPostModeSetCleanup();
@@ -384,10 +395,12 @@ public class UhdHelper {
         Mode[] supportedModes = getSupportedModes();
         boolean isRequestedModeSupported = false;
         boolean isRequestedModeUhd = false;
+        Mode requestedMode = null;
         for (Mode mode : supportedModes) {
             if (mode.getModeId() == modeId) {
                 isRequestedModeUhd = (mode.getPhysicalHeight() >= HEIGHT_UHD ? true : false);
                 isRequestedModeSupported = true;
+                requestedMode = mode;
                 break;
             }
         }
@@ -401,7 +414,7 @@ public class UhdHelper {
         //We are now going to do setMode call and will do callback for it.
         mIsSetModeInProgress.set(true);
         //Let the handler know what modeId onDisplayChanged callback event to look for
-        mWorkHandler.setExpectedMode(modeId);
+        mWorkHandler.setExpectedMode(modeId, requestedMode);
         //mContext.registerReceiver(overlayStateChangeReceiver, new IntentFilter(MODESWITCH_OVERLAY_STATE_CHANGED));
         ContextCompat.registerReceiver(mContext, overlayStateChangeReceiver, new IntentFilter(MODESWITCH_OVERLAY_STATE_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED);
         mDisplayListener = new DisplayManager.DisplayListener() {
@@ -517,6 +530,14 @@ public class UhdHelper {
      */
     public void unregisterDisplayModeChangeListener(UhdHelperListener listener) {
         mListener = null;
+    }
+
+    /**
+     * The same size and refresh rate, whatever the id the display gives it
+     */
+    static boolean isSameMode(Mode mode, Mode other) {
+        return mode != null && other != null && mode.getPhysicalWidth() == other.getPhysicalWidth()
+                && mode.getPhysicalHeight() == other.getPhysicalHeight() && Math.abs(mode.getRefreshRate() - other.getRefreshRate()) < 0.01f;
     }
 
     public static String toResolution(Mode mode) {

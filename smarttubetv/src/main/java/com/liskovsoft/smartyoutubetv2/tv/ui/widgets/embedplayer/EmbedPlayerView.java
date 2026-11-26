@@ -160,7 +160,7 @@ public class EmbedPlayerView extends PlayerView implements PlaybackView {
     }
 
     @Override
-    public void setChannelIcon(String iconUrl) {
+    public void setChannelIcons(List<String> iconUrls) {
 
     }
 

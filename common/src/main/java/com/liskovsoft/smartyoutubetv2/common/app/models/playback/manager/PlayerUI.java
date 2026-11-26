@@ -33,7 +33,10 @@ public interface PlayerUI {
     boolean isControlsShown();
     int getButtonState(int buttonId);
     void setButtonState(int buttonId, int buttonState);
-    void setChannelIcon(String iconUrl);
+    /**
+     * The avatar of the video's channel, the first two of a collaboration's channels as a group. Empty or null: the plain icon.
+     */
+    void setChannelIcons(List<String> iconUrls);
     void setSeekPreviewTitle(String title);
     void setNextTitle(Video nextVideo);
     void showDebugInfo(boolean show);

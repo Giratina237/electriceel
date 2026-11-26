@@ -58,6 +58,31 @@ public class SearchDataTest {
     }
 
     @Test
+    public void typingCorrectionIsOffByDefault() {
+        assertTrue(getData().isTypingCorrectionDisabled());
+    }
+
+    @Test
+    public void typingCorrectionOnSurvivesRestart() {
+        getData().setTypingCorrectionDisabled(false);
+        SearchData.resetInstanceForTesting();
+
+        assertFalse(getData().isTypingCorrectionDisabled());
+    }
+
+    /**
+     * Every value is saved when any one is set
+     */
+    @Test
+    public void typingCorrectionStaysOffWhenAnotherValueIsSaved() {
+        getData().setFocusOnResultsEnabled(false);
+        SearchData.resetInstanceForTesting();
+
+        assertTrue(getData().isTypingCorrectionDisabled());
+        assertFalse(getData().isFocusOnResultsEnabled());
+    }
+
+    @Test
     public void eachAccountHasItsOwnValues() {
         AppPrefs prefs = getPrefs();
         SearchData data = getData();

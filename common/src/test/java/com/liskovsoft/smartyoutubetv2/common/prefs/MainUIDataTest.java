@@ -582,6 +582,74 @@ public class MainUIDataTest {
         }
     }
 
+    @Test
+    public void saveRemovePlaylistIsBelowItsNeighbourByDefault() {
+        MainUIData data = getData();
+
+        for (int menu : CARD_MENUS) {
+            assertBelowItsNeighbour(data, menu);
+        }
+    }
+
+    /**
+     * It was down by Add/Remove from the home screen: put right below its default neighbour
+     */
+    @Test
+    public void saveRemovePlaylistInItsOldPlaceIsMovedUp() {
+        SavedMenus saved = SavedMenus.oldDefaults();
+        for (int menu : CARD_MENUS) {
+            putBelowHomeScreen(saved.orders.get(menu));
+        }
+        saved.save();
+
+        MainUIData data = getData();
+
+        for (int menu : CARD_MENUS) {
+            assertBelowItsNeighbour(data, menu);
+        }
+    }
+
+    /**
+     * Put above its neighbour, it isn't moved down
+     */
+    @Test
+    public void saveRemovePlaylistAboveItsNeighbourStaysAsItIs() {
+        SavedMenus saved = SavedMenus.oldDefaults();
+        List<Long> videos = saved.orders.get(MainUIData.MENU_VIDEOS);
+        videos.remove((Long) MainUIData.MENU_ITEM_SAVE_REMOVE_PLAYLIST);
+        videos.add(0, MainUIData.MENU_ITEM_SAVE_REMOVE_PLAYLIST);
+        putBelowHomeScreen(saved.orders.get(MainUIData.MENU_PLAYLISTS));
+        saved.save();
+
+        MainUIData data = getData();
+
+        assertEquals(0, data.getMenuItemIndex(MainUIData.MENU_VIDEOS, MainUIData.MENU_ITEM_SAVE_REMOVE_PLAYLIST));
+        assertBelowItsNeighbour(data, MainUIData.MENU_PLAYLISTS);
+    }
+
+    /**
+     * Once: put last after it was moved, it stays there
+     */
+    @Test
+    public void saveRemovePlaylistIsMovedOnce() {
+        SavedMenus saved = SavedMenus.oldDefaults();
+        putBelowHomeScreen(saved.orders.get(MainUIData.MENU_PLAYLISTS));
+        saved.save();
+        MainUIData data = getData();
+        assertBelowItsNeighbour(data, MainUIData.MENU_PLAYLISTS);
+        List<Long> order = new ArrayList<>(data.getMenuItemsOrdered(MainUIData.MENU_PLAYLISTS));
+        order.remove((Long) MainUIData.MENU_ITEM_SAVE_REMOVE_PLAYLIST);
+
+        data.setMenuItemsOrder(MainUIData.MENU_PLAYLISTS, order); // the others first: it comes after them
+        ShadowLooper.shadowMainLooper().idle();
+        MainUIData.resetInstanceForTesting();
+
+        data = getData();
+
+        assertEquals(data.getMenuItemsOrdered(MainUIData.MENU_PLAYLISTS).size() - 1,
+                data.getMenuItemIndex(MainUIData.MENU_PLAYLISTS, MainUIData.MENU_ITEM_SAVE_REMOVE_PLAYLIST));
+    }
+
     /**
      * The enabled ones put in order: the others come after them, in their order
      */
@@ -842,6 +910,23 @@ public class MainUIDataTest {
     private static void assertAboveTheSidebarOne(MainUIData data, int menu) {
         assertEquals("menu " + menu, data.getMenuItemIndex(menu, MainUIData.MENU_ITEM_PIN_TO_SIDEBAR) - 1,
                 data.getMenuItemIndex(menu, MainUIData.MENU_ITEM_SUBSCRIPTION_GROUP));
+    }
+
+    /**
+     * Right below Rename playlist in the Playlists menu, Add/Remove from playlist in the others
+     */
+    private static void assertBelowItsNeighbour(MainUIData data, int menu) {
+        long neighbour = menu == MainUIData.MENU_PLAYLISTS ? MainUIData.MENU_ITEM_RENAME_PLAYLIST : MainUIData.MENU_ITEM_ADD_TO_PLAYLIST;
+        assertEquals("menu " + menu, data.getMenuItemIndex(menu, neighbour) + 1,
+                data.getMenuItemIndex(menu, MainUIData.MENU_ITEM_SAVE_REMOVE_PLAYLIST));
+    }
+
+    /**
+     * Where Add to Playlists/Delete playlist was by default
+     */
+    private static void putBelowHomeScreen(List<Long> order) {
+        order.remove((Long) MainUIData.MENU_ITEM_SAVE_REMOVE_PLAYLIST);
+        order.add(order.indexOf(MainUIData.MENU_ITEM_ADD_TO_HOME_SCREEN) + 1, MainUIData.MENU_ITEM_SAVE_REMOVE_PLAYLIST);
     }
 
     private static void assertMenus(long menuItem, int... menus) {

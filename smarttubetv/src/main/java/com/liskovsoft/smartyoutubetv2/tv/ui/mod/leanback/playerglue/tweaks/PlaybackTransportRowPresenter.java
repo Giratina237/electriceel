@@ -20,6 +20,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
+import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -99,8 +100,6 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
      * A ViewHolder for the PlaybackControlsRow supporting seek UI.
      */
     public class ViewHolder extends PlaybackRowPresenter.ViewHolder implements PlaybackSeekUi {
-        private static final long SPEED_INCREASE_PERIOD_MS = 1000;
-        private static final double SPEED_INCREASE_FACTOR = 1.5;
         private static final int CONTROLS_MODE_FULL = 0;
         private static final int CONTROLS_MODE_COMPACT = 1;
         final Presenter.ViewHolder mDescriptionViewHolder;
@@ -151,8 +150,7 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
         PlaybackSeekDataProvider mSeekDataProvider;
         long[] mPositions;
         int mPositionsLength;
-        long mSeekIncrementMs = -1;
-        long mSeekStartTimeMs;
+        final SeekAccelerator mSeekAccelerator = new SeekAccelerator(SystemClock::uptimeMillis);
         final PlayerData mPlayerData;
 
         // MOD: update quality info
@@ -178,7 +176,7 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
             }
         };
 
-        void updateProgressInSeek(boolean forward) {
+        void updateProgressInSeek(boolean forward, boolean isKeyRepeat) {
             long newPos;
             long pos = mCurrentTimeInMs;
             if (mPositionsLength > 0) {
@@ -238,7 +236,7 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
                 }
                 updateThumbsInSeek(thumbHeroIndex, forward);
             } else {
-                long interval = calculateSeekIncrement();
+                long interval = calculateSeekIncrement(isKeyRepeat);
                 newPos = pos + (forward ? interval : -interval);
                 if (newPos > mTotalTimeInMs) {
                     newPos = mTotalTimeInMs;
@@ -254,12 +252,12 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
         /**
          * MOD: implement fast seeking for videos with storyboard (indexed thumbnails)
          */
-        void updateProgressInSeekMod(boolean forward) {
+        void updateProgressInSeekMod(boolean forward, boolean isKeyRepeat) {
             long newPos;
             long pos = mCurrentTimeInMs;
 
             // Use common seeking calculations for all cases
-            long interval = calculateSeekIncrement();
+            long interval = calculateSeekIncrement(isKeyRepeat);
             newPos = pos + (forward ? interval : -interval);
             if (newPos > mTotalTimeInMs) {
                 newPos = mTotalTimeInMs;
@@ -311,28 +309,15 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
         }
 
         void resetSeekIncrement() {
-            mSeekIncrementMs = -1;
+            mSeekAccelerator.reset();
         }
 
         /**
          * Implement non-linear seek speed<br/>
-         * By increasing seek speed by 1.5 every 1 second.
+         * By increasing seek speed by 1.5 every 1 second, only while the key is held (see {@link SeekAccelerator}).
          */
-        long calculateSeekIncrement() {
-            if (mSeekIncrementMs == -1) {
-                mSeekStartTimeMs = System.currentTimeMillis();
-                mSeekIncrementMs = mPlayerData.getSeekIncrementMs();
-            } else {
-                // increase seek speed by 1.5 every 1 second
-                long timePassed = System.currentTimeMillis() - mSeekStartTimeMs;
-                long timeFactor = timePassed / SPEED_INCREASE_PERIOD_MS;
-                if (timeFactor == 1) {
-                    mSeekStartTimeMs = System.currentTimeMillis();
-                    mSeekIncrementMs *= SPEED_INCREASE_FACTOR;
-                }
-            }
-
-            return mSeekIncrementMs;
+        long calculateSeekIncrement(boolean isKeyRepeat) {
+            return mSeekAccelerator.nextStepMs(mPlayerData.getSeekIncrementMs(), isKeyRepeat);
         }
 
         void updateThumbsInSeek(int thumbHeroIndex, boolean forward) {
@@ -412,15 +397,24 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
                     }
         };
 
+        /**
+         * A single step that no held key repeats (e.g. an accessibility action): never sped up
+         */
         boolean onForward() {
-            return onForward(true);
+            return onSeekStep(true, false);
         }
 
+        /**
+         * A single step that no held key repeats (e.g. an accessibility action): never sped up
+         */
         boolean onBackward() {
-            return onForward(false);
+            return onSeekStep(false, false);
         }
 
-        boolean onForward(boolean forward) {
+        /**
+         * @param isKeyRepeat the step comes from the auto repeat of a held key: only these speed up the seek
+         */
+        boolean onSeekStep(boolean forward, boolean isKeyRepeat) {
             if (!startSeek()) {
                 return false;
             }
@@ -429,16 +423,16 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
                 case PlayerData.SEEK_PREVIEW_CAROUSEL_SLOW:
                     // Calculate thumbs size based on width
                     mThumbsBar.setNumberOfThumbs(-1);
-                    updateProgressInSeek(forward);
+                    updateProgressInSeek(forward, isKeyRepeat);
                     break;
                 case PlayerData.SEEK_PREVIEW_CAROUSEL_FAST:
                     // Calculate thumbs size based on width
                     mThumbsBar.setNumberOfThumbs(-1);
-                    updateProgressInSeekMod(forward);
+                    updateProgressInSeekMod(forward, isKeyRepeat);
                     break;
                 default:
                     mThumbsBar.setNumberOfThumbs(1);
-                    updateProgressInSeekMod(forward);
+                    updateProgressInSeekMod(forward, isKeyRepeat);
                     break;
             }
 
@@ -512,7 +506,8 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
                         case KeyEvent.KEYCODE_MEDIA_REWIND:
                             if (keyEvent.getAction() == KeyEvent.ACTION_DOWN) {
                                 setControlsMode(CONTROLS_MODE_COMPACT);
-                                onBackward();
+                                // MOD: only the repeats of a held key speed up the seek, separate presses don't
+                                onSeekStep(false, keyEvent.getRepeatCount() > 0);
                             } else {
                                 // MOD: resume immediately after seeking
 
@@ -528,7 +523,8 @@ public class PlaybackTransportRowPresenter extends PlaybackRowPresenter {
                         case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
                             if (keyEvent.getAction() == KeyEvent.ACTION_DOWN) {
                                 setControlsMode(CONTROLS_MODE_COMPACT);
-                                onForward();
+                                // MOD: only the repeats of a held key speed up the seek, separate presses don't
+                                onSeekStep(true, keyEvent.getRepeatCount() > 0);
                             } else {
                                 // MOD: resume immediately after seeking
 

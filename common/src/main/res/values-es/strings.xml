@@ -482,6 +482,7 @@
   <string name="collaborations_desc">Un vídeo cuyo canal aparece como \"X and Y\", donde X e Y son nombres de canal. Cada nombre se comprueba una vez con una búsqueda de canales sin sesión. Solo en inglés.</string>
   <string name="collaborations_sections">Secciones</string>
   <string name="collaboration_mark">Colab</string>
+  <string name="collaborators">Colaboradores</string>
   <string name="watch_later">Ver más tarde</string>
   <string name="watch_later_show">Mostrar</string>
   <string name="watch_later_mark">Marcar</string>
@@ -652,8 +653,7 @@
   <string name="pressing_home_back">pulsando HOME o BACK</string>
   <string name="pressing_back">pulsando ATRÁS</string>
   <string name="player_number_key_seek">Búsqueda con teclas numéricas</string>
-  <string name="save_remove_playlist">Añadir/borrar lista de la sección de listas de reproducción</string>
-  <string name="remove_playlist">Eliminar permanentemente la lista de la sección de listas de reproducción</string>
+  <string name="add_delete_playlist">Añadir a Listas de reproducción/eliminar lista de reproducción</string>
   <string name="removed_from_playlists">Eliminado de la sección de listas de reproducción</string>
   <string name="saved_to_playlists">Añadido a la sección de listas de reproducción</string>
   <string name="create_playlist">Crear lista de reproducción</string>
@@ -666,6 +666,9 @@
   <string name="copy_playlist_to_youtube">Copiar a YouTube</string>
   <string name="copied_to_youtube">Copiada a YouTube</string>
   <string name="export_playlists">Exportar listas de reproducción</string>
+  <string name="playlists_on_youtube">Listas de reproducción en YouTube</string>
+  <string name="playlists_on_this_device">Listas de reproducción en este dispositivo</string>
+  <string name="on_this_device">En este dispositivo</string>
   <string name="import_playlists">Importar listas de reproducción</string>
   <string name="import_to_device">Importar a este dispositivo</string>
   <string name="import_to_youtube">Importar a YouTube</string>
@@ -901,6 +904,8 @@
   <string name="hide_upcoming_home">Ocultar próximos del Inicio</string>
   <string name="remember_position_of_live_videos">Recordar posición en el directo</string>
   <string name="save_playlist">Añadir lista de reproducción a la sección listas de reproducción</string>
+  <string name="delete_playlist">Eliminar lista de reproducción</string>
+  <string name="delete_playlist_fmt">¿Eliminar la lista de reproducción %s?</string>
   <string name="header_sports">Deportes</string>
   <string name="enable">Habilitar</string>
   <string name="more_info">Más información</string>
@@ -988,7 +993,6 @@
   <string name="search_exit_shortcut">Salir del buscador</string>
   <string name="original_lang">Original</string>
   <string name="suggestions">Sugerencias</string>
-  <string name="remove_playlist_fmt">Eliminar %s permanentemente </string>
   <string name="player_chapter_notification2">Avanzar al siguiente capítulo presionando en la notificación</string>
   <string name="dont_resize_video_to_fit_dialog">No redimensione el video para ajustar al cuadro de diálogo</string>
   <string name="typing_corrections">Desactivar auto corrección mientras ingresa texto</string>

@@ -20,6 +20,7 @@ import org.robolectric.annotation.Config;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import io.reactivex.Observable;
@@ -36,12 +37,20 @@ import static org.junit.Assert.assertTrue;
 public class BlockedChannelManagerTest {
     private static final String NEWS_ID = "UCaaaaaaaaaaaaaaaaaaaaaa";
     private static final String FAKE_NEWS_ID = "UCbbbbbbbbbbbbbbbbbbbbbb"; // another channel named "News"
+    private static final String FEXL_ID = "UCcccccccccccccccccccccc";
+    private static final String FREQUENSI_ID = "UCdddddddddddddddddddddd";
+    private static final String COLLABORATION = "Fexl and Frequensi"; // uploaded by Fexl
     private static final Map<String, Map<String, String>> HANDLES = new HashMap<>(); // video id -> its owners' handles -> their channel ids
 
     static {
         HANDLES.put("news", Collections.singletonMap("@News", NEWS_ID));
         HANDLES.put("renamed", Collections.singletonMap("@News", NEWS_ID)); // the channel is now "News Daily"
         HANDLES.put("fake", Collections.singletonMap("@FakeNews", FAKE_NEWS_ID));
+        Map<String, String> collaboration = new LinkedHashMap<>(); // the uploader first
+        collaboration.put("@fexl", FEXL_ID);
+        collaboration.put("@Frequensyt", FREQUENSI_ID);
+        HANDLES.put("collab", collaboration);
+        HANDLES.put("fexl", Collections.singletonMap("@fexl", FEXL_ID));
     }
 
     private final Context mContext = RuntimeEnvironment.getApplication();
@@ -155,6 +164,96 @@ public class BlockedChannelManagerTest {
         resolve(playlist);
 
         assertTrue(getManager().isBlocked(playlist));
+    }
+
+    /**
+     * Blocked from the Collaborators panel: a collaboration goes by any of its channels, not only by the uploader
+     */
+    @Test
+    public void collaborationIsBlockedByItsOtherChannel() {
+        getData().addChannel(FREQUENSI_ID, "Frequensi");
+        Video collaboration = createVideo("collab", COLLABORATION);
+
+        resolve(collaboration);
+
+        assertTrue(getManager().isBlocked(collaboration));
+    }
+
+    /**
+     * A card of search has its uploader's id (from its menu's Go to channel): its other channel blocks it too
+     */
+    @Test
+    public void collaborationWithItsUploadersIdIsBlockedByItsOtherChannel() {
+        getData().addChannel(FREQUENSI_ID, "Frequensi");
+        Video collaboration = createVideo("collab", COLLABORATION, FEXL_ID);
+
+        resolve(collaboration);
+
+        assertTrue(getManager().isBlocked(collaboration));
+    }
+
+    @Test
+    public void collaborationIsBlockedByItsUploader() {
+        getData().addChannel(FEXL_ID, "Fexl");
+        Video collaboration = createVideo("collab", COLLABORATION);
+
+        resolve(collaboration);
+
+        assertTrue(getManager().isBlocked(collaboration));
+    }
+
+    /**
+     * The ids its name was found to have tell
+     */
+    @Test
+    public void collaborationIsBlockedWhenItsVideoIsNotFound() {
+        getData().addChannel(FREQUENSI_ID, "Frequensi");
+        AiSListManager.instance(mContext).resolveHandles(Collections.singletonMap(COLLABORATION, "collab")).subscribe();
+        Video unknown = createVideo("unknown", COLLABORATION);
+
+        getManager().resolve(Collections.singletonList(unknown)).subscribe();
+
+        assertTrue(getManager().isBlocked(unknown));
+    }
+
+    /**
+     * The other channel of the collaboration is blocked, not the uploader
+     */
+    @Test
+    public void uploaderStaysWhenItsCollaboratorIsBlocked() {
+        getData().addChannel(FREQUENSI_ID, "Frequensi");
+        Video fexl = createVideo("fexl", "Fexl");
+
+        resolve(fexl);
+
+        assertFalse(getManager().isBlocked(fexl));
+    }
+
+    @Test
+    public void collaborationIsUnblockedFromItsCard() {
+        getData().addChannel(FREQUENSI_ID, "Frequensi");
+        Video collaboration = createVideo("collab", COLLABORATION);
+
+        resolve(collaboration);
+        getManager().unblock(collaboration);
+
+        assertTrue(getData().isEmpty());
+        assertFalse(getManager().isBlocked(collaboration));
+    }
+
+    /**
+     * A channel of the Collaborators panel is blocked with its id and name
+     */
+    @Test
+    public void collaboratorIsBlockedWithItsId() {
+        Video channel = new Video();
+        channel.channelId = FREQUENSI_ID;
+        channel.author = "Frequensi";
+
+        getManager().block(channel);
+
+        assertEquals(Collections.singletonList(new Pair<>(FREQUENSI_ID, "Frequensi")), getData().getChannelIdsWithNames());
+        assertTrue(getManager().isBlocked(channel));
     }
 
     /**

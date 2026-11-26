@@ -43,6 +43,21 @@ public class GitHubReleasesTest {
     }
 
     /**
+     * The release of the APKs under names without the version (scripts/release-github.sh) isn't a version
+     */
+    @Test
+    public void parse_leavesOutTheLatestRelease() throws IOException {
+        List<Release> releases = GitHubReleases.parse("[" +
+                "{\"tag_name\":\"32.71.5\"}," +
+                "{\"tag_name\":\"latest\",\"body_html\":\"<p>The newest APKs</p>\"}," +
+                "{\"tag_name\":\"32.71.4\"}]");
+
+        assertEquals(2, releases.size());
+        assertEquals("32.71.5", releases.get(0).version);
+        assertEquals("32.71.4", releases.get(1).version);
+    }
+
+    /**
      * Without notes or a date (e.g. published without a body): nothing in them, not "null"
      */
     @Test

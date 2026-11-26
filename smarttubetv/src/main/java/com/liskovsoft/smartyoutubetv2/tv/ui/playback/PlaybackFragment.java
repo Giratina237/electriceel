@@ -3,7 +3,9 @@ package com.liskovsoft.smartyoutubetv2.tv.ui.playback;
 import android.media.session.PlaybackState;
 import android.os.Build.VERSION;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
@@ -17,6 +19,7 @@ import android.view.ViewStub;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.media.MediaSessionManager;
 import androidx.core.content.ContextCompat;
 import androidx.leanback.media.PlayerAdapter;
 import androidx.leanback.app.RowsSupportFragment;
@@ -140,6 +143,15 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     private boolean mIsEngineBlocked;
     private MediaSessionCompat mMediaSession;
     private MediaSessionConnector mMediaSessionConnector;
+    /**
+     * A command of the media session this soon after a media key it was given came from that key (see #getMediaSessionSender)
+     */
+    private static final long MEDIA_KEY_COMMAND_MS = 1_000;
+    /**
+     * The media key the media session was last given, -1 for none, and when
+     */
+    private int mMediaKeyCode = -1;
+    private long mMediaKeyTimeMs;
     private DoubleTapPlayerAdapter mDoubleTapPlayerAdapter;
     private YouTubeOverlay mYouTubeOverlay;
     private Boolean mIsControlsShownPreviously;
@@ -851,9 +863,11 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
                     return false;
                 }
 
-                // E.g. a Bluetooth speaker's play (AVRCP), for a failure (see PlayerCommands)
+                // E.g. a Bluetooth speaker's play (AVRCP), for a failure and for the video's play (see PlayerCommands), with what
+                // told the session
                 if (player.getPlayWhenReady() != playWhenReady) {
-                    PlayerCommands.onPlayWhenReady(playWhenReady, PlayerCommands.SOURCE_MEDIA_SESSION, player.getCurrentPosition());
+                    PlayerCommands.onPlayWhenReady(playWhenReady, PlayerCommands.SOURCE_MEDIA_SESSION, getMediaSessionSender(),
+                            player.getCurrentPosition());
                 }
 
                 return super.dispatchSetPlayWhenReady(player, playWhenReady);
@@ -867,6 +881,57 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
                 return super.dispatchSeekTo(player, windowIndex, positionMs);
             }
         });
+
+        // A media key given to the session: the command it makes of it comes right after (see getMediaSessionSender). Handled as
+        // before.
+        mMediaSessionConnector.setMediaButtonEventHandler((player, controlDispatcher, mediaButtonEvent) -> {
+            KeyEvent event = null;
+
+            if (mediaButtonEvent != null) {
+                event = mediaButtonEvent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
+            }
+
+            // Its press is what the session makes a command of: its release, told here too, would name the next command after it
+            if (event != null && event.getAction() == KeyEvent.ACTION_DOWN) {
+                mMediaKeyCode = event.getKeyCode();
+                mMediaKeyTimeMs = SystemClock.elapsedRealtime();
+            }
+
+            return false;
+        });
+    }
+
+    /**
+     * What told the media session the command it's giving now, in one of its callbacks: the package of the app that did ("android"
+     * for the system, e.g. HDMI-CEC pausing the sessions when the device stops being the active source), then the media key when it
+     * came as one, e.g. "android KEYCODE_MEDIA_PAUSE". Null when not known. Six pauses came from the media session about every 64.5 s
+     * with nothing to say from what (QYZPW0FN).
+     */
+    @Nullable
+    private String getMediaSessionSender() {
+        String sender = null;
+
+        try {
+            MediaSessionManager.RemoteUserInfo info = mMediaSession != null ? mMediaSession.getCurrentControllerInfo() : null;
+            String packageName = info != null ? info.getPackageName() : null;
+
+            // Before Android 9 the session isn't told who
+            if (packageName != null && !MediaSessionManager.RemoteUserInfo.LEGACY_CONTROLLER.equals(packageName)) {
+                sender = packageName;
+            }
+        } catch (RuntimeException e) {
+            // Not in a callback of the session: nobody to name
+        }
+
+        if (mMediaKeyCode != -1 && SystemClock.elapsedRealtime() - mMediaKeyTimeMs <= MEDIA_KEY_COMMAND_MS) {
+            String key = KeyEvent.keyCodeToString(mMediaKeyCode);
+            sender = sender != null ? sender + " " + key : key;
+        }
+
+        // Its command is this one: the next isn't the key's
+        mMediaKeyCode = -1;
+
+        return sender;
     }
 
     private void initializePlayerRows() {
@@ -1121,7 +1186,8 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.dislikeCount, Helpers.NON_BREAKING_SPACE, Helpers.THUMB_DOWN); // color of thumb cannot be changed
         }
 
-        if (getContext() != null && video.subscriberCount != null) {
+        // A collaboration's would be the uploader's alone: each channel's is in the Collaborators panel (see CollaboratorsPresenter)
+        if (getContext() != null && video.subscriberCount != null && !video.hasCollaborators()) {
             result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.subscriberCount.replace(" ", Helpers.NON_BREAKING_SPACE));
         }
 
@@ -1637,9 +1703,9 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     }
 
     @Override
-    public void setChannelIcon(String iconUrl) {
+    public void setChannelIcons(List<String> iconUrls) {
         if (mPlayerGlue != null) {
-            mPlayerGlue.setChannelIcon(iconUrl);
+            mPlayerGlue.setChannelIcons(iconUrls);
         }
     }
 

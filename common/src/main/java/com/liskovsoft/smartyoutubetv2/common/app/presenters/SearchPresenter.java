@@ -120,7 +120,8 @@ public class SearchPresenter extends BasePresenter<SearchView> implements VideoG
         }
 
         VideoMenuPresenter.instance(getContext()).showMenu(item, (videoItem, action) -> {
-            if (action == VideoMenuCallback.ACTION_HIDE) {
+            // Removed too, as in Browse: e.g. its channel blocked, or a word of its title hidden
+            if (action == VideoMenuCallback.ACTION_REMOVE || action == VideoMenuCallback.ACTION_HIDE) {
                 removeItem(videoItem);
             }
         });

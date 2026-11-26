@@ -16,6 +16,7 @@ import com.liskovsoft.sharedutils.helpers.PermissionHelpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.R;
+import com.liskovsoft.smartyoutubetv2.common.prefs.DebuggingData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.HiddenPrefs;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 
@@ -249,6 +250,8 @@ public class BackupAndRestoreManager implements MotherActivity.OnPermissions {
         // The restored settings don't overwrite the other devices of the storage sync's group: the group's are taken instead.
         // Before the copy: the sync sees each file copied as a change made here.
         StorageSync.onBackupRestored(mContext);
+        // Loaded before the copy, if it wasn't yet: its values are this install's, whose history of submissions stays (XF9KYTK1)
+        DebuggingData debuggingData = DebuggingData.instance(mContext);
 
         if (mSharedPrefsDir.isDirectory()) {
             // remove old data
@@ -257,6 +260,7 @@ public class BackupAndRestoreManager implements MotherActivity.OnPermissions {
 
         FileHelpers.copy(sharedPrefsBackupDir, mSharedPrefsDir);
         FileHelpers.copy(filesBackupDir, mFilesDir);
+        debuggingData.onBackupRestored(mContext);
         fixFileNames(mSharedPrefsDir);
 
         MessageHelpers.showMessage(mContext, R.string.msg_done);

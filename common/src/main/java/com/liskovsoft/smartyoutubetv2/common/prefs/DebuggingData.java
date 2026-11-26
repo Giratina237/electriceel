@@ -5,10 +5,12 @@ import android.content.Context;
 import androidx.annotation.Nullable;
 
 import com.liskovsoft.mediaserviceinterfaces.oauth.Account;
+import com.liskovsoft.sharedutils.helpers.FileHelpers;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.common.DataSaverBase;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -35,6 +37,11 @@ public class DebuggingData extends DataSaverBase {
     private static final int LAST_APP_EXIT_TS = 6;
     private static final int START_GRAPH = 7;
     private static final int LAST_SUBMITTED_START_TS = 8;
+    /**
+     * This install's history of submissions: never another install's (see #onBackupRestored)
+     */
+    private static final int[] HISTORY = {LAST_SUBMITTED_FAILURE_TS, LAST_SUBMISSION_ID, LAST_SUBMISSION_TIME, LAST_APP_EXIT_TS,
+            LAST_SUBMITTED_START_TS};
     private static final String KEYS_DELIM = ",";
     private static DebuggingData sInstance;
 
@@ -129,6 +136,47 @@ public class DebuggingData extends DataSaverBase {
 
     public synchronized void setLastAppExitTs(long ts) {
         setString(LAST_APP_EXIT_TS, String.valueOf(ts));
+    }
+
+    /**
+     * A backup was restored over this install's data (see BackupAndRestoreManager#restoreData): its settings are taken, its history
+     * of submissions isn't. That was the other install's: XF9KYTK1, a tablet, named YNM4W0VE, a TV box's, as its previous
+     * submission, and the newest failure, start and app exit the box had submitted or recorded would have kept this one's older ones
+     * from ever being sent (a clock that was ahead). Called on the instance loaded before the restore, whose values are this
+     * install's. Written to the file restored, which is read when the app starts again: a save of the values in memory is skipped
+     * when they're the ones it saved last, whatever the restore put in the file.
+     */
+    public synchronized void onBackupRestored(Context context) {
+        File file = getFile(context);
+        String[] restored = Helpers.splitData(FileHelpers.getFileContents(file));
+
+        // None restored: this install's file stayed as it was
+        if (restored == null) {
+            return;
+        }
+
+        List<Object> values = new ArrayList<Object>(Arrays.asList(restored));
+
+        for (int index : HISTORY) {
+            while (values.size() <= index) {
+                values.add(null);
+            }
+
+            values.set(index, getString(index, null));
+        }
+
+        FileHelpers.stringToFileAtomic(Helpers.mergeData(values.toArray()), file);
+    }
+
+    /**
+     * Where AppPrefs keeps the values (see SharedPreferencesBase#getData), read as the file is: the prefs migrate a missing one. In the
+     * prefs' own files dir, by their context: the one they read the values from when the app starts again.
+     */
+    private static File getFile(Context context) {
+        String dataKey = DebuggingData.class.getSimpleName();
+        AppPrefs prefs = AppPrefs.instance(context);
+
+        return new File(FileHelpers.getFilesDir(prefs.getContext()), prefs.getPrefsDir() + "/" + dataKey);
     }
 
     /**

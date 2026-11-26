@@ -1,13 +1,40 @@
 {
   "package": {
     "downloadUrlList_arm64-v8a": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.71.4/ElectricEel_stable_32.71.4_arm64-v8a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.3/ElectricEel_stable_32.80.3_arm64-v8a.apk"
     ],
     "downloadUrlList_armeabi-v7a": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.71.4/ElectricEel_stable_32.71.4_armeabi-v7a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.3/ElectricEel_stable_32.80.3_armeabi-v7a.apk"
     ],
     "downloadUrlList": [
-      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.71.4/ElectricEel_stable_32.71.4_armeabi-v7a.apk"
+      "https://github.com/cygnusx-1-org/electriceel/releases/download/32.80.3/ElectricEel_stable_32.80.3_armeabi-v7a.apk"
+    ]
+  },
+  "32.80.3": {
+    "versionCode": 2461,
+    "changelog": [
+      "Implemented Disable auto-correct in the search keyboard #106",
+      "Implemented Support multiple channels listed in collab videos #109",
+      "Fixed Live streams open at 0:00 instead of the live edge when \"Remember speed\" is set to \"Per video #110"
+    ]
+  },
+  "32.80.2": {
+    "versionCode": 2461,
+    "changelog": [
+      "Fixed Like not highlighted on a video you just liked",
+      "Fixed \"Hide watched\" ignores what you watched in the app",
+      "Fixed Adding a video to a playlist from the app makes the playlist look like one video",
+      "Fixed Shuffle does nothing on playlists of 30 or fewer",
+      "Fixed Seek acceleration sticks",
+      "Fixed Member Only Videos do not appear #104"
+    ]
+  },
+  "32.80.1": {
+    "versionCode": 2461,
+    "changelog": [
+      "Implemented DNS improvements including DoH and DoT support #93",
+      "Implemented Live stream player controls indicator #94",
+      "Implemented Possible to include VTT subtitles? #95"
     ]
   },
   "32.71.4": {

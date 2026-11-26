@@ -9,6 +9,7 @@ import androidx.work.Configuration;
 import com.bumptech.glide.Glide;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
+import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.BrowseSection;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.BrowsePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.AddDeviceView;
@@ -102,6 +103,9 @@ public class MainApplication extends MultiDexApplication implements Configuratio
         }
 
         setupGlobalExceptionHandler();
+        // Here, not in Splash: a process Android brings back straight into a screen (e.g. Browse after a kill) never runs Splash, and an
+        // undeliverable error it would swallow (a cancelled request's IOException) crashed it (53M2PA8E)
+        RxHelper.setupGlobalErrorHandler();
         // A process killed before it showed anything (e.g. started for a job) says so on the next start (see AppExits)
         LastState.onProcessStart(this);
         // When the TV or the receiver last came or went, for a refused AudioTrack (see ErrorFixerController)

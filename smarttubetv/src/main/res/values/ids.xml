@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The size an icon of a side panel row has in its layout, kept while it shows an avatar (see ButtonPreference) -->
+    <item name="preference_icon_layout_size" type="id" />
+</resources>

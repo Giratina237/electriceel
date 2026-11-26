@@ -158,7 +158,7 @@ final class VideoStartFixture {
         at(3105);
         VideoStarts.onFirstFrame();
         at(3410);
-        VideoStarts.onModeSwitchEnd();
+        VideoStarts.onModeSwitchEnd(null);
         at(3420);
         VideoStarts.onPlaying(true);
 

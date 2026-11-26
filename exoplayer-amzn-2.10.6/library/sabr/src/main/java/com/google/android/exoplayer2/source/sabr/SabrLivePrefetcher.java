@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * the segment is, and the player asks for one segment of a track at a time: 1 s segments came at 0.8x of real time, and the stream
  * stalled every 25 s (seen 2026-11-15). Requests in parallel are answered in the same time each.<br/>
  * A response fetched ahead is the one the player's own request for that segment gets: it's read from memory then, not asked again.
- * Only segments the server said exist (see LiveMetadata) are asked for ahead: a later one is held until it exists.
+ * Only segments the server said exist (see LiveMetadata) are asked for ahead: a later one is held until it exists.<br/>
+ * Asked for on the playback thread, and on a seek's chunk's loading thread (see FirstSegmentDataSource).
  */
 final class SabrLivePrefetcher {
     private static final String TAG = SabrLivePrefetcher.class.getSimpleName();
@@ -91,7 +92,7 @@ final class SabrLivePrefetcher {
      *
      * @param upstream asked when there's none, or when it failed
      */
-    DataSource dataSourceFor(int itag, long sequenceNumber, DataSource upstream) {
+    synchronized DataSource dataSourceFor(int itag, long sequenceNumber, DataSource upstream) {
         if (itag != this.itag) {
             return upstream;
         }
@@ -120,7 +121,7 @@ final class SabrLivePrefetcher {
      *
      * @param dataSpec the request for it (see SabrManifest#createLiveRequestAfter)
      */
-    void prefetch(int itag, long sequenceNumber, DataSpec dataSpec, int maxBytes) {
+    synchronized void prefetch(int itag, long sequenceNumber, DataSpec dataSpec, int maxBytes) {
         if (itag != this.itag) {
             clear();
             this.itag = itag;
@@ -158,7 +159,7 @@ final class SabrLivePrefetcher {
     /**
      * A seek or another format: what's asked for ahead won't be read
      */
-    void clear() {
+    synchronized void clear() {
         fetches.clear();
         itag = -1;
     }
@@ -249,6 +250,65 @@ final class SabrLivePrefetcher {
             this.data = data;
             this.error = error;
             done.countDown();
+        }
+    }
+
+    /**
+     * Of a live seek's chunk: which segment it brings first isn't known before it comes, so the ones after it are asked for as soon as
+     * it has (see DefaultSabrChunkSource#maybePrefetch), not once the chunk is loaded. The check runs before each read, on the chunk's
+     * loading thread, till it says it's done: the extractor has parsed what was read before. Not once the load was canceled.
+     */
+    @VisibleForTesting
+    static final class FirstSegmentDataSource implements DataSource {
+        interface Check {
+            /**
+             * @return whether it's done: not run again
+             */
+            boolean run();
+        }
+
+        private final DataSource upstream;
+        private final Check check;
+        private boolean isDone;
+
+        FirstSegmentDataSource(DataSource upstream, Check check) {
+            this.upstream = upstream;
+            this.check = check;
+        }
+
+        @Override
+        public void addTransferListener(TransferListener transferListener) {
+            upstream.addTransferListener(transferListener);
+        }
+
+        @Override
+        public long open(DataSpec dataSpec) throws IOException {
+            return upstream.open(dataSpec);
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int readLength) throws IOException {
+            if (!isDone && !Thread.currentThread().isInterrupted()) {
+                isDone = check.run();
+            }
+
+            return upstream.read(buffer, offset, readLength);
+        }
+
+        @Nullable
+        @Override
+        public Uri getUri() {
+            return upstream.getUri();
+        }
+
+        @Override
+        public Map<String, List<String>> getResponseHeaders() {
+            return upstream.getResponseHeaders();
+        }
+
+        @Override
+        public void close() throws IOException {
+            upstream.close();
         }
     }
 

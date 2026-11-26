@@ -82,4 +82,6 @@
     <!-- Keyword filtering: the words of a feed on the whole screen -->
     <color name="keyword_words_dim_text">#B3FFFFFF</color>
     <color name="keyword_word_background">#1AFFFFFF</color>
+    <!-- A channel's avatar in a side panel row while it loads, on light and dark panels (see ButtonPreference) -->
+    <color name="preference_avatar_placeholder">#80808080</color>
 </resources>

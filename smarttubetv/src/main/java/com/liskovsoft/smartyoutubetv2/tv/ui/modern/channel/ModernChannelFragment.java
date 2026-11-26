@@ -103,7 +103,7 @@ public class ModernChannelFragment extends Fragment implements ChannelView {
         // UI setting: search inside the channel and sort its videos, like the classic channel header
         if (MainUIData.instance(getContext()).isChannelSearchBarEnabled()) {
             addAction(inflater, actions, R.drawable.modern_ic_search, R.string.lb_search_bar_hint).setOnClickListener(v ->
-                    SimpleEditDialog.show(getContext(), getString(R.string.lb_search_bar_hint), null, query -> {
+                    SimpleEditDialog.showSearch(getContext(), getString(R.string.lb_search_bar_hint), null, query -> {
                         if (!TextUtils.isEmpty(query)) {
                             mPresenter.onSearchSubmit(query);
                         }
