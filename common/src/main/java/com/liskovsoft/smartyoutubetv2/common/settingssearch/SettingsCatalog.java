@@ -33,6 +33,10 @@ public final class SettingsCatalog {
      * Sections opened in sections, e.g. Settings, System, General: more than that is a card that opens its own section again
      */
     private static final int MAX_DEPTH = 6;
+    @Nullable
+    private static SettingsCatalog sCached;
+    @Nullable
+    private static String sCachedLocale;
     private final List<SettingEntry> mEntries;
 
     private SettingsCatalog(List<SettingEntry> entries) {
@@ -55,6 +59,31 @@ public final class SettingsCatalog {
         }
 
         return null;
+    }
+
+    /**
+     * Built on the first search, then kept, as the search index of most apps: built again when the language of the app changes
+     * (the names are in it). A setting that isn't there anymore is reported as it's opened (see open). On the main thread.
+     */
+    public static SettingsCatalog get(Context context) {
+        String locale = context.getResources().getConfiguration().locale.toString();
+
+        if (sCached == null || !locale.equals(sCachedLocale)) {
+            long start = System.currentTimeMillis();
+            sCached = build(context);
+            sCachedLocale = locale;
+            Log.d(TAG, "Settings listed: " + sCached.mEntries.size() + " in " + (System.currentTimeMillis() - start) + " ms");
+        }
+
+        return sCached;
+    }
+
+    /**
+     * Listed again on the next search
+     */
+    public static void clearCache() {
+        sCached = null;
+        sCachedLocale = null;
     }
 
     /**
