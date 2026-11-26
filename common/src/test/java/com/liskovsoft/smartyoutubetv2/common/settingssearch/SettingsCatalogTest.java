@@ -62,6 +62,29 @@ public class SettingsCatalogTest {
     }
 
     /**
+     * The text as typed: names that start with it first, any case, the words in their order only
+     */
+    @Test
+    public void search_matchesTheTextAsTyped() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+        List<SettingEntry> entries = catalog.getEntries();
+
+        List<SettingEntry> shorts = SettingsSearch.find(entries, "  HIDE   Shorts ", 50);
+        assertFalse(shorts.isEmpty());
+        assertTrue(shorts.get(0).title, shorts.get(0).title.toLowerCase().startsWith("hide shorts"));
+
+        for (SettingEntry entry : shorts) {
+            assertTrue(entry.toString(), entry.title.toLowerCase().contains("hide shorts"));
+        }
+
+        assertTrue(SettingsSearch.find(entries, "shorts hide", 50).isEmpty());
+        assertTrue(SettingsSearch.find(entries, "zzqx", 50).isEmpty());
+
+        // Music isn't a setting's name: a choice of Set-up sections
+        assertFalse(SettingsSearch.find(entries, "music", 50).isEmpty());
+    }
+
+    /**
      * In the menu a row of a panel opens: Hide content, then Shorts
      */
     @Test

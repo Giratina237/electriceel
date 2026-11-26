@@ -1260,9 +1260,8 @@
     <!-- Settings search -->
     <string name="find_setting">Find a setting</string>
     <string name="card_desc_find_setting">Type what you want to change, and open the setting that does it</string>
-    <string name="find_setting_hint">E.g. subtitle size, skip sponsors</string>
+    <string name="find_setting_hint">E.g. subtitles, autoplay</string>
     <string name="find_setting_new">New search</string>
-    <string name="find_setting_more">More matches</string>
     <string name="find_setting_none">No setting matches \"%s\"</string>
     <string name="find_setting_gone">This setting isn\'t there anymore. Search again.</string>
 </resources>

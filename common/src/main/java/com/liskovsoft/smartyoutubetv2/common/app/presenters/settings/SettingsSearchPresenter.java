@@ -18,21 +18,16 @@ import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCatalog;
 import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsSearch;
 import com.liskovsoft.smartyoutubetv2.common.utils.SimpleEditDialog;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * The "Find a setting" card of the Settings section: a question, then the settings that answer it, as rows that open them (the
- * panel with the row focused, see SettingsCatalog.open). Found on the device (SettingsSearch): the best ones on top.
+ * panel with the row focused, see SettingsCatalog.open). The settings whose name has the text typed (SettingsSearch).
  */
 public class SettingsSearchPresenter extends BasePresenter<Void> {
     private static final String TAG = SettingsSearchPresenter.class.getSimpleName();
     public static final int SEARCH_ID = 153;
-    private static final int MAX_MATCHES = 25;
-    /**
-     * The best matches, on top of the others
-     */
-    private static final int MAX_PICKS = 3;
+    private static final int MAX_MATCHES = 50;
     @SuppressLint("StaticFieldLeak")
     private static SettingsSearchPresenter sInstance;
     private String mQuestion;
@@ -122,9 +117,7 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
             askQuestion(mQuestion);
         }));
 
-        List<SettingEntry> picks = new ArrayList<>(mMatches.subList(0, Math.min(MAX_PICKS, mMatches.size())));
-
-        for (SettingEntry entry : picks) {
+        for (SettingEntry entry : mMatches) {
             OptionItem row = createRow(context, entry);
             dialog.appendSingleButton(row);
 
@@ -133,17 +126,8 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
             }
         }
 
-        List<SettingEntry> matches = new ArrayList<>(mMatches);
-        matches.removeAll(picks);
-
-        if (picks.isEmpty()) {
+        if (mMatches.isEmpty()) {
             dialog.appendSingleButton(note(context.getString(R.string.find_setting_none, mQuestion)));
-        } else if (!matches.isEmpty()) {
-            dialog.appendSingleButton(note(context.getString(R.string.find_setting_more)));
-
-            for (SettingEntry entry : matches) {
-                dialog.appendSingleButton(createRow(context, entry));
-            }
         }
 
         if (focused != null) {
