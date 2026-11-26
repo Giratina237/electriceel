@@ -488,6 +488,7 @@
   <string name="collaborations_desc">Une vidéo dont la chaîne s\'affiche \"X and Y\", X et Y étant des noms de chaîne. Chaque nom est vérifié une fois par une recherche de chaîne sans connexion. Anglais uniquement.</string>
   <string name="collaborations_sections">Sections</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Collaborateurs</string>
   <string name="watch_later">À regarder plus tard</string>
   <string name="watch_later_show">Afficher</string>
   <string name="watch_later_mark">Marquer</string>
@@ -659,8 +660,7 @@
   <string name="pressing_home_back">en appuyant sur ACCUEIL ou RETOUR</string>
   <string name="pressing_back">en appuyant sur RETOUR</string>
   <string name="player_number_key_seek">Avancer/Reculer la vidéo avec les touches numériques</string>
-  <string name="save_remove_playlist">Ajouter/Supprimer cette playlist de la bibliothèque</string>
-  <string name="remove_playlist">Supprimer cette playlist de la bibliothèque</string>
+  <string name="add_delete_playlist">Ajouter aux Playlists/Supprimer la playlist</string>
   <string name="removed_from_playlists">Playlist supprimée de la bibliothèque</string>
   <string name="saved_to_playlists">Playlist ajoutée à la bibliothèque</string>
   <string name="create_playlist">Créer une nouvelle playlist</string>
@@ -673,6 +673,9 @@
   <string name="copy_playlist_to_youtube">Copier sur YouTube</string>
   <string name="copied_to_youtube">Copiée sur YouTube</string>
   <string name="export_playlists">Exporter les playlists</string>
+  <string name="playlists_on_youtube">Playlists sur YouTube</string>
+  <string name="playlists_on_this_device">Playlists sur cet appareil</string>
+  <string name="on_this_device">Sur cet appareil</string>
   <string name="import_playlists">Importer des playlists</string>
   <string name="import_to_device">Importer sur cet appareil</string>
   <string name="import_to_youtube">Importer sur YouTube</string>
@@ -929,6 +932,8 @@
   <string name="dearrow_status">Vérifier l’état du serveur DeArrow</string>
   <string name="skip_shorts">Sauter les Shorts</string>
   <string name="save_playlist">Ajouter une playlist à la section Playlists</string>
+  <string name="delete_playlist">Supprimer la playlist</string>
+  <string name="delete_playlist_fmt">Supprimer la playlist %s ?</string>
   <string name="player_exit_shortcut">Quitter le lecteur</string>
   <string name="device_specific_backup">Sauvegarde pour cet appareil uniquement</string>
   <string name="local_backup">Sauvegarde locale</string>
@@ -988,7 +993,6 @@
   <string name="card_unlocalized_titles">Titres originals des tuiles</string>
   <string name="search_exit_shortcut">Quitter la recherche</string>
   <string name="original_lang">Original</string>
-  <string name="remove_playlist_fmt">Supprimer %s définitivement\?</string>
   <string name="dont_resize_video_to_fit_dialog">Ne pas ajuster la vidéo à la fenêtre</string>
   <string name="typing_corrections">Désactiver la correction automatique lors de la saisie de texte</string>
   <string name="play_from_start">Lire depuis le début</string>

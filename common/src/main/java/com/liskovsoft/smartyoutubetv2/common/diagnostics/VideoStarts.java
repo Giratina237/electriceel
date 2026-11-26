@@ -6,12 +6,17 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
+import android.text.TextUtils;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.RendererReadiness;
+import com.google.android.exoplayer2.source.sabr.DefaultSabrChunkSource;
 import com.google.android.exoplayer2.source.sabr.parser.SabrStream;
+import com.liskovsoft.sharedutils.cronet.CronetManager;
+import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
@@ -43,9 +48,22 @@ public final class VideoStarts {
      */
     static final String LOG_TAG = "VideoStart";
     /**
-     * Not playing by then, the start is given up and recorded as it is (see VideoStart#OUTCOME_GAVE_UP)
+     * Not playing by then, the start is late: ready and paused, it's recorded as paused (see #giveUp); otherwise it's timed on, till
+     * it plays, is left, or MAX_RECORDED_MS
      */
     static final long MAX_START_MS = 15_000;
+    /**
+     * Not playing by then, the start is given up and recorded as it is (see VideoStart#OUTCOME_GAVE_UP). Given up at 15 s, a start's
+     * record stopped there though the video went on to play: 97Z1YWD3's start 92 was ready ~26 s after the click, its last ~11 s not
+     * recorded, and R71TW3F4's oKgDcmHScsM (gave_up) played 0.7 s after. A player's first preprocess takes 22-27 s on a slow box
+     * (H5B64KBE, Y1D66CNW); past a minute the user has most likely gone.
+     */
+    static final long MAX_RECORDED_MS = 60_000;
+    /**
+     * Ready and paused past its 15 s: paused from then if it still is this long after (see #onPlayerState). The app pauses too: auto
+     * frame rate holds the playback for the display's mode switch, and its pause setting goes up to 15 s (see AutoFrameRateController).
+     */
+    static final long LATE_PAUSED_MS = 16_000;
     /**
      * A start that never played is recorded when it ran this long: one left sooner was skipped by the user (e.g. pressing next
      * twice), not stuck. One found unplayable is recorded however soon.
@@ -56,6 +74,14 @@ public final class VideoStarts {
      */
     static final long MAX_COLD_START_MS = 30_000;
     static final String STAGE_APP_START = "app start";
+    /**
+     * A moment at the start of a reload that played after one gave up (see onReload): how many reloads it took, and since when
+     */
+    static final String STAGE_RECOVERY = "recovery";
+    /**
+     * A reload this long after a start that gave up isn't its recovery any more
+     */
+    static final long MAX_RECOVERY_MS = 10 * 60 * 1_000;
     static final String STAGE_PLAYER_SCREEN = "player screen";
     static final String STAGE_ENGINE_RESTART = "engine restart";
     static final String STAGE_FORMATS = "formats";
@@ -109,6 +135,11 @@ public final class VideoStarts {
      */
     static final String STAGE_SERVER_HOLD = "server hold";
     /**
+     * A live stream at its head: its request for the next segment got none, and the next one waits, from then for as long (see
+     * LiveHeadWaits)
+     */
+    static final String STAGE_LIVE_HEAD = "live head";
+    /**
      * What SABR's server made of the poToken when it said so, a moment: the first, then each change (see ProtectionStatuses)
      */
     static final String STAGE_PROTECTION = "protection";
@@ -117,6 +148,15 @@ public final class VideoStarts {
      * LoadErrors): the player tries it again after a wait
      */
     static final String STAGE_LOAD_ERROR = "load error";
+    /**
+     * A load of the player cancelled while it started (e.g. by a seek), from when it was asked for, its detail the load and the bytes
+     * it got, e.g. "video chunk, 36 KB" (see #onLoadCanceled)
+     */
+    static final String STAGE_LOAD_CANCELLED = "load cancelled";
+    /**
+     * Of a start: a seek cancels a load of each track at most (see MAX_SEEKS)
+     */
+    static final int MAX_CANCELLED_LOADS = 20;
     /**
      * A moment of the formats stage: the formats the player got were made before this start's fetch began (e.g. cached, or the ones a
      * reload took), its detail how long before, e.g. "made 11h36m ago" (see #onFormats)
@@ -139,12 +179,46 @@ public final class VideoStarts {
      * no init segment (e.g. the server held the stream, KKSJMSQX: 0 KB, then seconds with no row), or the format changed.
      */
     private static final String[] INIT_AGAIN_STAGES = {STAGE_VIDEO_INIT_AGAIN, STAGE_AUDIO_INIT_AGAIN};
+    static final String STAGE_MORE_VIDEO_CHUNKS = "more video chunks";
+    static final String STAGE_MORE_AUDIO_CHUNKS = "more audio chunks";
+    /**
+     * The media segments loaded after the first one, by track (as CHUNK_STAGES' last two), as one row: from the first of them to the
+     * end of the last, its detail how many and their bytes, e.g. "5, 12.3 MB". Of a start that didn't play at its first frame (see
+     * AFTER_FRAME_MIN_MS): what the player went on loading while it waited, e.g. the audio asked for again after a seek back.
+     */
+    private static final String[] MORE_CHUNK_STAGES = {STAGE_MORE_VIDEO_CHUNKS, STAGE_MORE_AUDIO_CHUNKS};
+    /**
+     * A renderer that couldn't play from where it was after the start's first frame, till it could (see RendererWaits): the player is
+     * ready only once the video's and the audio's both can
+     */
+    static final String STAGE_VIDEO_NOT_READY = "video not ready";
+    static final String STAGE_AUDIO_NOT_READY = "audio not ready";
+    /**
+     * Played this long after its first frame, a start has rows for what it waited on meanwhile (see MORE_CHUNK_STAGES and
+     * STAGE_AUDIO_NOT_READY). The frame was shown at 1226 ms and it played at 2882 ms, with 30.8 s buffered and no row between
+     * (6EZTNXBF): sooner, the two are one moment.
+     */
+    static final long AFTER_FRAME_MIN_MS = 200;
     static final String STAGE_VIDEO_DECODER = "video decoder";
     /**
      * The frames decoded only to reach where the video starts (e.g. a resume's position), from the keyframe before it, till its first
      * frame: from the first of them (see DebugInfoMediaCodecVideoRenderer#getSkippedToPosition)
      */
     static final String STAGE_TO_POSITION = "to the position";
+    /**
+     * What a resume made of the keyframe before its position (see #onKeyframeResume), after the frames on its "to the position" row.
+     * Told only to the log, a resume that decoded 72 4K frames in 1084 ms, not gone back to its keyframe, didn't say why (WVE7ZKDD
+     * 11-24 22:43:55).
+     */
+    public static final String KEYFRAME_GONE_BACK = "gone back to the keyframe";
+    public static final String KEYFRAME_DECODER_THERE = "decoder there already";
+    public static final String KEYFRAME_AUDIO_LOADING = "audio still loading";
+    public static final String KEYFRAME_OTHER_POSITION = "decoded to another position";
+    static final String KEYFRAME_NOT_WORTH_IT = "not worth going back";
+    /**
+     * Before a decision made again once the audio came in (see KEYFRAME_AUDIO_LOADING)
+     */
+    static final String KEYFRAME_AFTER_AUDIO = "after the audio";
     static final String STAGE_MODE_SWITCH = "display mode switch";
     static final String STAGE_FIRST_FRAME = "first frame";
     /**
@@ -155,6 +229,18 @@ public final class VideoStarts {
      * Of a start: a user scrubbing past it isn't a row each
      */
     static final int MAX_SEEKS = 10;
+    /**
+     * How a mode switch the playback waited for ended (see onModeSwitchEnd)
+     */
+    public static final String MODE_SWITCH_REPORTED = "reported";
+    public static final String MODE_SWITCH_TIMED_OUT = "timed out";
+    private static final int MAX_MODE_REPORTS = 3;
+    private static final String APP_PACKAGE = "com.liskovsoft.smartyoutubetv2.";
+    /**
+     * The methods that pass a seek on to the player (see describeSeekCaller): not what made it
+     */
+    private static final java.util.Set<String> SEEK_PASS_THROUGHS = new java.util.HashSet<>(java.util.Arrays.asList(
+            "setPositionMs", "setResumePositionMs", "seekTo", "onSeek", "run", "handleMessage", "dispatchMessage"));
     /**
      * The whole of a fetch (see FetchStages#open): its stages are shown, not it
      */
@@ -200,7 +286,8 @@ public final class VideoStarts {
     @VisibleForTesting
     static Scheduler sScheduler = new HandlerScheduler();
     /**
-     * A start not playing 15 s after the user's action is given up, even when nothing happens any more (e.g. a request hangs)
+     * A start not playing 15 s after the user's action is late, then given up a minute after it, even when nothing happens any more
+     * (e.g. a request hangs)
      */
     private static final Runnable sGiveUp = VideoStarts::giveUp;
     /**
@@ -215,9 +302,13 @@ public final class VideoStarts {
     @VisibleForTesting
     static LoadHoldSource sBackoffs = ServerBackoffs::take;
     @VisibleForTesting
+    static LoadHoldSource sLiveHeadWaits = LiveHeadWaits::take;
+    @VisibleForTesting
     static ProtectionSource sProtection = ProtectionStatuses::take;
     @VisibleForTesting
     static LoadHoldSource sLoadErrors = LoadErrors::take;
+    @VisibleForTesting
+    static LoadHoldSource sRendererWaits = RendererWaits::take;
     @VisibleForTesting
     static Recorder sRecorder = VideoStarts::save;
     @VisibleForTesting
@@ -227,6 +318,13 @@ public final class VideoStarts {
      */
     @VisibleForTesting
     static WarmUpSource sWarmUps = WarmUps::snapshot;
+    /**
+     * The starts after the run's first that have its warm-ups too, as they are then: one still going when it was recorded (e.g. a
+     * player's first preprocess, still going 95 s on when QJVVSYS7's first start gave up at 15 s) ends in a later one's (see build).
+     * At most this many: one that never ends isn't in every start.
+     */
+    private static final int MAX_WARM_UP_FOLLOW_UPS = 3;
+    private static int sWarmUpFollowUps;
     /**
      * Where the device is at, for a start that never played (see DeviceCapabilities#buildStartState)
      */
@@ -253,6 +351,14 @@ public final class VideoStarts {
      */
     @Nullable
     private static String sReloadableId;
+    /**
+     * The video whose start gave up (see #abandon), and when that start began: its reloads are timed, only the one that plays recorded,
+     * with how many it took (QYZPW0FN: four reloads in an outage left no start, the recovery's time not known). -1 for none.
+     */
+    @Nullable
+    private static String sRecoveryId;
+    private static long sRecoveryFromMs = -1;
+    private static int sRecoveryReloads;
     /**
      * Of each kind of first segment (see CHUNK_STAGES) since the player was prepared, timed or not (a start is given up after 15 s):
      * it started to load, and it loaded (see #isOneTrackStuck)
@@ -418,6 +524,12 @@ public final class VideoStarts {
         long pausedMs = -1;
         long modeSwitchMs = -1;
         /**
+         * Of the mode switch going on: the mode asked for, and the ones the display reported (see onDisplayModeReported)
+         */
+        @Nullable
+        String modeSwitchMode;
+        final List<String> modeReports = new ArrayList<>(2);
+        /**
          * Of its first frame (see FirstFrame)
          */
         long positionMs = -1;
@@ -438,8 +550,29 @@ public final class VideoStarts {
         final long[] initAgainBytes = new long[INIT_AGAIN_STAGES.length];
         final long[] initAgainStartMs = new long[INIT_AGAIN_STAGES.length];
         final long[] initAgainEndMs = new long[INIT_AGAIN_STAGES.length];
+        /**
+         * Of the media segments' loads after the first one, by track (see MORE_CHUNK_STAGES): how many, their bytes, and from the
+         * start of the first to the end of the last
+         */
+        final int[] moreChunkLoads = new int[MORE_CHUNK_STAGES.length];
+        final long[] moreChunkBytes = new long[MORE_CHUNK_STAGES.length];
+        final long[] moreChunkStartMs = new long[MORE_CHUNK_STAGES.length];
+        final long[] moreChunkEndMs = new long[MORE_CHUNK_STAGES.length];
         boolean hasVideoDecoder;
         int seeks;
+        /**
+         * Of the loads cancelled (see #onLoadCanceled)
+         */
+        int cancelledLoads;
+        /**
+         * What the resume made of its keyframe (see #onKeyframeResume), null for nothing told
+         */
+        @Nullable
+        String keyframeResume;
+        /**
+         * Not playing at MAX_START_MS: timed on (see #giveUp)
+         */
+        boolean isLate;
         boolean isCached;
         String client;
         String protocol;
@@ -454,6 +587,10 @@ public final class VideoStarts {
          */
         @Nullable
         String reason;
+        /**
+         * A reload after a start that gave up (see sRecoveryId): recorded only if it plays
+         */
+        boolean isRecovery;
 
         Timer(String videoId, String trigger, long t0, long ts, boolean isFirstOfRun, long sinceProcessStartMs) {
             Arrays.fill(chunkLoadMs, -1);
@@ -539,7 +676,12 @@ public final class VideoStarts {
         }
 
         SabrStream.setBackoffListener(ServerBackoffs::onBackoff);
+        DefaultSabrChunkSource.setLiveHeadWaitListener(LiveHeadWaits::onWait);
         SabrStream.setProtectionStatusListener(ProtectionStatuses::onStatus);
+        RendererReadiness.setListener(RendererWaits::onReadiness);
+        // Where a Cronet opening's time went
+        CronetManager.setRequestFinishedListener(Connections::onRequestFinished);
+        Plays.init(context);
     }
 
     public static void setListener(@Nullable Listener listener) {
@@ -556,6 +698,10 @@ public final class VideoStarts {
 
         if (videoId == null) {
             return;
+        }
+
+        if (sRecoveryId != null && !sRecoveryId.equals(videoId)) {
+            sRecoveryId = null; // another video: that one's reloads are over
         }
 
         long now = sClock.now();
@@ -602,7 +748,14 @@ public final class VideoStarts {
      * @param reason why it's loaded again, e.g. the kind of failure the error fixer acted on (see VideoStart#reason), null when not known
      */
     public static void onReload(@Nullable String videoId, @Nullable String reason) {
-        if (videoId == null || !videoId.equals(sReloadableId) || getTimer(videoId) != null) {
+        if (videoId == null || getTimer(videoId) != null) {
+            return;
+        }
+
+        boolean isRecovery = !videoId.equals(sReloadableId) && videoId.equals(sRecoveryId)
+                && sClock.now() - sRecoveryFromMs <= MAX_RECOVERY_MS;
+
+        if (!videoId.equals(sReloadableId) && !isRecovery) {
             return;
         }
 
@@ -611,6 +764,11 @@ public final class VideoStarts {
 
         if (sTimer != null) {
             sTimer.reason = reason;
+            sTimer.isRecovery = isRecovery;
+        }
+
+        if (isRecovery) {
+            sRecoveryReloads++;
         }
     }
 
@@ -849,6 +1007,16 @@ public final class VideoStarts {
     }
 
     /**
+     * The formats are of a live stream or a premiere that hasn't begun (see VideoLoaderController#isUpcoming): the start ends, with
+     * nothing to play yet
+     */
+    public static void onUpcoming(String videoId) {
+        if (getTimer(videoId) != null) {
+            abandon(VideoStart.OUTCOME_UPCOMING);
+        }
+    }
+
+    /**
      * How the formats are played, e.g. sabr (see PlayerFailure#PROTOCOL_SABR). Null for none: the video can't be played.
      */
     public static void onProtocol(@Nullable String protocol) {
@@ -870,6 +1038,14 @@ public final class VideoStarts {
      * The player buffers the formats
      */
     public static void onPrepare() {
+        onPrepare(null);
+    }
+
+    /**
+     * @param engine the network engine the source's requests go over (see ExoMediaSourceFactory#getBuiltEngine), null when not known:
+     *               the one the settings give then
+     */
+    public static void onPrepare(@Nullable String engine) {
         Arrays.fill(sIsChunkStarted, false);
         Arrays.fill(sIsChunkDone, false);
         sPreparedMs = sClock.now();
@@ -879,7 +1055,7 @@ public final class VideoStarts {
             return;
         }
 
-        timer.engine = sEngine.get();
+        timer.engine = engine != null ? engine : sEngine.get();
         long now = sClock.now();
         timer.close(STAGE_OPEN, now);
         Group replaced = timer.findOpen(STAGE_BUFFERING);
@@ -895,6 +1071,13 @@ public final class VideoStarts {
         timer.prepareMs = now;
         timer.firstFrameMs = -1;
         timer.playingMs = -1;
+
+        // A late one's pause is over with its player: given up at its minute again (see #onPlayerState)
+        if (timer.isLate && timer.pausedMs >= 0) {
+            sScheduler.cancel(sGiveUp);
+            sScheduler.schedule(sGiveUp, Math.max(0, MAX_RECORDED_MS - (now - timer.t0)));
+        }
+
         timer.pausedMs = -1;
         timer.positionMs = -1;
         timer.video = null;
@@ -903,7 +1086,10 @@ public final class VideoStarts {
         Arrays.fill(timer.chunkLoadMs, -1);
         Arrays.fill(timer.initAgainLoads, 0);
         Arrays.fill(timer.initAgainBytes, 0);
+        Arrays.fill(timer.moreChunkLoads, 0);
+        Arrays.fill(timer.moreChunkBytes, 0);
         timer.hasVideoDecoder = false;
+        timer.keyframeResume = null;
     }
 
     /**
@@ -948,6 +1134,9 @@ public final class VideoStarts {
         if (timer.isChunkLoaded[chunk]) {
             if (isInit) {
                 addInitAgain(timer, chunk, startMs, endMs, bytes);
+            } else {
+                // After the init segments in CHUNK_STAGES: the video's, then the audio's
+                addMoreChunk(timer, chunk - INIT_AGAIN_STAGES.length, startMs, endMs, bytes);
             }
 
             return;
@@ -955,6 +1144,49 @@ public final class VideoStarts {
 
         timer.isChunkLoaded[chunk] = true;
         addToBuffering(timer, CHUNK_STAGES[chunk], formatBytes(bytes), startMs, endMs);
+    }
+
+    /**
+     * A segment's load was cancelled (e.g. by a seek), in the clock's time: a row of its own, from when it was asked for, with the
+     * bytes it got. It left nothing before (2M1DY5CD -BwLZBMKW4g: no load from 0.96 s to a jump to the live position at 1.76 s, then
+     * the first chunks took 2.3-2.6 s on new connections, as loads cut off mid-response do).
+     *
+     * @param isInit its initialization (the format's header), not its media
+     */
+    public static void onLoadCanceled(boolean isInit, boolean isVideo, boolean isAudio, long startMs, long endMs, long bytes) {
+        Timer timer = getTimer();
+        int chunk = chunkOf(isInit, isVideo, isAudio);
+
+        if (timer == null || chunk < 0 || timer.prepareMs < 0 || startMs < timer.prepareMs) {
+            return;
+        }
+
+        // Its kind's first not loaded yet: the next one's load is the one still loading (see getBufferingExtras)
+        if (!timer.isChunkLoaded[chunk]) {
+            timer.chunkLoadMs[chunk] = -1;
+        }
+
+        if (timer.cancelledLoads++ < MAX_CANCELLED_LOADS) {
+            String load = (isVideo ? "video " : "audio ") + (isInit ? Connections.LOAD_INIT_CHUNK : Connections.LOAD_CHUNK);
+            addToBuffering(timer, STAGE_LOAD_CANCELLED, load + ", " + formatBytes(bytes), startMs, endMs);
+        }
+    }
+
+    /**
+     * A media segment's load after the first one of its track (see MORE_CHUNK_STAGES)
+     *
+     * @param track of the segment, in MORE_CHUNK_STAGES
+     */
+    private static void addMoreChunk(Timer timer, int track, long startMs, long endMs, long bytes) {
+        if (timer.moreChunkLoads[track]++ == 0) {
+            timer.moreChunkStartMs[track] = startMs;
+            timer.moreChunkEndMs[track] = endMs;
+        } else {
+            timer.moreChunkStartMs[track] = Math.min(timer.moreChunkStartMs[track], startMs);
+            timer.moreChunkEndMs[track] = Math.max(timer.moreChunkEndMs[track], endMs);
+        }
+
+        timer.moreChunkBytes[track] += Math.max(bytes, 0);
     }
 
     /**
@@ -1028,18 +1260,66 @@ public final class VideoStarts {
 
         if (timer != null && timer.modeSwitchMs < 0) {
             timer.modeSwitchMs = sClock.now();
+            timer.modeSwitchMode = null;
+            timer.modeReports.clear();
         }
     }
 
-    public static void onModeSwitchEnd() {
+    /**
+     * The mode the display is asked for, e.g. "3840x2160@48.0"
+     */
+    public static void onModeSwitchRequested(@Nullable String mode) {
+        Timer timer = getTimer();
+
+        if (timer != null && timer.modeSwitchMs >= 0) {
+            timer.modeSwitchMode = mode;
+        }
+    }
+
+    /**
+     * The display told of a change, e.g. "3840x2160@48.0 id 7" (see UhdHelper): the one asked for or not. A switch only ended by its
+     * timeout said nothing of why (DBRPJG76: 12 holds of 5.5 s).
+     */
+    public static void onDisplayModeReported(String mode, boolean isExpected) {
+        Timer timer = getTimer();
+
+        if (timer != null && timer.modeSwitchMs >= 0 && timer.modeReports.size() < MAX_MODE_REPORTS) {
+            timer.modeReports.add("display said " + mode + (isExpected ? "" : ", not it"));
+        }
+    }
+
+    /**
+     * @param how e.g. MODE_SWITCH_REPORTED, MODE_SWITCH_TIMED_OUT
+     */
+    public static void onModeSwitchEnd(@Nullable String how) {
         Timer timer = getTimer();
 
         if (timer == null || timer.modeSwitchMs < 0) {
             return;
         }
 
-        addToBuffering(timer, STAGE_MODE_SWITCH, null, timer.modeSwitchMs, sClock.now());
+        addToBuffering(timer, STAGE_MODE_SWITCH, describeModeSwitch(timer, how), timer.modeSwitchMs, sClock.now());
         timer.modeSwitchMs = -1;
+    }
+
+    /**
+     * E.g. "to 3840x2160@48.0, timed out, display said 3840x2160@48.0 id 9, not it", null for nothing known
+     */
+    @Nullable
+    private static String describeModeSwitch(Timer timer, @Nullable String how) {
+        List<String> parts = new ArrayList<>(timer.modeReports.size() + 2);
+
+        if (timer.modeSwitchMode != null) {
+            parts.add("to " + timer.modeSwitchMode);
+        }
+
+        if (how != null) {
+            parts.add(how);
+        }
+
+        parts.addAll(timer.modeReports);
+
+        return parts.isEmpty() ? null : TextUtils.join(", ", parts);
     }
 
     /**
@@ -1047,15 +1327,126 @@ public final class VideoStarts {
      * frame waited for is the last one's
      */
     public static void onSeek(long positionMs) {
+        onSeek(positionMs, -1, -1);
+    }
+
+    /**
+     * Of a live stream, where it was and where the live end is: its jump to the live position is made when it's within 1 s of it (see
+     * VideoStateController#isLiveEnd). 2M1DY5CD -BwLZBMKW4g jumped there at 1.76 s, 15 s behind it since 0.74 s, by what wasn't known.
+     *
+     * @param fromMs where it was, -1 for not told
+     * @param liveEndMs where the live stream's window ends, -1 for not told (e.g. not live)
+     */
+    public static void onSeek(long positionMs, long fromMs, long liveEndMs) {
         Timer timer = getTimer();
 
-        if (timer == null || timer.prepareMs < 0 || timer.firstFrameMs >= 0 || timer.seeks >= MAX_SEEKS) {
+        // Till it's recorded, its first frame or not (a tunneled one plays before it): the play's own seeks are kept from then (see
+        // Plays#onSeek)
+        if (timer == null || timer.prepareMs < 0) {
+            return;
+        }
+
+        // Sent elsewhere, its decoder's way to the position is another's
+        timer.keyframeResume = null;
+
+        if (timer.seeks >= MAX_SEEKS) {
             return;
         }
 
         long now = sClock.now();
         timer.seeks++;
-        addToBuffering(timer, STAGE_SEEK, "to " + VideoStart.formatPosition(positionMs), now, now);
+        // What sent it there (0J159Z0Z: the tunneled resumes that froze had one seek, the ones that played two, made by what wasn't known)
+        String caller = describeSeekCaller(Thread.currentThread().getStackTrace());
+        String detail = describeSeek(positionMs, fromMs, liveEndMs);
+        addToBuffering(timer, STAGE_SEEK, caller != null ? detail + ", " + caller : detail, now, now);
+    }
+
+    /**
+     * E.g. "to 0:30", "to 9:11, from 9:10, 850 ms before the live end", "to 9:11, live end 9:12"
+     */
+    @VisibleForTesting
+    static String describeSeek(long positionMs, long fromMs, long liveEndMs) {
+        StringBuilder result = new StringBuilder("to ").append(VideoStart.formatPosition(positionMs));
+
+        if (fromMs >= 0) {
+            result.append(", from ").append(VideoStart.formatPosition(fromMs));
+        }
+
+        if (liveEndMs >= 0 && fromMs >= 0) {
+            long toEndMs = liveEndMs - fromMs;
+            result.append(", ").append(Math.abs(toEndMs)).append(toEndMs >= 0 ? " ms before the live end" : " ms past the live end");
+        } else if (liveEndMs >= 0) {
+            result.append(", live end ").append(VideoStart.formatPosition(liveEndMs));
+        }
+
+        return result.toString();
+    }
+
+    /**
+     * What the resume made of the keyframe before its position (e.g. KEYFRAME_GONE_BACK, see ExoPlayerController#maybeResumeFromKeyframe):
+     * said after the frames on its "to the position" row. The last told counts.
+     */
+    public static void onKeyframeResume(String decision) {
+        Timer timer = getTimer();
+
+        if (timer != null && timer.prepareMs >= 0 && timer.firstFrameMs < 0) {
+            timer.keyframeResume = decision;
+        }
+    }
+
+    /**
+     * E.g. "not worth going back, 380 ms to go": the decoder gets to the position sooner than going back costs, as it was estimated
+     * (see KeyframeResume)
+     *
+     * @param isAfterAudio decided again once the audio came in (see KEYFRAME_AUDIO_LOADING)
+     */
+    public static String describeKeyframeNotWorthIt(long remainingMs, boolean isAfterAudio) {
+        return describeKeyframeDecision(KEYFRAME_NOT_WORTH_IT + ", " + remainingMs + " ms to go", isAfterAudio);
+    }
+
+    /**
+     * E.g. "decoder there already", "after the audio, gone back to the keyframe"
+     *
+     * @param isAfterAudio decided again once the audio came in (see KEYFRAME_AUDIO_LOADING)
+     */
+    public static String describeKeyframeDecision(String decision, boolean isAfterAudio) {
+        return isAfterAudio ? KEYFRAME_AFTER_AUDIO + ", " + decision : decision;
+    }
+
+    /**
+     * Of a start's seek, the app's code that made it: the first of the app's frames past the ones that pass it on (e.g.
+     * "VideoStateController.restoreState, resume", "ExoPlayerController.maybeResumeFromKeyframe"), null when none is the app's (e.g. a
+     * test's)
+     */
+    @Nullable
+    static String describeSeekCaller(StackTraceElement[] stack) {
+        boolean isResume = false;
+
+        for (StackTraceElement frame : stack) {
+            String className = frame.getClassName();
+            String method = frame.getMethodName();
+
+            if (!className.startsWith(APP_PACKAGE) || className.startsWith(VideoStarts.class.getName())) {
+                continue;
+            }
+
+            String simpleName = className.substring(className.lastIndexOf('.') + 1);
+            int inner = simpleName.indexOf('$');
+            simpleName = inner > 0 ? simpleName.substring(0, inner) : simpleName;
+
+            if (simpleName.endsWith("Test")) {
+                return null;
+            }
+
+            if (SEEK_PASS_THROUGHS.contains(method) || method.startsWith("lambda$")) {
+                isResume |= "setResumePositionMs".equals(method);
+                continue;
+            }
+
+            return simpleName + "." + method + (isResume ? ", resume" : "");
+        }
+
+        return isResume ? "resume" : null;
     }
 
     public static void onFirstFrame() {
@@ -1079,9 +1470,11 @@ public final class VideoStarts {
             timer.video = frame.video;
             timer.videoBitrateKbps = frame.videoBitrateKbps;
 
-            // Of this source: the renderer counts since its position was set
+            // Of this source: the renderer counts since its position was set. Gone back to the keyframe, it has none: its seek says so.
             if (frame.skippedFrames > 0 && frame.skipStartMs >= timer.prepareMs) {
-                addToBuffering(timer, STAGE_TO_POSITION, frame.skippedFrames + " frames", frame.skipStartMs, timer.firstFrameMs);
+                String frames = frame.skippedFrames + " frames";
+                addToBuffering(timer, STAGE_TO_POSITION, timer.keyframeResume != null ? frames + ", " + timer.keyframeResume : frames,
+                        frame.skipStartMs, timer.firstFrameMs);
             }
         }
 
@@ -1102,9 +1495,22 @@ public final class VideoStarts {
         }
 
         if (!isReady || playWhenReady) {
+            // A late one's pause is over: given up at its minute again, not at the pause's end (see below)
+            if (timer.isLate && timer.pausedMs >= 0) {
+                sScheduler.cancel(sGiveUp);
+                sScheduler.schedule(sGiveUp, Math.max(0, MAX_RECORDED_MS - (sClock.now() - timer.t0)));
+            }
+
             timer.pausedMs = -1;
         } else if (timer.pausedMs < 0) {
             timer.pausedMs = sClock.now();
+
+            // Past its 15 s (see #giveUp): still paused a while after, paused from now, as it would have been then. Else a play long
+            // after would count the pause as start time, and a leave would read as never ready.
+            if (timer.isLate) {
+                sScheduler.cancel(sGiveUp);
+                sScheduler.schedule(sGiveUp, LATE_PAUSED_MS);
+            }
         }
     }
 
@@ -1190,13 +1596,31 @@ public final class VideoStarts {
         sScheduler.cancel(sGiveUp);
         long now = sClock.now();
 
-        // Unplayable is the app's own outcome, not the user skipping it
-        if (now - timer.t0 < MIN_ABANDONED_MS && !VideoStart.OUTCOME_UNPLAYABLE.equals(outcome)) {
+        // A reload after a start that gave up, that didn't play either: counted, not recorded (see #onReload)
+        if (timer.isRecovery) {
+            Log.d(TAG, "Recovery reload %s after %d ms: %s", outcome, now - timer.t0, timer.videoId);
+            return;
+        }
+
+        // Unplayable (or not begun) is the app's own outcome, not the user skipping it
+        if (now - timer.t0 < MIN_ABANDONED_MS && !Helpers.equalsAny(outcome, VideoStart.OUTCOME_UNPLAYABLE, VideoStart.OUTCOME_UPCOMING)) {
             Log.d(TAG, "Video start %s after %d ms: %s", outcome, now - timer.t0, timer.videoId);
             return;
         }
 
-        record(build(timer, now, outcome));
+        // Late, ready and paused when it was left: paused, timed till it was ready, as it would have been then (see #onPlayerState).
+        // Not finished as a play: the player is closing.
+        boolean isLatePaused = timer.isLate && timer.pausedMs >= 0
+                && Helpers.equalsAny(outcome, VideoStart.OUTCOME_LEFT, VideoStart.OUTCOME_REPLACED);
+        record(isLatePaused ? build(timer, Math.max(timer.pausedMs, timer.firstFrameMs), VideoStart.OUTCOME_PAUSED)
+                : build(timer, now, outcome));
+
+        if (VideoStart.OUTCOME_GAVE_UP.equals(outcome)) {
+            // Its reloads are timed till one plays (see #onReload)
+            sRecoveryId = timer.videoId;
+            sRecoveryFromMs = timer.t0;
+            sRecoveryReloads = 0;
+        }
     }
 
     /**
@@ -1218,9 +1642,10 @@ public final class VideoStarts {
     }
 
     /**
-     * Not playing 15 s after the user's action: given up, unless it's been ready and paused since (by the user, or started so), then
-     * recorded as paused, timed till it was ready. A paused start was recorded as given up, as if it were stuck: one that showed its
-     * first frame with 54 s buffered, then played 97 s once the user played it.
+     * Not playing 15 s after the user's action: recorded as paused if it's been ready and paused since (by the user, or started so),
+     * timed till it was ready. A paused start was recorded as given up, as if it were stuck: one that showed its first frame with 54 s
+     * buffered, then played 97 s once the user played it. Otherwise it's late: timed on till it plays or is left, given up at
+     * MAX_RECORDED_MS.
      */
     private static void giveUp() {
         Timer timer = sTimer;
@@ -1229,12 +1654,21 @@ public final class VideoStarts {
             return;
         }
 
-        if (timer.pausedMs < 0) {
-            abandon(VideoStart.OUTCOME_GAVE_UP);
+        if (timer.pausedMs >= 0) {
+            finish(timer, Math.max(timer.pausedMs, timer.firstFrameMs), VideoStart.OUTCOME_PAUSED);
             return;
         }
 
-        finish(timer, Math.max(timer.pausedMs, timer.firstFrameMs), VideoStart.OUTCOME_PAUSED);
+        long leftMs = MAX_RECORDED_MS - (sClock.now() - timer.t0);
+
+        if (leftMs > 0) {
+            timer.isLate = true;
+            sScheduler.cancel(sGiveUp);
+            sScheduler.schedule(sGiveUp, leftMs);
+            return;
+        }
+
+        abandon(VideoStart.OUTCOME_GAVE_UP);
     }
 
     /**
@@ -1244,6 +1678,16 @@ public final class VideoStarts {
         sTimer = null;
         sScheduler.cancel(sGiveUp);
         sReloadableId = timer.videoId;
+
+        if (timer.isRecovery) {
+            // E.g. "reload 4 since a start gave up 67 s before it"
+            timer.open(STAGE_RECOVERY, "reload " + sRecoveryReloads + " since a start gave up " + (timer.t0 - sRecoveryFromMs) / 1_000
+                    + " s before it", timer.t0).endMs = timer.t0;
+        }
+
+        if (timer.videoId.equals(sRecoveryId)) {
+            sRecoveryId = null;
+        }
         // The same video again: its new start
         sPlayed.remove(timer.videoId);
         sPlayed.put(timer.videoId, timer.ts);
@@ -1253,6 +1697,8 @@ public final class VideoStarts {
             oldest.remove();
         }
         record(build(timer, endMs, outcome));
+        // After it's recorded: how its play goes on from here is added to it (see Plays)
+        Plays.onStarted(timer.videoId, timer.ts, VideoStart.OUTCOME_PLAYED.equals(outcome));
     }
 
     private static void record(VideoStart start) {
@@ -1320,6 +1766,12 @@ public final class VideoStarts {
         for (Group group : groups) {
             boolean isOpen = group.endMs < 0;
 
+            // Begun after the record's end, e.g. the engine released by leaving a late start recorded paused at its pause (see #abandon):
+            // not of it
+            if (group.startMs > endMs) {
+                continue;
+            }
+
             // Leaving the player released its engine: no restart
             if (isOpen && STAGE_ENGINE_RESTART.equals(group.name) && VideoStart.OUTCOME_LEFT.equals(outcome)) {
                 continue;
@@ -1356,8 +1808,14 @@ public final class VideoStarts {
             stages.add(new VideoStart.Stage(STAGE_FIRST_FRAME, null, 0, frameMs, frameMs));
         }
 
-        // Whether the run's first video found ready what the warm-up was to get ready, or the warm-up never ran
-        List<VideoStart.WarmUp> warmUps = timer.isFirstOfRun && !isLookedAt ? buildWarmUps(timer, endMs) : null;
+        // Whether the run's first video found ready what the warm-up was to get ready, or the warm-up never ran. Still going then, when
+        // it ended is in the next starts'.
+        boolean isWarmUpFollowUp = !timer.isFirstOfRun && sWarmUpFollowUps > 0;
+        List<VideoStart.WarmUp> warmUps = (timer.isFirstOfRun || isWarmUpFollowUp) && !isLookedAt ? buildWarmUps(timer, endMs) : null;
+
+        if (warmUps != null) {
+            sWarmUpFollowUps = !hasOpen(warmUps) ? 0 : timer.isFirstOfRun ? MAX_WARM_UP_FOLLOW_UPS : sWarmUpFollowUps - 1;
+        }
         // E.g. starved of memory
         JSONObject state = !isReady && !isLookedAt ? sState.get() : null;
 
@@ -1382,7 +1840,7 @@ public final class VideoStarts {
 
                 for (WarmUps.Step step : run.steps) {
                     steps.add(new VideoStart.WarmUpStep(step.name, step.startMs - timer.t0,
-                            step.isOpen() ? VideoStart.WarmUp.OPEN : step.endMs - timer.t0, step.result));
+                            step.isOpen() ? VideoStart.WarmUp.OPEN : step.endMs - timer.t0, step.result, step.detail));
                 }
 
                 result.add(new VideoStart.WarmUp(run.startMs - timer.t0, run.isOpen() ? VideoStart.WarmUp.OPEN : run.endMs - timer.t0,
@@ -1394,6 +1852,22 @@ public final class VideoStarts {
         }
 
         return result;
+    }
+
+    private static boolean hasOpen(List<VideoStart.WarmUp> warmUps) {
+        for (VideoStart.WarmUp warmUp : warmUps) {
+            if (warmUp.isOpen()) {
+                return true;
+            }
+
+            for (VideoStart.WarmUpStep step : warmUp.steps) {
+                if (step.isOpen()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     @Nullable
@@ -1437,10 +1911,27 @@ public final class VideoStarts {
             result.addAll(sConnections.take(timer.prepareMs, endMs));
             // A wait asked for by the server and not waited: what's asked for in it may be answered late
             result.addAll(sBackoffs.take(timer.prepareMs, endMs));
+            // A live stream at its head: the next segment wasn't there yet, and its request waits
+            result.addAll(sLiveHeadWaits.take(timer.prepareMs, endMs));
             // Whether the server took the poToken: past its grace period, it sends no media with one it hasn't
             result.addAll(sProtection.take(timer.videoId, timer.prepareMs, endMs));
             // A load that failed: the player waits before it tries again, a gap with no row of its own
             result.addAll(sLoadErrors.take(timer.prepareMs, endMs));
+        }
+
+        // Its first frame was shown and it didn't play: what it waited on from there
+        if (timer.firstFrameMs >= 0 && endMs - timer.firstFrameMs >= AFTER_FRAME_MIN_MS) {
+            for (int track = 0; track < MORE_CHUNK_STAGES.length; track++) {
+                if (timer.moreChunkLoads[track] > 0 && timer.moreChunkStartMs[track] < endMs) {
+                    String detail = String.format(Locale.US, "%d, %s", timer.moreChunkLoads[track],
+                            formatBytes(timer.moreChunkBytes[track]));
+                    result.add(new VideoStart.Stage(MORE_CHUNK_STAGES[track], detail, 1, timer.moreChunkStartMs[track],
+                            Math.min(timer.moreChunkEndMs[track], endMs)));
+                }
+            }
+
+            // The renderer that couldn't play from where it was: the player is ready only once both can
+            result.addAll(sRendererWaits.take(timer.firstFrameMs, endMs));
         }
 
         return result;
@@ -1462,7 +1953,9 @@ public final class VideoStarts {
             if (stage.depth == 0 && FETCH.equals(stage.name)) {
                 fetchStartMs = fetchStartMs < 0 ? stage.startMs : Math.min(fetchStartMs, stage.startMs);
             } else if (stage.isOpen()) {
-                result.add(new VideoStart.Stage(stage.name, DETAIL_GOING, Math.max(1, stage.depth), stage.startMs, endMs));
+                // What it's at too, e.g. the lock wait's holder, the warm-up's stage it waits through (C4JB8CZX)
+                String detail = stage.detail != null ? stage.detail + ", " + DETAIL_GOING : DETAIL_GOING;
+                result.add(new VideoStart.Stage(stage.name, detail, Math.max(1, stage.depth), stage.startMs, endMs));
             } else {
                 result.add(new VideoStart.Stage(stage.name, stage.detail, Math.max(1, stage.depth), stage.startMs, stage.endMs));
             }
@@ -1504,15 +1997,15 @@ public final class VideoStarts {
     }
 
     /**
-     * The start going on. One that's run too long is given up.
+     * The start going on. One that's run too long is late or given up (see #giveUp), its give-up not run yet (e.g. the main thread busy).
      */
     @Nullable
     private static Timer getTimer() {
         Timer timer = sTimer;
 
-        if (timer != null && sClock.now() - timer.t0 > MAX_START_MS) {
+        if (timer != null && sClock.now() - timer.t0 > (timer.isLate ? MAX_RECORDED_MS : MAX_START_MS)) {
             giveUp();
-            return null;
+            return sTimer == timer ? timer : null;
         }
 
         return timer;
@@ -1583,7 +2076,11 @@ public final class VideoStarts {
         sTimer = null;
         sOpenStepDepth = 0;
         sPlayed.clear();
+        Plays.resetForTesting();
         sReloadableId = null;
+        sRecoveryId = null;
+        sRecoveryFromMs = -1;
+        sRecoveryReloads = 0;
         Arrays.fill(sIsChunkStarted, false);
         Arrays.fill(sIsChunkDone, false);
         sPreparedMs = -1;
@@ -1608,11 +2105,14 @@ public final class VideoStarts {
         sLoadHolds = LoadHolds::take;
         sConnections = Connections::take;
         sBackoffs = ServerBackoffs::take;
+        sLiveHeadWaits = LiveHeadWaits::take;
         sProtection = ProtectionStatuses::take;
         sLoadErrors = LoadErrors::take;
+        sRendererWaits = RendererWaits::take;
         sRecorder = VideoStarts::save;
         sFramesRecorder = VideoStarts::saveFrames;
         sWarmUps = WarmUps::snapshot;
+        sWarmUpFollowUps = 0;
         sState = VideoStarts::getState;
     }
 }

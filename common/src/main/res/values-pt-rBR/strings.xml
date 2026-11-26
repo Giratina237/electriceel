@@ -507,6 +507,7 @@
   <string name="collaborations_desc">Um vídeo cujo canal aparece como \"X and Y\", em que X e Y são nomes de canais. Cada nome é verificado uma vez com uma busca de canais sem login. Só em inglês.</string>
   <string name="collaborations_sections">Seções</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Colaboradores</string>
   <string name="watch_later">Assistir mais tarde</string>
   <string name="watch_later_show">Mostrar</string>
   <string name="watch_later_mark">Marcar</string>
@@ -687,10 +688,10 @@
   <string name="pressing_home_back">Pressionando o botão \"Início\" ou \"Voltar\"</string>
   <string name="pressing_back">Pressionando o botão \"Voltar\"</string>
   <string name="player_number_key_seek">Avanço/Retrocesso com as teclas numéricas</string>
-  <string name="save_remove_playlist">Salvar/Remover essa playlist da seção \"Playlists\"</string>
+  <string name="add_delete_playlist">Adicionar às Playlists/Excluir playlist</string>
   <string name="save_playlist">Adicionar playlist para seção de \"Playlists\"</string>
-  <string name="remove_playlist">Remover essa playlist da seção \"Playlists\" permanentemente</string>
-  <string name="remove_playlist_fmt">Remove %s permanently\?</string>
+  <string name="delete_playlist">Excluir playlist</string>
+  <string name="delete_playlist_fmt">Excluir a playlist %s?</string>
   <string name="removed_from_playlists">Removida da seção \"Playlists\"</string>
   <string name="saved_to_playlists">Salva na seção \"Playlists\"</string>
   <string name="create_playlist">Criar nova playlist </string>
@@ -704,6 +705,9 @@
   <string name="copy_playlist_to_youtube">Copiar para o YouTube</string>
   <string name="copied_to_youtube">Copiada para o YouTube</string>
   <string name="export_playlists">Exportar playlists</string>
+  <string name="playlists_on_youtube">Playlists no YouTube</string>
+  <string name="playlists_on_this_device">Playlists neste dispositivo</string>
+  <string name="on_this_device">Neste dispositivo</string>
   <string name="import_playlists">Importar playlists</string>
   <string name="import_to_device">Importar para este dispositivo</string>
   <string name="import_to_youtube">Importar para o YouTube</string>

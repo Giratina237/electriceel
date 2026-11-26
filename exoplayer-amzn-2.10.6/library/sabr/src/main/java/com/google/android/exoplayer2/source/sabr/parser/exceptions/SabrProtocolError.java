@@ -25,6 +25,16 @@ public class SabrProtocolError extends SabrStreamError {
      * The HTTP status the server gives the error, UNSET when it gave none
      */
     public final int statusCode;
+    /**
+     * What the refused request asked for (see SabrManifest#describeRequest), null when not known
+     */
+    @Nullable
+    private volatile String request;
+    /**
+     * How long before the refusal the session it was made with was swapped in (see SabrManifest#requestSessionRefresh), UNSET for the
+     * stream's first one
+     */
+    private volatile long sessionAgeMs = UNSET;
 
     public SabrProtocolError(SabrError sabrError) {
         this(sabrError.hasType() ? sabrError.getType() : null,
@@ -37,6 +47,33 @@ public class SabrProtocolError extends SabrStreamError {
         this.type = type;
         this.action = action;
         this.statusCode = statusCode;
+    }
+
+    /**
+     * Told by the chunk source that made the request (see DefaultSabrChunkSource#onChunkLoadError): the error is parsed from the
+     * response alone
+     *
+     * @param sessionAgeMs see {@link #getSessionAgeMs()}
+     */
+    public void setRequest(@Nullable String request, long sessionAgeMs) {
+        this.request = request;
+        this.sessionAgeMs = sessionAgeMs;
+    }
+
+    /**
+     * E.g. "init, video 248:xtags, audio 251, selected none, session 2", null when not known
+     */
+    @Nullable
+    public String getRequest() {
+        return request;
+    }
+
+    /**
+     * How long before it the stream's session was refreshed (the player response fetched again, see SabrManifest#refreshSession),
+     * UNSET for the session the stream started with. A refused fresh one says the client is refused, not a stale player response.
+     */
+    public long getSessionAgeMs() {
+        return sessionAgeMs;
     }
 
     /**

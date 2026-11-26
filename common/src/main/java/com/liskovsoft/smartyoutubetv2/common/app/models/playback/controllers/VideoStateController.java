@@ -37,6 +37,10 @@ public class VideoStateController extends BasePlayerController {
      * rebuffer only a second or two is loaded past the margin, after a pause up to the whole buffer (30 s by default).
      */
     private static final long LIVE_RESTORE_MIN_GAIN_MS = 5_000;
+    /**
+     * Within this of the end of its window, a live stream has caught up with it (see restoreSpeedAndPositionIfNeeded)
+     */
+    private static final long LIVE_END_MS = 1_000;
     private static final long BEGIN_THRESHOLD_MS = 10_000;
     private static final long EMBED_THRESHOLD_MS = 30_000;
     private static final int HISTORY_UPDATE_INTERVAL_MINUTES = 3; // Sync history every x minutes
@@ -52,6 +56,10 @@ public class VideoStateController extends BasePlayerController {
      * The live position is being restored (see restoreActualLivePosition): the play after that seek's buffering isn't a new one
      */
     private boolean mIsRestoringActualLive;
+    /**
+     * The start has played (onPlay since onSourceChanged): before, the position is the one restorePosition placed
+     */
+    private boolean mIsStartPlayed;
     private long mSleepTimerStartMs;
 
     @Override
@@ -251,6 +259,7 @@ public class VideoStateController extends BasePlayerController {
 
     @Override
     public void onPlay() {
+        mIsStartPlayed = true;
         setPlayEnabled(true);
         showHideScreensaver(false);
         // throttle seeking calls
@@ -322,6 +331,7 @@ public class VideoStateController extends BasePlayerController {
         // A new start (see setRestoreActualLive), not the previous video's
         mIsRestoreActualLive = null;
         mIsRestoringActualLive = false;
+        mIsStartPlayed = false;
     }
 
     @Override
@@ -608,8 +618,10 @@ public class VideoStateController extends BasePlayerController {
             }
         }
 
-        // Set actual position for live videos with uncommon length
-        if (item.isLive && (state == null || state.durationMs - state.positionMs < Math.max(RESTORE_LIVE_BUFFER_MS, getLiveThreshold()))) {
+        // Set actual position for live videos with uncommon length. At 0 its position was reset with its speed kept (see resetPosition):
+        // it played from the start of its window.
+        if (item.isLive && (state == null || state.positionMs <= 0
+                || state.durationMs - state.positionMs < Math.max(RESTORE_LIVE_BUFFER_MS, getLiveThreshold()))) {
             // Add buffer. Should I take into account segment offset???
             state = new State(item, getPlayer().getDurationMs() - getLiveBuffer());
         }
@@ -685,8 +697,12 @@ public class VideoStateController extends BasePlayerController {
 
         boolean liveEnd = isLiveEnd();
 
-        // Position
-        if (liveEnd) {
+        // Position: back to the live position from the end the playback caught up with. Not before the start has played:
+        // restorePosition has just placed it, and each such seek cancelled the loads in flight (MD8RQZM2: 6 live starts with 2-3
+        // seeks each). Nor with the buffer on streams off: the live position is the end itself, so the position was at the end again
+        // straight away, and each call sent it to the end as it was by then (2M1DY5CD -BwLZBMKW4g: placed at the end at 0.74 s, sent
+        // there again 26 ms and 1.02 s later, the last cutting off its first media loads; 4961 ms).
+        if (liveEnd && mIsStartPlayed && getLiveBuffer() > LIVE_END_MS) {
             getPlayer().setPositionMs(getPlayer().getDurationMs() - getLiveBuffer());
         }
 
@@ -820,7 +836,7 @@ public class VideoStateController extends BasePlayerController {
             return false;
         }
 
-        return getPlayer().getDurationMs() - getPlayer().getPositionMs() <= 1_000;
+        return getPlayer().getDurationMs() - getPlayer().getPositionMs() <= LIVE_END_MS;
     }
 
     private long getLiveThreshold() {

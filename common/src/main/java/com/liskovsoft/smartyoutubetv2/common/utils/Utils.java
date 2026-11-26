@@ -1170,6 +1170,26 @@ public class Utils {
         return getNetworkEngineId(source);
     }
 
+    /**
+     * Cronet's engine is made ahead, off the main thread, when it's the one the player will use (see
+     * ExoMediaSourceFactory#buildHttpDataSourceFactory): a video is about to be opened, and making it loads its native library, which
+     * the run's first video did on the main thread while it opened (6EZTNXBF: 833 ms of a start's media source, 16-38 ms for the
+     * others). Never throws.
+     */
+    public static void warmUpNetworkEngine(Context context) {
+        try {
+            if (context == null || OkHttpManager.isIpv6Disabled() || NetworkEngineFallback.isOkHttp()
+                    || PlayerTweaksData.instance(context).getPlayerDataSource() != PlayerTweaksData.PLAYER_DATA_SOURCE_CRONET) {
+                return;
+            }
+
+            CronetManager.warmUp(context);
+        } catch (RuntimeException e) {
+            // Made when the player asks for it, as before
+            Log.e(TAG, "Can't make the network engine ahead: %s", e.getMessage());
+        }
+    }
+
     public static boolean skipCronet() {
         // Android 6 and below may crash running Cronet???
         //return VERSION.SDK_INT <= 23 || Helpers.equals(BuildConfig.FLAVOR, "strtarmenia");

@@ -13,6 +13,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.service.SidebarService;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil;
 import com.liskovsoft.smartyoutubetv2.common.misc.VideoCategoryManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.EndScreenData;
@@ -847,10 +848,15 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
                 option -> mPlayerTweaksData.setAvcOverVp9Preferred(option.isSelected()),
                 mPlayerTweaksData.isAvcOverVp9Preferred()));
 
+        // On, but suspended on the device after it froze the picture in two runs (see TunnelingFallback): said, and set again, tried again
+        // till it freezes once more (see TunnelingFallback#reset, which keeps when)
+        boolean isTunnelingSuspended = mPlayerTweaksData.isTunneledPlaybackEnabled() && TunnelingFallback.isSuspended(getContext());
         options.add(UiOptionItem.from(getContext().getString(R.string.tunneled_video_playback),
-                getContext().getString(R.string.tunneled_video_playback_desc),
+                getContext().getString(isTunnelingSuspended ? R.string.tunneled_video_playback_suspended_desc
+                        : R.string.tunneled_video_playback_desc),
                 option -> {
                     mPlayerTweaksData.setTunneledPlaybackEnabled(option.isSelected());
+                    TunnelingFallback.reset(getContext());
                     if (option.isSelected()) {
                         // Tunneled playback works only with SurfaceView
                         mPlayerTweaksData.setTextureViewEnabled(false);

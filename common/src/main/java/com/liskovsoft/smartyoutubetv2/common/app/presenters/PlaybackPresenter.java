@@ -32,6 +32,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.Plays;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStart;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
@@ -141,6 +142,9 @@ public class PlaybackPresenter extends BasePresenter<PlaybackView> implements Pl
         } else {
             VideoStarts.start(video.videoId, trigger);
         }
+
+        // While its player screen comes up and its formats are fetched, not on the main thread once they're there
+        Utils.warmUpNetworkEngine(getContext());
 
         if (getView() != null && getView().isEmbed()) { // switching from the embed player to the fullscreen one
             // The embed player doesn't disposed properly
@@ -399,6 +403,9 @@ public class PlaybackPresenter extends BasePresenter<PlaybackView> implements Pl
 
     @Override
     public void onPlayEnd() {
+        // Before the controllers: the next video is loaded by one of them (see VideoLoaderController#onPlayEnd), and this one's play
+        // would have ended by that
+        Plays.onEnded(getView() != null ? getView().getPositionMs() : -1);
         process(PlayerEventListener::onPlayEnd);
     }
 

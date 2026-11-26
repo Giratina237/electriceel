@@ -66,6 +66,47 @@ public class AutoFrameRateControllerTest {
         assertEquals(Arrays.asList(false, true), mPlayWhenReady);
     }
 
+    /**
+     * A display that didn't report the last switches (DBRPJG76: 12 holds of 5.5 s, none reported): the hold lasts as long as the stall
+     * it's for, not the whole timeout
+     */
+    @Test
+    public void aDisplayThatNeverReportsIsWaitedForLess() throws Exception {
+        TestController controller = new TestController(true);
+
+        for (int i = 0; i < AutoFrameRateController.UNCONFIRMED_SWITCHES; i++) {
+            controller.onModeStart(MODE_50HZ);
+            ShadowLooper.idleMainLooper(5, TimeUnit.SECONDS);
+        }
+
+        mPlayWhenReady.clear();
+        controller.onModeStart(MODE_50HZ);
+        ShadowLooper.idleMainLooper(2, TimeUnit.SECONDS);
+
+        assertEquals(Arrays.asList(false, true), mPlayWhenReady);
+    }
+
+    /**
+     * Reported again: the whole timeout again for the next one
+     */
+    @Test
+    public void aReportedSwitchWaitsTheWholeTimeoutAgain() throws Exception {
+        TestController controller = new TestController(true);
+
+        for (int i = 0; i < AutoFrameRateController.UNCONFIRMED_SWITCHES; i++) {
+            controller.onModeStart(MODE_50HZ);
+            ShadowLooper.idleMainLooper(5, TimeUnit.SECONDS);
+        }
+
+        controller.onModeStart(MODE_50HZ);
+        controller.onModeEnd();
+        mPlayWhenReady.clear();
+        controller.onModeStart(MODE_50HZ);
+        ShadowLooper.idleMainLooper(2, TimeUnit.SECONDS);
+
+        assertEquals(Collections.singletonList(false), mPlayWhenReady);
+    }
+
     @Test
     public void aCanceledSwitchEndsTheHold() throws Exception {
         TestController controller = new TestController(true);

@@ -508,6 +508,7 @@
   <string name="collaborations_desc">En video vars kanal visas som \"X and Y\", där X och Y båda är kanalnamn. Varje namn slås upp en gång med en kanalsökning utan inloggning. Endast engelska.</string>
   <string name="collaborations_sections">Avsnitt</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Medverkande</string>
   <string name="watch_later">Titta senare</string>
   <string name="watch_later_show">Visa</string>
   <string name="watch_later_mark">Markera</string>
@@ -688,10 +689,10 @@
   <string name="pressing_home_back">genom att trycka på hem- eller bakåtknappen</string>
   <string name="pressing_back">genom att trycka på bakåtknappen</string>
   <string name="player_number_key_seek">Spola med sifferknapparna</string>
-  <string name="save_remove_playlist">Lägg till/ta bort spellistan från avsnittet Spellistor</string>
+  <string name="add_delete_playlist">Lägg till i Spellistor/radera spellistan</string>
   <string name="save_playlist">Lägg till spellistan i avsnittet Spellistor</string>
-  <string name="remove_playlist">Ta bort spellistan från avsnittet Spellistor permanent</string>
-  <string name="remove_playlist_fmt">Ta bort %s permanent\?</string>
+  <string name="delete_playlist">Radera spellistan</string>
+  <string name="delete_playlist_fmt">Radera spellistan %s?</string>
   <string name="removed_from_playlists">Borttagen från avsnittet Spellistor</string>
   <string name="saved_to_playlists">Tillagd i avsnittet Spellistor</string>
   <string name="create_playlist">Skapa en spellista</string>
@@ -705,6 +706,9 @@
   <string name="copy_playlist_to_youtube">Kopiera till YouTube</string>
   <string name="copied_to_youtube">Kopierad till YouTube</string>
   <string name="export_playlists">Exportera spellistor</string>
+  <string name="playlists_on_youtube">Spellistor på YouTube</string>
+  <string name="playlists_on_this_device">Spellistor på den här enheten</string>
+  <string name="on_this_device">På den här enheten</string>
   <string name="import_playlists">Importera spellistor</string>
   <string name="import_to_device">Importera till den här enheten</string>
   <string name="import_to_youtube">Importera till YouTube</string>

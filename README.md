@@ -43,7 +43,7 @@ Electric Eel is a fork of [SmartTube](https://github.com/yuliskov/SmartTube), an
 - "Don't recommend channel" and "Not interested" are available in Gaming, Music, Sports, etc now
 - Settings are per account
 - Apply to copy all settings from one account to another
-- Refactored Settings to use more cards
+- Refactored Settings to use more cards in the Classic skin
 - Keyword filtering that hides videos by the words in their titles
 - Full-screen word picker for keywords and a Hide words item to the context menu
 - Blocking videos in different sections by category
@@ -86,12 +86,12 @@ Electric Eel is a fork of [SmartTube](https://github.com/yuliskov/SmartTube), an
 ### LocalSend
 The recommend method of installation the first time is to use [LocalSend](https://localsend.org/).
 
-### [Downloader](https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en_US) codes
-**2566384** `ElectricEel_stable_32.68.5_arm64-v8a.apk`
+### Downloader codes
+<a href="https://play.google.com/store/apps/details?id=com.esaba.downloader&hl=en_US"><picture><source height="72px" media="(prefers-color-scheme: dark)" srcset="/assets/icons/Downloader.png" /><img height="72px" src="/assets/icons/Downloader.png" /></picture></a>
 
-**3574784** `ElectricEel_stable_32.68.5_armeabi-v7a.apk`
+**8248268** `ElectricEel_stable_arm64-v8a.apk`
 
-[Downloader code generator](https://go.aftvnews.com/)
+**5531853** `ElectricEel_stable_armeabi-v7a.apk`
 
 ### Discoverium
 You can install [Discoverium](https://github.com/cygnusx-1-org/Discoverium/), and then install `Electric Eel` via it.
@@ -117,7 +117,7 @@ If the installation fails, either your **disk space is full** or the update didn
 
 ## Compatibility
 
-Electric Eel requires Android 4.3 or above. It does not work on non-Android devices (incl. LG or Samsung TVs). On unsupported TVs, you can use a TV stick or TV box. Though this app technically runs on smartphones and tablets, it is not optimized for such and offers no official support!
+Electric Eel requires Android 7.0 or above. It does not work on non-Android devices (incl. LG or Samsung TVs). On unsupported TVs, you can use a TV stick or TV box. Though this app technically runs on smartphones and tablets, it is not optimized for such and offers no official support!
 
 It has been successfully tested on TVs, TV boxes and TV sticks that are based on Android, including:
 

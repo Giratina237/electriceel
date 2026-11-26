@@ -78,6 +78,24 @@ public class PlayerCommandsTest {
     }
 
     /**
+     * QYZPW0FN: six pauses from the media session, with nothing to say what told it. Its command has the app that did, the others
+     * have none.
+     */
+    @Test
+    public void aMediaSessionsCommandSaysWhatToldIt() throws Exception {
+        PlayerCommands.onNewVideo("video");
+        PlayerCommands.onPlayWhenReady(false, PlayerCommands.SOURCE_MEDIA_SESSION, "android KEYCODE_MEDIA_PAUSE", 29_234);
+        PlayerCommands.onPlayWhenReady(true, PlayerCommands.SOURCE_APP, 29_240);
+
+        JSONArray commands = PlayerCommands.snapshot();
+
+        assertCommand(commands.getJSONObject(0), "pause", PlayerCommands.SOURCE_MEDIA_SESSION, 29_234);
+        assertEquals("android KEYCODE_MEDIA_PAUSE", commands.getJSONObject(0).getString("sender"));
+        assertCommand(commands.getJSONObject(1), "play", PlayerCommands.SOURCE_APP, 29_240);
+        assertFalse(commands.getJSONObject(1).has("sender"));
+    }
+
+    /**
      * A reload of the video goes on with them, another video has its own
      */
     @Test

@@ -14,6 +14,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class PlaybackHealthTest {
+    /**
+     * Where a start is sent to (YHN2G3G9 #1's 20:20)
+     */
+    private static final long RESUME_MS = 1_220_000;
     private PlaybackHealth mHealth;
     private PlaybackHealth.Sample mSample;
     private final List<String> mFound = new ArrayList<>();
@@ -372,6 +376,136 @@ public class PlaybackHealthTest {
     }
 
     /**
+     * YHN2G3G9 #1: a start resumed at 20:20 dropped 124 of 136 frames in its first 0.8 s, none in the 10 s after. Its decoder caught up
+     * to the position it was sent to, as after a seek's resume.
+     */
+    @Test
+    public void dropsOfAStartSentToAPositionAreItsCatchUp() {
+        startDropping(RESUME_MS, true);
+
+        assertTrue(mFound.toString(), mFound.isEmpty());
+    }
+
+    /**
+     * The same with the seek and the start before the format's first sample (it may come 500 ms after the source was prepared)
+     */
+    @Test
+    public void dropsOfAStartSentToAPositionBeforeItsFirstSampleAreItsCatchUp() {
+        startDropping(RESUME_MS, false);
+
+        assertTrue(mFound.toString(), mFound.isEmpty());
+    }
+
+    /**
+     * The same drops of a start from where it begins: nothing to catch up on
+     */
+    @Test
+    public void dropsOfAStartFromTheBeginningAreFrameDrops() {
+        startDropping(-1, true);
+
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_FRAME_DROPS), mFound);
+        assertFalse(mHealth.isDropsAfterCatchUp());
+    }
+
+    /**
+     * A seek of the video before (e.g. left right after one) isn't this start's
+     */
+    @Test
+    public void aSeekBeforeThePrepareIsntTheStartsCatchUp() {
+        mHealth.onSeek(mSample.nowMs, 0, RESUME_MS);
+        startDropping(-1, true);
+
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_FRAME_DROPS), mFound);
+        assertFalse(mHealth.isDropsAfterCatchUp());
+    }
+
+    /**
+     * EY23XNK9 #1: a 0:40 video, started from 0:00 with no seek, dropped 40 of 91 frames in its first 1.1 s, reported. A video over
+     * 6 min with no position saved is sent to 0:00 too (see VideoStateController#restorePosition), a seek ExoPlayer does nothing for,
+     * and its same drops were let go. Where it starts, not the video's length, tells.
+     */
+    @Test
+    public void aSeekToWhereItIsIsntTheStartsCatchUp() {
+        startDropping(0, true);
+
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_FRAME_DROPS), mFound);
+    }
+
+    /**
+     * MD8RQZM2 #1: a start resumed at 0:02 (2160p60 AV1) showed no frame and dropped none in its first 571 ms, then dropped 23 by 1.08 s
+     * and 75 of 83 by 1.6 s, then 29 more in the 9 s after. Its decoder hadn't put out a frame yet: the sample with nothing new isn't the
+     * end of its catch-up.
+     */
+    @Test
+    public void aCatchUpGoesOnWhileItsDecoderPutsOutNothing() {
+        mSample.isVideoRendered = true;
+        mSample.attempt = 2;
+        mHealth.onPrepare();
+        mSample.isPlaying = false;
+        tick(500, 0, 0, 0);
+        mHealth.onSeek(mSample.nowMs, 0, 2_066);
+        mSample.positionMs = 2_066;
+
+        mSample.nowMs += 400;
+        mSample.isPlaying = true;
+        mHealth.onStarted(mSample.nowMs);
+        tick(40, 0, 1, 0);
+        tick(571, 528, 1, 0);
+        tick(513, 529, 3, 23);
+        tick(516, 514, 8, 75);
+
+        for (int i = 1; i <= 17; i++) {
+            tick(518, 518, 8 + i * 30, 75 + i * 29 / 17);
+        }
+
+        assertTrue(mFound.toString(), mFound.isEmpty());
+    }
+
+    /**
+     * The drops counted from where the catch-up ended went on past it: told, they aren't the catch-up's
+     */
+    @Test
+    public void dropsPastACatchUpAreToldSo() {
+        dropsOfASeeksResumeAreItsCatchUp();
+
+        assertTrue(mHealth.isDropsAfterCatchUp());
+    }
+
+    /**
+     * As YHN2G3G9 #1: prepared at 0:00, sent to a position or not, 124 of 136 frames dropped in the first 0.8 s it plays, then none in
+     * 10 s
+     *
+     * @param sentToMs where it's sent, -1 for nowhere
+     * @param isSampledFirst the format's first sample before the seek and the start, else after
+     */
+    private void startDropping(long sentToMs, boolean isSampledFirst) {
+        mSample.isVideoRendered = true;
+        mSample.attempt = 2;
+        mHealth.onPrepare();
+        mSample.isPlaying = false;
+
+        if (isSampledFirst) {
+            tick(500, 0, 0, 0);
+        } else {
+            mSample.nowMs += 500;
+        }
+
+        if (sentToMs >= 0) {
+            mHealth.onSeek(mSample.nowMs, 0, sentToMs);
+        }
+
+        mSample.nowMs += 700;
+        mSample.isPlaying = true;
+        mHealth.onStarted(mSample.nowMs);
+        tick(400, 400, 6, 62);
+        tick(400, 400, 12, 124);
+
+        for (int i = 1; i <= 10; i++) {
+            tick(1_000, 1_000, 12 + i * 28, 124);
+        }
+    }
+
+    /**
      * As #19: paused 7.5 s (the window holds little playing), sent elsewhere the given time before it plays again (-1 for not), then
      * 44 dropped and 26 shown in 1.5 s, then none dropped
      */
@@ -386,7 +520,7 @@ public class PlaybackHealthTest {
 
         if (seekBeforeMs >= 0) {
             tick(pausedMs - seekBeforeMs, 0, 480, 12);
-            mHealth.onSeek(mSample.nowMs);
+            mHealth.onSeek(mSample.nowMs, mSample.positionMs, mSample.positionMs + 60_000);
             tick(seekBeforeMs, 0, 480, 12);
         } else {
             tick(pausedMs, 0, 480, 12);
@@ -504,6 +638,89 @@ public class PlaybackHealthTest {
         assertEquals(1, mFound.size());
     }
 
+    /**
+     * H5B64KBE 11-21 12:00:57: the picture stood still 5.2 s at the start while the position went on, and the user paused. Nothing was
+     * reported: the pause started the freeze's count over.
+     */
+    @Test
+    public void aFreezeOfTheStartEndedByAPauseIsReported() {
+        mSample.isVideoRendered = true;
+        tick(500, 500, 1, 0);
+
+        for (int i = 0; i < 10; i++) {
+            tick(500, 500, 1, 0);
+        }
+
+        assertTrue(mFound.isEmpty());
+
+        // Paused 200 ms of playing after the sample before
+        pause(300, 200, 1);
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_START_FROZEN), mFound);
+        assertEquals(5_200, mHealth.getStartFrozenMs());
+        assertEquals(5_200, mHealth.getPauseFrozenMs());
+
+        // Once, and of that sample only
+        mSample.isPlaying = true;
+        mSample.isPaused = false;
+        tick(500, 0, 1, 0);
+        assertEquals(-1, mHealth.getPauseFrozenMs());
+        assertEquals(1, mFound.size());
+    }
+
+    /**
+     * Past the start: frozen 4 s as last sampled, 1.5 s more till the pause
+     */
+    @Test
+    public void aFreezeEndedByAPauseIsReported() {
+        mSample.isVideoRendered = true;
+        playPastTheStart();
+        tick(2_000, 2_000, 360, 0);
+        tick(2_000, 2_000, 360, 0);
+        assertTrue(mFound.isEmpty());
+
+        pause(1_600, 1_500, 360);
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_VIDEO_FROZEN), mFound);
+        assertEquals(5_500, mHealth.getPauseFrozenMs());
+        assertFalse(mHealth.isClockStuck());
+    }
+
+    /**
+     * Buffering isn't the user's doing: the stall is told as one (see FormatAttempts)
+     */
+    @Test
+    public void aFreezeEndedByBufferingIsntReportedAsPaused() {
+        mSample.isVideoRendered = true;
+        tick(500, 500, 1, 0);
+
+        for (int i = 0; i < 10; i++) {
+            tick(500, 500, 1, 0);
+        }
+
+        mSample.isPlaying = false;
+        tick(300, 200, 1, 0);
+
+        assertTrue(mFound.isEmpty());
+    }
+
+    /**
+     * A frame was shown before the pause: the freeze ended by itself, as the ones reported when the picture goes on while it plays
+     */
+    @Test
+    public void aFreezeOfTheStartThatEndedBeforeAPauseIsReported() {
+        mSample.isVideoRendered = true;
+        tick(500, 500, 1, 0);
+        tick(500, 500, 1, 0);
+        tick(500, 500, 1, 0);
+        tick(500, 500, 1, 0);
+        tick(500, 500, 1, 0);
+
+        pause(300, 200, 4);
+
+        assertEquals(Collections.singletonList(PlaybackHealth.KIND_START_FROZEN), mFound);
+        assertEquals(2_000, mHealth.getStartFrozenMs());
+        assertEquals(-1, mHealth.getPauseFrozenMs());
+    }
+
     @Test
     public void framesNotCountedAreNeitherFrozenNorMeasured() {
         // Tunneled: the first frame was shown, the decoder reports no more (see DebugInfoMediaCodecVideoRenderer#isRenderedCountKnown)
@@ -605,6 +822,10 @@ public class PlaybackHealthTest {
         assertNull(mHealth.endStart());
     }
 
+    /**
+     * With the video's buffer and how late the sample was: T26RECBZ #1 had no row for 2.1 s while its decoder took no input, and it
+     * couldn't be told whether there was none to take or the main thread was held up
+     */
     @Test
     public void theStartsTrailIsOnlyGivenDuringIt() {
         mSample.inputBuffers = 7;
@@ -612,10 +833,12 @@ public class PlaybackHealthTest {
         mSample.audioTimestampState = 2;
         mSample.audioPlayheadMs = 480;
         mSample.audioLatencyMs = 20;
+        mSample.videoBufferedAheadMs = 30_000;
+        mSample.tickLateMs = 1_602;
         tick(500, 500, 3, 2);
 
         assertEquals(1, mHealth.getStartTrail().size());
-        assertArrayEquals(new long[]{0, 500, 3, 2, 7, 1, 2, 480, 20}, mHealth.getStartTrail().get(0));
+        assertArrayEquals(new long[]{0, 500, 3, 2, 7, 1, 2, 480, 20, 30_000, 1_602}, mHealth.getStartTrail().get(0));
 
         playPastTheStart();
         assertTrue(mHealth.getStartTrail().isEmpty());
@@ -690,7 +913,7 @@ public class PlaybackHealthTest {
         assertEquals(500, mHealth.getTickMs());
         assertEquals(PlaybackHealth.RESUMED_BY_SEEK, mHealth.getResumedBy());
         assertEquals(2, mHealth.getResumeTrail().size());
-        assertArrayEquals(new long[]{0, 60_000, 361, 0, -1, -1, 1, -1, -1}, mHealth.getResumeTrail().get(0));
+        assertArrayEquals(new long[]{0, 60_000, 361, 0, -1, -1, 1, -1, -1, -1, -1}, mHealth.getResumeTrail().get(0));
         assertEquals(500, mHealth.getResumeTrail().get(1)[0]);
         // Past the start, it has none
         assertTrue(mHealth.getStartTrail().isEmpty());
@@ -736,12 +959,40 @@ public class PlaybackHealthTest {
         assertEquals(1, mHealth.getResumeTrail().size());
 
         mHealth.onInterrupted(PlaybackHealth.RESUMED_BY_PAUSE);
-        mHealth.onStarted();
+        assertFalse(mHealth.onStarted(mSample.nowMs));
         tick(500, 500, 3, 0);
         assertTrue(mHealth.getResumeTrail().isEmpty());
 
         mHealth.onResumed(mSample.nowMs);
         assertNull(mHealth.getResumedBy());
+    }
+
+    /**
+     * H5B64KBE #1: the video opened again 35 min after it was left, sent to 21:25 with the same format, 816 s of it played. It froze 1 s
+     * into the play and had neither trail: the start's is of the format's first 10 s.
+     */
+    @Test
+    public void aSourcePreparedAgainPastTheStartHasAResumeTrail() {
+        mSample.isVideoRendered = true;
+        playPastTheStart();
+        tick(2_000, 2_000, 420, 0);
+        mHealth.onPrepare();
+        mSample.isPlaying = false;
+        tick(500, 0, 0, 0);
+        mHealth.onSeek(mSample.nowMs, 0, 1_285_300);
+        mSample.positionMs = 1_285_300;
+
+        mSample.nowMs += 1_100;
+        mSample.isPlaying = true;
+        assertTrue(mHealth.onStarted(mSample.nowMs));
+        tick(0, 0, 1, 0);
+        tick(500, 500, 30, 0);
+
+        assertTrue(mHealth.getStartTrail().isEmpty());
+        assertEquals(PlaybackHealth.RESUMED_BY_PREPARE, mHealth.getResumedBy());
+        assertEquals(2, mHealth.getResumeTrail().size());
+        assertEquals(500, mHealth.getResumeTrail().get(1)[0]);
+        assertEquals(PlaybackHealth.START_TICK_MS, mHealth.getTickMs());
     }
 
     /**
@@ -769,6 +1020,15 @@ public class PlaybackHealthTest {
         mSample.audioTotalFramesMismatches = framesMismatches;
         mSample.audioTotalClockMismatches = clockMismatches;
         mSample.audioTotalHoldReleases = holdReleases;
+    }
+
+    /**
+     * Paused that long after the sample before, having played the given part of it, with the frames rendered
+     */
+    private void pause(long elapsedMs, long movedMs, long rendered) {
+        mSample.isPlaying = false;
+        mSample.isPaused = true;
+        tick(elapsedMs, movedMs, rendered, mSample.droppedFrames);
     }
 
     private void playPastTheStart() {

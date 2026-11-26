@@ -259,10 +259,10 @@ public class ModernPlaybackFragment extends PlaybackFragment {
     }
 
     @Override
-    public void setChannelIcon(String iconUrl) {
-        super.setChannelIcon(iconUrl);
+    public void setChannelIcons(List<String> iconUrls) {
+        super.setChannelIcons(iconUrls);
         if (mShorts != null) {
-            mShorts.setChannelIcon(iconUrl);
+            mShorts.setChannelIcons(iconUrls);
         }
     }
 

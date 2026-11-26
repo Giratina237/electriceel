@@ -60,6 +60,11 @@ public final class PlayerFailure {
     private static final String[] KNOWN_DOMAINS = {"googlevideo.com", "youtube.com"};
     private static final String HOST_OTHER = "other";
     private static final int MAX_STACK_FRAMES = 20;
+    /**
+     * A crash's frames past the root cause's first ones (see #error): the bottom of its stack and the top of the one it was thrown as
+     */
+    private static final int CRASH_BOTTOM_FRAMES = 8;
+    private static final int CRASH_OUTER_FRAMES = 12;
     private static final int MAX_CAUSES = 8;
     private final Context mContext;
     private final String mKind;
@@ -253,9 +258,27 @@ public final class PlayerFailure {
 
         JSONArray stack = new JSONArray();
         StackTraceElement[] frames = root.getStackTrace();
+        putFrames(stack, frames, 0, MAX_STACK_FRAMES);
 
-        for (int i = 0; i < frames.length && i < MAX_STACK_FRAMES; i++) {
-            stack.put(frames[i].toString());
+        // A crash, how it came where it crashed too: the root cause's first frames may all be a library's (53M2PA8E: OkHttp's call
+        // cancelled, not what of the app ran it, nor what threw it to the uncaught exception handler)
+        if (AppExits.KIND_CRASH.equals(mKind)) {
+            int rest = frames.length - MAX_STACK_FRAMES;
+
+            if (rest > 0) {
+                int bottom = Math.min(rest, CRASH_BOTTOM_FRAMES);
+
+                if (rest > bottom) {
+                    stack.put("... " + (rest - bottom) + " more");
+                }
+
+                putFrames(stack, frames, frames.length - bottom, bottom);
+            }
+
+            if (root != error) {
+                stack.put("--- thrown as " + error.getClass().getSimpleName());
+                putFrames(stack, error.getStackTrace(), 0, CRASH_OUTER_FRAMES);
+            }
         }
 
         try {
@@ -268,6 +291,12 @@ public final class PlayerFailure {
         }
 
         return this;
+    }
+
+    private static void putFrames(JSONArray stack, StackTraceElement[] frames, int from, int count) {
+        for (int i = from; i < frames.length && i < from + count; i++) {
+            stack.put(frames[i].toString());
+        }
     }
 
     public PlayerFailure playability(@Nullable String status, @Nullable String reason) {
@@ -450,10 +479,12 @@ public final class PlayerFailure {
     }
 
     /**
-     * The same failure again: its repeats within a minute are counted, not written (see PlayerFailureLog)
+     * The same failure again: its repeats within a minute are counted, not written (see PlayerFailureLog). On another client it's
+     * another: the line of the repeats has the last one's client only, and a round of the clients at the attestation wall read as
+     * WEB repeated 8 times, the WEB_SAFARI and MWEB failures between them unseen (EENAQFZF #3).
      */
     String getSignature() {
-        return mKind + "|" + mVideoId + "|" + mErrorClass + "|" + mErrorMessage + "|" + mHttpCode;
+        return mKind + "|" + mVideoId + "|" + mClient + "|" + mErrorClass + "|" + mErrorMessage + "|" + mHttpCode;
     }
 
     JSONObject toJson(long ts, String appVersion, int appVersionCode, int account) {

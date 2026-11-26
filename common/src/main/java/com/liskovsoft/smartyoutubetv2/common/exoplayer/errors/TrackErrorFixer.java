@@ -31,8 +31,16 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
     private final TrackSelectorManager mTrackSelectorManager;
     private long mSelectionTimeMs;
     private final Map<MediaTrack, Long> mBlacklistedTracks = new HashMap<>();
-    private InvalidResponseCodeException mLastEx;
     private OnHttpError mOnHttpError;
+    @Nullable
+    private LiveCheck mLiveCheck;
+
+    /**
+     * The video playing is a live stream
+     */
+    public interface LiveCheck {
+        boolean isLive();
+    }
 
     public interface OnHttpError {
         /**
@@ -54,21 +62,36 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
         mOnHttpError = listener;
     }
 
+    public void setLiveCheck(@Nullable LiveCheck liveCheck) {
+        mLiveCheck = liveCheck;
+    }
+
     /**
-     * 1) Blacklist non-playable audio tracks for live streams.<br/>
-     * Last segment of such streams produce 404 error.<br/>
-     * See DrLupo streams, for example.<br/.
-     * <br/>
-     * 2) Blacklist non-playable tracks for regular videos (error 503).<br/>
+     * Another codec for the track whose segment failed: a live stream's segment that isn't there (404, e.g. DrLupo's streams, whose
+     * last audio segment did so), or one its server failed (500, 503). Not a regular video's 500 or 503: every format of it fails
+     * the same (97MSK8B6 #1, #2: AVC answered 503 too, 7 s after VP9 did; 0CW972QK: every format, on three clients), and the swap
+     * marked formats that play as failed. Nor a load of another track (e.g. subtitles), which no codec of the media fixes.
+     *
+     * @param track of the load that failed (see #trackOf): its own, not its URL's, which names the mime type only in the path of a
+     *              YouTube manifest's segments. The app's own manifests have it in the query (mime=audio%2Fwebm, see
+     *              YouTubeMPDBuilder), so an audio segment's 404 or 503 swapped the video (Q19MW058 #2: 1080p to 720p, 97MSK8B6 #5:
+     *              VP9 to AVC).
      */
-    public boolean fixError(Exception e) {
+    public boolean fixError(Exception e, String track) {
         if (!(e instanceof InvalidResponseCodeException)) {
             return false;
         }
 
-        InvalidResponseCodeException ex = (InvalidResponseCodeException) e;
+        boolean isAudio = PlayerFailure.TRACK_AUDIO.equals(track);
 
-        if (ex.responseCode != 404 && ex.responseCode != 503 && ex.responseCode != 500) {
+        if (!isAudio && !PlayerFailure.TRACK_VIDEO.equals(track)) {
+            return false;
+        }
+
+        int responseCode = ((InvalidResponseCodeException) e).responseCode;
+        boolean isLive = mLiveCheck != null && mLiveCheck.isLive();
+
+        if (responseCode != 404 && !(isLive && (responseCode == 503 || responseCode == 500))) {
             return false;
         }
 
@@ -76,9 +99,7 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
             return false;
         }
 
-        mLastEx = ex;
-
-        return selectDifferentCodec(isAudio(mLastEx));
+        return selectDifferentCodec(isAudio);
     }
 
     //public boolean fixError(ExoPlaybackException error) {
@@ -106,9 +127,6 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
             return false;
         }
 
-        String currentCodec = currentTrack.format.codecs;
-        int width = currentTrack.format.width;
-
         MediaTrack nextTrack = null;
 
         for (MediaTrack track : tracks) {
@@ -117,7 +135,7 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
             }
 
             // Voice boost is opt-in. The new track becomes the origin for later matches.
-            if (!currentCodec.equals(track.format.codecs) && track.format.width <= width
+            if (isOtherCodec(currentTrack.format, track.format, isAudio)
                     && !TrackSelectorUtil.isUnwantedVb(currentTrack.format, track.format)) {
                 nextTrack = track;
                 break;
@@ -247,10 +265,22 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
         return null;
     }
 
-    private boolean isAudio(InvalidResponseCodeException ex) {
-        String url = ex.dataSpec.uri.toString();
+    /**
+     * Another codec than the one in use. Of a video, another family (AVC, VP9, AV1) of the same size: a codec string alone tells AVC's
+     * profiles apart, so a 1080p AVC's failure picked a 720p one (Q19MW058 #2). Of an audio, another codec string (e.g. AAC's HE
+     * profile for its LC one), as before: an audio has no size.
+     */
+    static boolean isOtherCodec(Format current, Format other, boolean isAudio) {
+        if (current.codecs == null || other.codecs == null) {
+            return false;
+        }
 
-        return url.contains("mime/audio");
+        if (isAudio) {
+            return !current.codecs.equals(other.codecs);
+        }
+
+        return !Helpers.equals(TrackSelectorUtil.codecNameShort(current.codecs), TrackSelectorUtil.codecNameShort(other.codecs))
+                && Math.max(current.width, current.height) == Math.max(other.width, other.height);
     }
 
     private boolean isBlacklisted(MediaTrack track) {
@@ -285,8 +315,7 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
     @Override
     public void onLoadError(int windowIndex, @Nullable MediaPeriodId mediaPeriodId, LoadEventInfo loadEventInfo,
                             MediaLoadData mediaLoadData, IOException error, boolean wasCanceled) {
-        if (!(error instanceof InvalidResponseCodeException) || mOnHttpError == null) {
-            fixError(error);
+        if (!(error instanceof InvalidResponseCodeException)) {
             return;
         }
 
@@ -295,7 +324,11 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
         MediaTrack failed = PlayerFailure.TRACK_AUDIO.equals(track) ? getSelectedTrack(mTrackSelectorManager.getAudioTracks()) :
                 PlayerFailure.TRACK_VIDEO.equals(track) ? getSelectedTrack(mTrackSelectorManager.getVideoTracks()) : null;
 
-        boolean switched = fixError(error);
+        boolean switched = fixError(error, track);
+
+        if (mOnHttpError == null) {
+            return;
+        }
 
         mOnHttpError.onHttpError(ex.responseCode, track, PlayerFailure.describeHost(ex.dataSpec.uri.getHost()),
                 failed != null ? failed.format : null, switched);
@@ -303,7 +336,8 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
 
     /**
      * Of a load: audio, video, text (subtitles) or other (e.g. a manifest). By the track it loads for, else its format: the URL names
-     * the mime type of a DASH segment only, so every SABR request was other, like a subtitle's. Muxed (the URL list's) is video.
+     * the mime type of a DASH segment only, so every SABR request was other, like a subtitle's. Muxed (the URL list's) is video. The
+     * URL names it in its path (a YouTube manifest's segment) or its query (the app's own manifests', see YouTubeMPDBuilder).
      */
     static String trackOf(@Nullable MediaLoadData data, String url) {
         if (data != null) {
@@ -329,7 +363,7 @@ public class TrackErrorFixer extends DefaultMediaSourceEventListener {
             }
         }
 
-        return url.contains("mime/audio") ? PlayerFailure.TRACK_AUDIO : url.contains("mime/video") ? PlayerFailure.TRACK_VIDEO
-                : PlayerFailure.TRACK_OTHER;
+        return Helpers.containsAny(url, "mime/audio", "mime=audio") ? PlayerFailure.TRACK_AUDIO
+                : Helpers.containsAny(url, "mime/video", "mime=video") ? PlayerFailure.TRACK_VIDEO : PlayerFailure.TRACK_OTHER;
     }
 }

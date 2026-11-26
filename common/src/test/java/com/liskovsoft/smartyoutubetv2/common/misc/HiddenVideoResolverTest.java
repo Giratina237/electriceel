@@ -12,6 +12,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AiSListFilterData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.BlockedChannelData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.CollaborationsData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.MembersData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.WatchLaterData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 
@@ -79,6 +80,9 @@ public class HiddenVideoResolverTest {
     private WatchLaterData mWatchLaterData;
     private AiSListFilterData mAiSListData;
     private boolean mIsNetworkDown;
+    private List<String> mMemberships = Collections.singletonList("UCmember");
+    private PublishSubject<List<String>> mPendingMemberships; // the next reads end when the test says
+    private int mMembershipReads;
 
     @Before
     public void setUp() {
@@ -105,6 +109,8 @@ public class HiddenVideoResolverTest {
         aiSListManager.setHandleLookupForTesting(this::lookupHandle);
         BlockedChannelData.instance(mContext).clear();
         BlockedChannelManager.instance(mContext).resetForTesting(this::lookupHandle);
+        MembersData.clearForTesting(mContext);
+        MembershipManager.instance(mContext).resetForTesting(this::readMemberships, () -> "one@example.com");
     }
 
     @After
@@ -113,7 +119,88 @@ public class HiddenVideoResolverTest {
         mWatchLaterData.setMode(WatchLaterData.MODE_SHOW);
         disableAiSList();
         BlockedChannelData.instance(mContext).clear();
+        MembersData.clearForTesting(mContext);
         Utils.sHandler.removeCallbacksAndMessages(null);
+    }
+
+    /**
+     * The account is a member of a channel: the members' video of the first group with one appears, once that's known
+     */
+    @Test
+    public void membersVideoWaitsForTheMemberships() {
+        PublishSubject<List<String>> memberships = PublishSubject.create();
+        mPendingMemberships = memberships;
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createMembersVideo("members1"), createVideo("human", HUMAN_CHANNEL))),
+                home).subscribe(shown::add);
+
+        assertTrue(shown.isEmpty());
+
+        memberships.onNext(mMemberships);
+        memberships.onComplete();
+
+        assertEquals(1, shown.size());
+        VideoGroup group = VideoGroup.from(shown.get(0), home);
+        assertEquals(2, group.getSize());
+        assertEquals("members1", group.get(0).videoId);
+    }
+
+    @Test
+    public void membersVideoStaysHiddenForNotAMember() {
+        mMemberships = Collections.emptyList();
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createMembersVideo("members1"), createVideo("human", HUMAN_CHANNEL))),
+                home).subscribe(shown::add);
+
+        assertEquals(1, mMembershipReads);
+        VideoGroup group = VideoGroup.from(shown.get(0), home);
+        assertEquals(1, group.getSize());
+        assertEquals("human", group.get(0).videoId);
+    }
+
+    /**
+     * Nothing to wait for without a members' video
+     */
+    @Test
+    public void otherVideosDontWaitForTheMemberships() {
+        mPendingMemberships = PublishSubject.create();
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createVideo("human", HUMAN_CHANNEL))), home).subscribe(shown::add);
+
+        assertEquals(1, shown.size());
+        assertEquals(0, mMembershipReads);
+    }
+
+    /**
+     * Also when the other lookups are needed (here the collaborations)
+     */
+    @Test
+    public void membersVideoWaitsAlongTheOtherLookups() {
+        mCollaborationsData.setMode(CollaborationsData.MODE_HIDE);
+        PublishSubject<List<String>> memberships = PublishSubject.create();
+        mPendingMemberships = memberships;
+        BrowseSection home = createSection(MediaGroup.TYPE_HOME);
+        List<MediaGroup> shown = new ArrayList<>();
+
+        HiddenVideoResolver.resolveGroup(mContext, Observable.just(createRow(createMembersVideo("members1"), createVideo("collab", COLLABORATION))),
+                home).subscribe(shown::add);
+
+        // The names were searched: held for the memberships alone
+        assertTrue(mSearches.contains(COLLABORATION));
+        assertTrue(shown.isEmpty());
+
+        memberships.onNext(mMemberships);
+        memberships.onComplete();
+
+        VideoGroup group = VideoGroup.from(shown.get(0), home);
+        assertEquals(1, group.getSize());
+        assertEquals("members1", group.get(0).videoId);
     }
 
     @Test
@@ -619,6 +706,12 @@ public class HiddenVideoResolverTest {
         return Observable.just(names != null ? names : Collections.emptyList());
     }
 
+    private Observable<List<String>> readMemberships() {
+        mMembershipReads++;
+
+        return mPendingMemberships != null ? mPendingMemberships : Observable.just(mMemberships);
+    }
+
     private Observable<List<String>> loadWatchLater() {
         mWatchLaterLoads++;
 
@@ -660,7 +753,7 @@ public class HiddenVideoResolverTest {
     /**
      * A search row or a channel page: no sidebar section
      */
-    private static MediaGroup createGroup(int type, String channelId, Video... videos) {
+    static MediaGroup createGroup(int type, String channelId, Video... videos) {
         return new TestMediaGroup(type, channelId, videos);
     }
 
@@ -673,6 +766,12 @@ public class HiddenVideoResolverTest {
         video.title = "Video " + videoId;
         video.author = author;
         video.secondTitle = author + " • 5K views • 3 weeks ago";
+        return video;
+    }
+
+    private static Video createMembersVideo(String videoId) {
+        Video video = createVideo(videoId, "Members Channel");
+        video.membersLabel = "Members only";
         return video;
     }
 

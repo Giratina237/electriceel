@@ -80,7 +80,8 @@ public final class VideoStart {
      */
     public static final String OUTCOME_WAITING = "waiting";
     /**
-     * Not playing 15 s after the user's action (see VideoStarts#MAX_START_MS)
+     * Not playing a minute after the user's action (see VideoStarts#MAX_RECORDED_MS). One that played or was left sooner, past 15 s,
+     * is recorded as that (it was given up at 15 s).
      */
     public static final String OUTCOME_GAVE_UP = "gave_up";
     /**
@@ -95,6 +96,11 @@ public final class VideoStart {
      * Its formats said it can't be played
      */
     public static final String OUTCOME_UNPLAYABLE = "unplayable";
+    /**
+     * A live stream or a premiere that hasn't begun: nothing to play yet. It was recorded as unplayable, with no why (6ABPRYGH: one
+     * opened from the suggestions).
+     */
+    public static final String OUTCOME_UPCOMING = "upcoming";
     /**
      * Ready to play and paused (by the user, or started so) 15 s after the user's action, not played: timed till it was ready. It was
      * recorded as given up, as if it were stuck.
@@ -236,12 +242,23 @@ public final class VideoStart {
          */
         @Nullable
         public final String result;
+        /**
+         * What it ran, e.g. of the player data, its player's load: "player JS load (first of run) 19.3 s, player preprocess 12.9 s…".
+         * Null for nothing to tell (e.g. the player was loaded already).
+         */
+        @Nullable
+        public final String detail;
 
         public WarmUpStep(String name, long startMs, long endMs, @Nullable String result) {
+            this(name, startMs, endMs, result, null);
+        }
+
+        public WarmUpStep(String name, long startMs, long endMs, @Nullable String result, @Nullable String detail) {
             this.name = name;
             this.startMs = startMs;
             this.endMs = endMs;
             this.result = result;
+            this.detail = detail;
         }
 
         public boolean isOpen() {
@@ -259,6 +276,10 @@ public final class VideoStart {
 
             if (this.result != null) {
                 result.put("result", this.result);
+            }
+
+            if (detail != null) {
+                result.put("detail", detail);
             }
 
             return result;
@@ -549,6 +570,9 @@ public final class VideoStart {
             case VideoStarts.STAGE_LOADING_HELD:
             case VideoStarts.STAGE_SERVER_BACKOFF:
             case VideoStarts.STAGE_SERVER_HOLD:
+            case VideoStarts.STAGE_LIVE_HEAD:
+            case VideoStarts.STAGE_VIDEO_NOT_READY:
+            case VideoStarts.STAGE_AUDIO_NOT_READY:
             case "lock wait":
                 return Category.WAIT;
             case VideoStarts.STAGE_FORMATS:
@@ -563,6 +587,8 @@ public final class VideoStart {
             case "player preprocess":
             case "n-function load":
             case "decipher":
+            case "player load":
+            case "solve":
                 return Category.PLAYER_JS;
             case VideoStarts.STAGE_BUFFERING:
             case VideoStarts.STAGE_FIRST_VIDEO_CHUNK:
@@ -571,6 +597,8 @@ public final class VideoStart {
             case VideoStarts.STAGE_AUDIO_INIT_CHUNK:
             case VideoStarts.STAGE_VIDEO_INIT_AGAIN:
             case VideoStarts.STAGE_AUDIO_INIT_AGAIN:
+            case VideoStarts.STAGE_MORE_VIDEO_CHUNKS:
+            case VideoStarts.STAGE_MORE_AUDIO_CHUNKS:
                 return Category.BUFFER;
             case VideoStarts.STAGE_VIDEO_DECODER:
             case VideoStarts.STAGE_TO_POSITION:
@@ -581,7 +609,9 @@ public final class VideoStart {
             case VideoStarts.STAGE_PROTECTION:
             case VideoStarts.STAGE_SEEK:
             case VideoStarts.STAGE_REUSED:
+            case VideoStarts.STAGE_RECOVERY:
             case "cached":
+            case "player stand-in":
                 return Category.MARK;
             default:
                 // The fetch's: each client's attempt, its request, sign-in, the subtitles, the HLS fix…

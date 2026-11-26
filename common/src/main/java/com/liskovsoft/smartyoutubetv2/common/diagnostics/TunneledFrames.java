@@ -25,20 +25,31 @@ public final class TunneledFrames {
      */
     @Nullable
     public final Long queuedAheadMs;
+    /**
+     * The position it was last sent to (a seek, or where the renderer was enabled) less the time of the first sample given to the
+     * decoder since: the keyframe before it, how far the decoder had to decode to get there before it showed a frame. Null when none
+     * was given since. A start sent to a position that froze and one that didn't are told apart by it (H5B64KBE, Y1D66CNW: 4 of 7
+     * froze).
+     */
+    @Nullable
+    public final Long keyframeBehindMs;
 
-    public TunneledFrames(@Nullable Long shownBehindMs, @Nullable Long shownAgoMs, @Nullable Long queuedAheadMs) {
+    public TunneledFrames(@Nullable Long shownBehindMs, @Nullable Long shownAgoMs, @Nullable Long queuedAheadMs,
+                          @Nullable Long keyframeBehindMs) {
         this.shownBehindMs = shownBehindMs;
         this.shownAgoMs = shownAgoMs;
         this.queuedAheadMs = queuedAheadMs;
+        this.keyframeBehindMs = keyframeBehindMs;
     }
 
     /**
-     * As a failure's details: tunneled, tunneledShownBehindMs, tunneledShownAgoMs, tunneledQueuedAheadMs
+     * As a failure's details: tunneled, tunneledShownBehindMs, tunneledShownAgoMs, tunneledQueuedAheadMs, tunneledKeyframeBehindMs
      */
     void addTo(PlayerFailure failure) {
         failure.detail("tunneled", true)
                 .detail("tunneledShownBehindMs", shownBehindMs)
                 .detail("tunneledShownAgoMs", shownAgoMs)
-                .detail("tunneledQueuedAheadMs", queuedAheadMs);
+                .detail("tunneledQueuedAheadMs", queuedAheadMs)
+                .detail("tunneledKeyframeBehindMs", keyframeBehindMs);
     }
 }

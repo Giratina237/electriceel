@@ -15,6 +15,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +30,8 @@ import io.reactivex.Observable;
  * so it's taken as one when X and Y are both channel names but "X and Y" itself isn't (e.g. "Dan and Phil").<br/>
  * A name is a channel name when a channel search finds a channel called exactly that. Each name is searched once,
  * signed out (it stays out of the search history), before the cards are shown, and the answer is cached on disk.<br/>
+ * A "not a channel" is searched again once it's a few days old, in the background (see {@link #RECHECK_MS}): a channel
+ * days old isn't found by its name yet (e.g. "Will Tenny", made 4 days before its first collaboration), weeks later it is.<br/>
  * Only the English "and" is known: in another app language no collaboration is found.
  */
 public class CollaborationManager {
@@ -40,22 +43,56 @@ public class CollaborationManager {
     private static final int MAX_NAMES = 5_000;
     private static final long SAVE_DELAY_MS = 10_000;
     private static final int MAX_PARALLEL_SEARCHES = 4;
+    /**
+     * A "not a channel" older than that is searched again. A collaboration is in the feeds for a week or two:
+     * a channel missed at its first card still gets its mark on the later ones.
+     */
+    static final long RECHECK_MS = 3 * 24 * 60 * 60 * 1_000L;
     @SuppressLint("StaticFieldLeak")
     private static CollaborationManager sInstance;
     private final Context mContext;
     private final File mNamesFile;
     private ChannelSearch mChannelSearch;
-    // Name key -> it's a channel name. Access order, so the names unused the longest are dropped first.
-    private final Map<String, Boolean> mIsChannelName = Collections.synchronizedMap(new LinkedHashMap<String, Boolean>(16, 0.75f, true) {
+    private Clock mClock = System::currentTimeMillis;
+    // Name key -> what the search told. Access order, so the names unused the longest are dropped first.
+    private final Map<String, Answer> mAnswers = Collections.synchronizedMap(new LinkedHashMap<String, Answer>(16, 0.75f, true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<String, Answer> eldest) {
             return size() > MAX_NAMES;
         }
     });
     // The search failed, don't repeat it this session
     private final Set<String> mFailedNames = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Map<String, Observable<Boolean>> mRunningSearches = new ConcurrentHashMap<>();
+    // Key -> the name, of the answers waiting to be searched again (see #recheck). Guards mIsRechecking too.
+    private final Map<String, String> mRecheckNames = new LinkedHashMap<>();
+    private boolean mIsRechecking;
     private final Runnable mSaveNames = () -> RxHelper.runAsync(this::saveNames);
+
+    interface Clock {
+        long now();
+    }
+
+    /**
+     * What a channel search told about a name, and when
+     */
+    static final class Answer {
+        final boolean isChannel;
+        final long checkedMs;
+
+        Answer(boolean isChannel, long checkedMs) {
+            this.isChannel = isChannel;
+            this.checkedMs = checkedMs;
+        }
+
+        /**
+         * A "not a channel" to search again. A channel stays one. The time is in the future when the clock was wrong then or now:
+         * searched again too, rather than kept until then.
+         */
+        boolean isStale(long nowMs) {
+            return !isChannel && (nowMs - checkedMs >= RECHECK_MS || nowMs < checkedMs);
+        }
+    }
 
     interface ChannelSearch {
         /**
@@ -174,13 +211,16 @@ public class CollaborationManager {
      * Every name a card might need is searched at once, its whole name and each side of each "and", rather than one after
      * the other: a search takes about 0.4 s on a Shield. A name the answer doesn't need costs a search, kept like the others
      * (e.g. the sides of "Dan and Phil", one channel).<br/>
+     * The stale answers a card's verdict read are searched again in the background, the card is shown with them (see {@link #recheck}).<br/>
      * Completes once every card is answered or its search failed.
      */
     public Observable<Boolean> resolve(Collection<String> authors) {
         Map<String, String> names = new LinkedHashMap<>(); // key -> the name searched
+        Map<String, String> staleNames = new LinkedHashMap<>(); // key -> the name searched again
+        long nowMs = mClock.now();
 
         for (String author : authors) {
-            if (!needsSearch(judge(author, this::getKnown))) {
+            if (!needsSearch(judge(author, name -> getKnown(name, nowMs, staleNames)))) {
                 continue;
             }
 
@@ -193,15 +233,65 @@ public class CollaborationManager {
             }
         }
 
-        if (names.isEmpty()) {
-            return Observable.just(true);
-        }
-
-        return Observable.fromIterable(names.values())
+        Observable<Boolean> lookups = names.isEmpty() ? Observable.just(true) : Observable.fromIterable(names.values())
                 .flatMap(this::search, MAX_PARALLEL_SEARCHES)
                 .toList()
                 .map(results -> true)
                 .toObservable();
+
+        // After the searches the cards wait for
+        return lookups.doFinally(() -> recheck(staleNames));
+    }
+
+    /**
+     * Searches the names again in the background, one at a time across the loads, after the searches of the cards shown:
+     * the rows being filled need the pool more (see RxHelper). The cards keep the answers they had, the next load gets the new ones.
+     */
+    private void recheck(Map<String, String> names) {
+        if (names.isEmpty()) {
+            return;
+        }
+
+        synchronized (mRecheckNames) {
+            for (Map.Entry<String, String> entry : names.entrySet()) {
+                mRecheckNames.putIfAbsent(entry.getKey(), entry.getValue());
+            }
+
+            if (mIsRechecking) {
+                return;
+            }
+
+            mIsRechecking = true;
+        }
+
+        recheckNext();
+    }
+
+    private void recheckNext() {
+        String name = null;
+
+        synchronized (mRecheckNames) {
+            Iterator<Map.Entry<String, String>> iterator = mRecheckNames.entrySet().iterator();
+
+            while (name == null && iterator.hasNext()) {
+                Map.Entry<String, String> entry = iterator.next();
+                iterator.remove();
+                Answer answer = mAnswers.get(entry.getKey());
+
+                // Searched since it was queued, dropped, or its search failed this session
+                if (answer != null && answer.isStale(mClock.now()) && !mFailedNames.contains(entry.getKey())) {
+                    name = entry.getValue();
+                }
+            }
+
+            if (name == null) {
+                mIsRechecking = false;
+                return;
+            }
+        }
+
+        // The search returns its error as a result: the queue goes on either way
+        RxHelper.execute(search(name), null, error -> recheckNext(), this::recheckNext);
     }
 
     /**
@@ -262,13 +352,13 @@ public class CollaborationManager {
 
         return mRunningSearches.computeIfAbsent(key, unused -> mChannelSearch.getChannelNames(name)
                 .map(names -> {
-                    mIsChannelName.put(key, containsName(names, name));
+                    mAnswers.put(key, new Answer(containsName(names, name), mClock.now()));
                     Utils.postDelayed(mSaveNames, SAVE_DELAY_MS);
                     return true;
                 })
                 .onErrorReturn(error -> {
                     Log.e(TAG, "Can't search for the channel %s: %s", name, error.getMessage());
-                    mFailedNames.add(key);
+                    mFailedNames.add(key); // a stale answer keeps its old one
                     return true;
                 })
                 .doFinally(() -> mRunningSearches.remove(key))
@@ -276,7 +366,22 @@ public class CollaborationManager {
     }
 
     private Boolean getKnown(String name) {
-        return mIsChannelName.get(getKey(name));
+        Answer answer = mAnswers.get(getKey(name));
+        return answer != null ? answer.isChannel : null;
+    }
+
+    /**
+     * As {@link #getKnown(String)}, collects the stale answer to search again
+     */
+    private Boolean getKnown(String name, long nowMs, Map<String, String> staleNames) {
+        String key = getKey(name);
+        Answer answer = mAnswers.get(key);
+
+        if (answer != null && answer.isStale(nowMs) && !mFailedNames.contains(key)) {
+            staleNames.putIfAbsent(key, name);
+        }
+
+        return answer != null ? answer.isChannel : null;
     }
 
     /**
@@ -359,46 +464,91 @@ public class CollaborationManager {
      * Searches with the given one from now on and forgets every name
      */
     void resetForTesting(ChannelSearch search) {
+        resetForTesting(search, System::currentTimeMillis);
+    }
+
+    /**
+     * As {@link #resetForTesting(ChannelSearch)}, the answers are timed by the given clock
+     */
+    void resetForTesting(ChannelSearch search, Clock clock) {
         mChannelSearch = search;
-        mIsChannelName.clear();
+        mClock = clock;
+        mAnswers.clear();
         mFailedNames.clear();
         mRunningSearches.clear();
+
+        synchronized (mRecheckNames) {
+            mRecheckNames.clear();
+            mIsRechecking = false;
+        }
     }
 
     private void restoreNames() {
         String content = FileHelpers.getFileContents(mNamesFile);
 
-        if (content == null) {
-            return;
-        }
-
-        for (String line : content.split("\n")) {
-            String[] pair = line.split("\t");
-
-            if (pair.length == 2 && !pair[0].isEmpty() && (CHANNEL.equals(pair[1]) || NOT_CHANNEL.equals(pair[1]))) {
-                // A search done while the file was read is newer
-                mIsChannelName.putIfAbsent(pair[0], CHANNEL.equals(pair[1]));
-            }
+        if (content != null) {
+            readNames(content, mAnswers);
         }
     }
 
     private void saveNames() {
-        StringBuilder content = new StringBuilder();
+        String content;
 
-        synchronized (mIsChannelName) {
-            for (Map.Entry<String, Boolean> entry : mIsChannelName.entrySet()) {
-                if (entry.getKey().contains("\t") || entry.getKey().contains("\n")) {
-                    continue;
-                }
-
-                content.append(entry.getKey()).append('\t').append(entry.getValue() ? CHANNEL : NOT_CHANNEL).append('\n');
-            }
+        synchronized (mAnswers) {
+            content = writeNames(mAnswers);
         }
 
         File parent = mNamesFile.getParentFile();
 
         if (parent != null && (parent.exists() || parent.mkdirs())) {
-            FileHelpers.stringToFile(content.toString(), mNamesFile);
+            FileHelpers.stringToFile(content, mNamesFile);
+        }
+    }
+
+    /**
+     * Lines of the name key, 1 or 0 and the time of the search (see {@link #writeNames}). A line without the time was saved
+     * before the answers had one: as old as can be, so its "not a channel" is searched again.<br/>
+     * A search done while the file was read is newer: an answer already there is kept.
+     */
+    static void readNames(String content, Map<String, Answer> answers) {
+        for (String line : content.split("\n")) {
+            String[] fields = line.split("\t");
+
+            if ((fields.length != 2 && fields.length != 3) || fields[0].isEmpty() || !(CHANNEL.equals(fields[1]) || NOT_CHANNEL.equals(fields[1]))) {
+                continue;
+            }
+
+            answers.putIfAbsent(fields[0], new Answer(CHANNEL.equals(fields[1]), fields.length == 3 ? parseTime(fields[2]) : 0));
+        }
+    }
+
+    /**
+     * In the order of the map, so the least recently used stay first. The caller holds its lock.
+     */
+    static String writeNames(Map<String, Answer> answers) {
+        StringBuilder content = new StringBuilder();
+
+        for (Map.Entry<String, Answer> entry : answers.entrySet()) {
+            if (entry.getKey().contains("\t") || entry.getKey().contains("\n")) {
+                continue;
+            }
+
+            Answer answer = entry.getValue();
+            content.append(entry.getKey()).append('\t').append(answer.isChannel ? CHANNEL : NOT_CHANNEL)
+                    .append('\t').append(answer.checkedMs).append('\n');
+        }
+
+        return content.toString();
+    }
+
+    /**
+     * @return 0 for a broken time: its "not a channel" is searched again
+     */
+    private static long parseTime(String time) {
+        try {
+            return Long.parseLong(time);
+        } catch (NumberFormatException e) {
+            return 0;
         }
     }
 }

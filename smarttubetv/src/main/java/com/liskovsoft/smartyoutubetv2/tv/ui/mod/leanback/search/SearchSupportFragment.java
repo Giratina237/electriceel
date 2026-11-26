@@ -9,7 +9,6 @@ import android.os.Handler;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.text.Editable;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -41,6 +40,7 @@ import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.helpers.KeyHelpers;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter;
+import com.liskovsoft.smartyoutubetv2.common.utils.TypingCorrection;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.smartyoutubetv2.tv.BuildConfig;
 
@@ -379,7 +379,7 @@ public class SearchSupportFragment extends Fragment {
             KeyHelpers.fixEnterKey(mSearchTextEditor);
         }
         if (mIsTypingCorrectionDisabled) {
-            mSearchTextEditor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+            TypingCorrection.turnOff(mSearchTextEditor);
         }
         // BUGFIX: focus lost with keyboard???
         //mSearchTextEditor.setOnKeyboardDismissListener(this::focusOnSearchField);

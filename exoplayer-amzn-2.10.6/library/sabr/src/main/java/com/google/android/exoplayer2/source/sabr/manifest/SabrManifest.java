@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Represents a SABR media presentation
@@ -130,6 +131,20 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
      */
     private long sessionStartMs = -1;
     /**
+     * How the session in use came, one of the SESSION_ constants (see describeRequest). A refusal 38-95 ms into a new session
+     * (0CW972QK, H8ZP1GPV) didn't come again with sessions the app asked for in a burst of seeks on the emulator (2026-11-23): the
+     * server's asks, with their reload token, were the difference left.
+     */
+    private volatile String sessionOrigin = SESSION_FIRST;
+    /**
+     * Of the session being asked for (see requestSessionRefresh)
+     */
+    private String pendingSessionOrigin;
+    static final String SESSION_FIRST = "first";
+    static final String SESSION_ASKED = "server-asked";
+    static final String SESSION_ASKED_WITH_TOKEN = "server-asked with a token";
+    static final String SESSION_REFETCHED = "refetched";
+    /**
      * When the new session being asked for was (SystemClock#elapsedRealtime), -1 for none
      */
     private long sessionRefreshStartMs = -1;
@@ -138,6 +153,11 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
      * video. Not after another one was swapped in (see refreshSession).
      */
     private boolean isSessionRefreshFailed;
+    /**
+     * Of each track, its last request (see describeRequest): what one the server refused asked for (see SabrProtocolError#setRequest).
+     * Made on the loading threads.
+     */
+    private final Map<Integer, String> lastRequests = new ConcurrentHashMap<>();
 
     /**
      * Asks for the player response again when the server asks for it (see SabrReloadPlayerError), e.g. as the session expires about
@@ -376,6 +396,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
             Log.d(TAG, "Asking for a new session of %s", videoId);
             sessionRefreshStartMs = nowMs;
+            pendingSessionOrigin = reloadPlaybackToken != null && !reloadPlaybackToken.isEmpty() ? SESSION_ASKED_WITH_TOKEN : SESSION_ASKED;
             refresher = sessionRefresher;
             refreshedSessionId = sessionId;
         }
@@ -432,6 +453,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
         }
 
         refreshSession(session.serverAbrStreamingUrl, session.videoPlaybackUstreamerConfig, session.poToken);
+        sessionOrigin = pendingSessionOrigin != null ? pendingSessionOrigin : SESSION_ASKED;
 
         return true;
     }
@@ -479,6 +501,8 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
 
         sessionId++;
         sessionStartMs = SystemClock.elapsedRealtime();
+        // Asked for by the server, it's set after this (see onSessionRefreshed)
+        sessionOrigin = SESSION_REFETCHED;
         // The requests waiting for a new session (see requestSessionRefresh) go on with this one: the one asked for is dropped when it
         // comes (see onSessionRefreshed)
         sessionRefreshStartMs = -1;
@@ -591,7 +615,7 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
             selectedFormats.add(0, bufferRanges.second);
         }
 
-        return VideoPlaybackAbrRequest.newBuilder()
+        VideoPlaybackAbrRequest request = VideoPlaybackAbrRequest.newBuilder()
                 .setClientAbrState(clientAbrState)
                 .addAllPreferredVideoFormatIds(getFormatSelector(C.TRACK_TYPE_VIDEO).formatIds)
                 .addAllPreferredAudioFormatIds(getFormatSelector(C.TRACK_TYPE_AUDIO).formatIds)
@@ -605,6 +629,65 @@ public class SabrManifest implements FilterableManifest<SabrManifest> {
                 )
                 .setStreamerContext(createStreamerContext(trackType))
                 .build();
+
+        lastRequests.put(trackType, describeRequest(request, isInit, getSessionId(), sessionOrigin));
+
+        return request;
+    }
+
+    /**
+     * The track's last request (see describeRequest), null for none yet
+     */
+    @Nullable
+    public String getLastRequest(int trackType) {
+        return lastRequests.get(trackType);
+    }
+
+    /**
+     * How long ago the session in use was swapped in (see refreshSession), -1 for the stream's first one
+     */
+    public synchronized long getSessionAgeMs() {
+        return sessionStartMs == -1 ? -1 : SystemClock.elapsedRealtime() - sessionStartMs;
+    }
+
+    /**
+     * The formats a request names, for a refusal's diagnostics: e.g. "init, video 248, audio 251:drc, selected none, session 1 (server-asked)"
+     */
+    static String describeRequest(VideoPlaybackAbrRequest request, boolean isInit, int sessionId, String sessionOrigin) {
+        return (isInit ? "init" : "media")
+                + ", video " + describeFormats(request.getPreferredVideoFormatIdsList())
+                + ", audio " + describeFormats(request.getPreferredAudioFormatIdsList())
+                + ", selected " + describeFormats(request.getSelectedFormatIdsList())
+                + ", session " + sessionId + " (" + sessionOrigin + ")";
+    }
+
+    /**
+     * How the session in use came: first, server-asked (with a token or not), or refetched (see describeRequest)
+     */
+    public String getSessionOrigin() {
+        return sessionOrigin;
+    }
+
+    private static String describeFormats(List<FormatId> formats) {
+        if (formats.isEmpty()) {
+            return "none";
+        }
+
+        StringBuilder result = new StringBuilder();
+
+        for (FormatId format : formats) {
+            if (result.length() > 0) {
+                result.append(' ');
+            }
+
+            result.append(format.getItag());
+
+            if (format.hasXtags() && !format.getXtags().isEmpty()) {
+                result.append(':').append(format.getXtags());
+            }
+        }
+
+        return result.toString();
     }
 
     /**

@@ -617,6 +617,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
       // https://github.com/google/ExoPlayer/issues/1874
       boolean rendererReadyOrEnded = renderer.isReady() || renderer.isEnded()
           || rendererWaitingForNextStream(renderer);
+      // MOD: which renderer the player waits for (see RendererReadiness)
+      RendererReadiness.onReadiness(renderer, rendererReadyOrEnded);
       if (!rendererReadyOrEnded) {
         renderer.maybeThrowStreamError();
       }

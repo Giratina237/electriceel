@@ -507,6 +507,7 @@
     <string name="collaborations_desc">Տեսանյութ, որի ալիքը ցուցադրվում է \"X and Y\" ձևով, որտեղ X-ը և Y-ը ալիքների անուններ են։ Յուրաքանչյուր անուն ստուգվում է մեկ անգամ՝ առանց մուտքի որոնմամբ։ Միայն անգլերեն։</string>
     <string name="collaborations_sections">Բաժիններ</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Համագործակիցներ</string>
     <string name="watch_later">Դիտել ավելի ուշ</string>
     <string name="watch_later_show">Ցույց տալ</string>
     <string name="watch_later_mark">Նշել</string>
@@ -687,10 +688,10 @@
     <string name="pressing_home_back">HOME կամ BACK սեղմելով</string>
     <string name="pressing_back">BACK սեղմելով</string>
     <string name="player_number_key_seek">Սահեցնել թվային ստեղներով</string>
-    <string name="save_remove_playlist">Ավելացնել նվագացանկը Նվագացանկեր բաժնում/հեռացնել դրանից</string>
+    <string name="add_delete_playlist">Ավելացնել Նվագացանկեր բաժնում/ջնջել նվագացանկը</string>
     <string name="save_playlist">Ավելացնել նվագացանկը Նվագացանկեր բաժնում</string>
-    <string name="remove_playlist">Մշտապես հեռացնել նվագացանկը Նվագացանկեր բաժնից</string>
-    <string name="remove_playlist_fmt">Մշտապե՞ս հեռացնել %s-ը</string>
+    <string name="delete_playlist">Ջնջել նվագացանկը</string>
+    <string name="delete_playlist_fmt">Ջնջե՞լ %s նվագացանկը</string>
     <string name="removed_from_playlists">Հեռացվել է Նվագացանկեր բաժնից</string>
     <string name="saved_to_playlists">Ավելացվել է Նվագացանկեր բաժնում</string>
     <string name="create_playlist">Ստեղծել նվագացանկ</string>
@@ -704,6 +705,9 @@
     <string name="copy_playlist_to_youtube">Պատճենել YouTube</string>
     <string name="copied_to_youtube">Պատճենվեց YouTube</string>
     <string name="export_playlists">Արտահանել նվագացանկերը</string>
+    <string name="playlists_on_youtube">Երգացանկեր YouTube-ում</string>
+    <string name="playlists_on_this_device">Երգացանկեր այս սարքում</string>
+    <string name="on_this_device">Այս սարքում</string>
     <string name="import_playlists">Ներմուծել նվագացանկեր</string>
     <string name="import_to_device">Ներմուծել այս սարք</string>
     <string name="import_to_youtube">Ներմուծել YouTube</string>

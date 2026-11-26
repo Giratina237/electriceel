@@ -1219,6 +1219,8 @@ public class AppDialogUtil {
 
             OptionItem option = UiOptionItem.from(
                     playlistInfo.getTitle(),
+                    // Apart from one on YouTube of the same title: they're separate playlists
+                    itemService.isKeptOnDevice(playlistInfo) ? context.getString(R.string.on_this_device) : null,
                     (item) -> {
                         addRemoveFromPlaylist(context, video, callback, playlistInfo, item.isSelected());
                         GeneralData.instance(context).setLastPlaylistId(playlistInfo.getPlaylistId());

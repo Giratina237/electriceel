@@ -32,6 +32,10 @@ public abstract class SectionFilterData extends DataSaverBase {
     private static final int MARK_COLOR_INDEX = 2;
     private static final int QUICK_TOGGLE_INDEX = 3;
     private static final int QUICK_TOGGLE_SHOWING_INDEX = 4; // saved the other way round: a value never set comes back as false
+    /**
+     * The first index a subclass saves values of its own at
+     */
+    protected static final int OWN_VALUES_INDEX = 5;
     private static final int MAX_SECTION_ID = 30; // the bits of an int. Pinned items use hash ids: only the groups are filtered (SECTION_CHANNEL_GROUPS).
     private static final int DEFAULT_SECTIONS = Integer.MAX_VALUE; // every section (bits 0-30), the ones added later too
 
@@ -80,6 +84,15 @@ public abstract class SectionFilterData extends DataSaverBase {
         int mode = getInt(MODE_INDEX, getDefaultMode());
 
         return mode == MODE_SHOW || mode == MODE_MARK || mode == MODE_HIDE ? mode : getDefaultMode();
+    }
+
+    /**
+     * A mode was saved: picked in the settings, or set by the app (e.g. MembersData.onMembershipsRead). Not before: it's the default.
+     */
+    protected boolean isModePicked() {
+        int mode = getInt(MODE_INDEX, -1);
+
+        return mode == MODE_SHOW || mode == MODE_MARK || mode == MODE_HIDE;
     }
 
     /**

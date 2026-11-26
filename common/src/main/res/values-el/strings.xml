@@ -473,6 +473,7 @@
   <string name="collaborations_desc">Βίντεο με κανάλι της μορφής \"X and Y\", όπου X και Y είναι ονόματα καναλιών. Κάθε όνομα ελέγχεται μία φορά με αναζήτηση καναλιών χωρίς σύνδεση. Μόνο στα αγγλικά.</string>
   <string name="collaborations_sections">Ενότητες</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Συνεργάτες</string>
   <string name="watch_later">Παρακολούθηση αργότερα</string>
   <string name="watch_later_show">Εμφάνιση</string>
   <string name="watch_later_mark">Σήμανση</string>
@@ -645,8 +646,7 @@
   <string name="pressing_home">Πατώντας ΑΡΧΙΚΗ</string>
   <string name="pressing_home_back">Πατώντας ΑΡΧΙΚΗ ή ΠΊΣΩ</string>
   <string name="player_number_key_seek">Αναζήτηση με αριθμητικά κουμπιά</string>
-  <string name="save_remove_playlist">Προσθήκη/Διαγραφή λίστας αναπαραγωγής από Λίστες αναπαραγωγής</string>
-  <string name="remove_playlist">Διαγραφή λίστας αναπαραγωγής από Λίστες αναπαραγωγής μόνιμα</string>
+  <string name="add_delete_playlist">Προσθήκη στις Λίστες αναπαραγωγής/Διαγραφή λίστας αναπαραγωγής</string>
   <string name="removed_from_playlists">Αφαιρέθηκε από Λίστες αναπαραγωγής</string>
   <string name="saved_to_playlists">Προστέθηκε σε Λίστες αναπαραγωγής</string>
   <string name="create_playlist">Δημιουργία λίστας αναπαραγωγής</string>
@@ -659,6 +659,9 @@
   <string name="copy_playlist_to_youtube">Αντιγραφή στο YouTube</string>
   <string name="copied_to_youtube">Αντιγράφηκε στο YouTube</string>
   <string name="export_playlists">Εξαγωγή λιστών αναπαραγωγής</string>
+  <string name="playlists_on_youtube">Λίστες αναπαραγωγής στο YouTube</string>
+  <string name="playlists_on_this_device">Λίστες αναπαραγωγής σε αυτή τη συσκευή</string>
+  <string name="on_this_device">Σε αυτή τη συσκευή</string>
   <string name="import_playlists">Εισαγωγή λιστών αναπαραγωγής</string>
   <string name="import_to_device">Εισαγωγή σε αυτή τη συσκευή</string>
   <string name="import_to_youtube">Εισαγωγή στο YouTube</string>
@@ -876,6 +879,8 @@
   <string name="enable_history">Ενεργοποίηση ιστορικού</string>
   <string name="open_comments">Ανοίξτε τα σχόλια</string>
   <string name="save_playlist">Προσθήκη λίστας αναπαραγωγής στην ενότητα Λίστες αναπαραγωγής</string>
+  <string name="delete_playlist">Διαγραφή λίστας αναπαραγωγής</string>
+  <string name="delete_playlist_fmt">Διαγραφή λίστας αναπαραγωγής %s;</string>
   <string name="player_volume">Ένταση</string>
   <string name="live_stream_fix_4k_desc">Προειδοποίηση, αυτή η παραμετροποίηση απενεργοποιεί την επαναφορά των ροών. Βελτιώνει σημαντικά την απόδοση της ζωντανής ροής. Η μέγιστη ανάλυση είναι 4K.</string>
   <string name="hide_upcoming_home">Απόκρυψη επερχόμενων από την Αρχική σελίδα</string>
@@ -963,7 +968,6 @@
   <string name="hide_shorts_from_gaming">Απόκρυψη Shorts από τα Παιχνίδια</string>
   <string name="hide_shorts_from_news">Απόκρυψη Shorts από τις Ειδήσεις</string>
   <string name="hide_shorts_from_music">Απόκρυψη Shorts από τη Μουσική</string>
-  <string name="remove_playlist_fmt">Αφαίρεση %s μόνιμα;</string>
   <string name="create_playlist_note">δε θα φαίνεται στην εφαρμογή YouTube</string>
   <string name="suggestions">Προτάσεις</string>
   <string name="place_comments_left">Τοποθέτηση σχολίων αριστερά</string>

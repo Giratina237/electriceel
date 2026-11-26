@@ -37,6 +37,7 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.ShowsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.StreamedData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.TopChannelsData;
 import com.liskovsoft.smartyoutubetv2.common.utils.CompactInfo;
+import com.liskovsoft.youtubeapi.service.internal.MediaServiceData;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -568,7 +569,7 @@ public class VideoGroup {
                 || isHiddenWatchLater(video) || isHiddenShow(video) || isHiddenMembers(video) || isHiddenStreamed(video) || isHiddenTopChannel(video)
                 || isHiddenExploreTopic(video)
                 || hasHiddenKeyword(video) || isWatchedSuggestion(video) || isUnsubscribedChannel(video) || isHiddenChannelGroupChannel(video)
-                || isWatchedInChannelGroup(video) || isHiddenOpened(video) || isDuplicate(video)) {
+                || isWatchedInChannelGroup(video) || isWatchedInAppHidden(video) || isHiddenOpened(video) || isDuplicate(video)) {
             if (video.videoId != null) {
                 mHiddenVideoCount++;
             }
@@ -815,6 +816,34 @@ public class VideoGroup {
         }
 
         return video.percentWatched > WATCHED_PERCENT || getPercentWatchedInApp(video) > WATCHED_PERCENT;
+    }
+
+    /**
+     * Watched as the app played it (see VideoStateService), in Home or Subscriptions while Hide watched is on for it. YouTube's
+     * progress is filtered before (see MediaGroupOptions of MediaServiceCore), but YouTube may still have a video played to the
+     * end in the app as barely watched, or not have it at all (e.g. incognito, or history paused). A live stream is left alone.
+     */
+    private boolean isWatchedInAppHidden(Video video) {
+        if (video.isChapter || video.videoId == null || video.isLive || !isWatchedHidden()) {
+            return false;
+        }
+
+        return getPercentWatchedInApp(video) > WATCHED_PERCENT;
+    }
+
+    /**
+     * Hide watched from Home or Subscriptions is on for the group, as MediaServiceCore applies it (see MediaGroupOptions): by the
+     * group's type, so the Subscriptions row added to Home goes by Subscriptions'
+     */
+    private boolean isWatchedHidden() {
+        switch (getType()) {
+            case MediaGroup.TYPE_HOME:
+                return MediaServiceData.instance().isContentHidden(MediaServiceData.CONTENT_WATCHED_HOME);
+            case MediaGroup.TYPE_SUBSCRIPTIONS:
+                return MediaServiceData.instance().isContentHidden(MediaServiceData.CONTENT_WATCHED_SUBSCRIPTIONS);
+            default:
+                return false;
+        }
     }
 
     /**

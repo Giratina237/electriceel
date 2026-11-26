@@ -26,6 +26,7 @@ public class UiOptionItem implements OptionItem {
     private ChatReceiver mChatReceiver;
     private CommentsReceiver mCommentsReceiver;
     private Runnable mOnDescriptionChange;
+    private String mIconUrl;
 
     public static List<OptionItem> from(List<FormatItem> formats, OptionCallback callback) {
         return from(formats, callback, null);
@@ -278,6 +279,16 @@ public class UiOptionItem implements OptionItem {
     @Override
     public OptionItem[] getSelectAll() {
         return mSelectAllItems;
+    }
+
+    @Override
+    public void setIconUrl(String iconUrl) {
+        mIconUrl = iconUrl;
+    }
+
+    @Override
+    public String getIconUrl() {
+        return mIconUrl;
     }
 
     @Override

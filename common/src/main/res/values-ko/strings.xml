@@ -498,6 +498,7 @@
   <string name="collaborations_desc">채널이 \"X and Y\"로 표시되고 X와 Y가 모두 채널 이름인 동영상. 각 이름은 로그아웃 상태의 채널 검색으로 한 번 확인합니다. 영어만 지원.</string>
   <string name="collaborations_sections">섹션</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">공동 작업자</string>
   <string name="watch_later">나중에 볼 동영상</string>
   <string name="watch_later_show">보이기</string>
   <string name="watch_later_mark">표시</string>
@@ -670,9 +671,10 @@
   <string name="pressing_home_back">홈 또는 뒤로가기를 누름</string>
   <string name="pressing_back">뒤로가기를 누름</string>
   <string name="player_number_key_seek">숫자 키로 찾기</string>
-  <string name="save_remove_playlist">재생목록 섹션에서 재생목록 추가/삭제</string>
+  <string name="add_delete_playlist">재생목록 섹션에 추가/재생목록 삭제</string>
   <string name="save_playlist">재생 목록 섹션에 재생 목록 추가</string>
-  <string name="remove_playlist">재생목록 섹션에서 재생목록을 영구적으로 삭제</string>
+  <string name="delete_playlist">재생목록 삭제</string>
+  <string name="delete_playlist_fmt">재생목록 %s을(를) 삭제할까요?</string>
   <string name="removed_from_playlists">재생목록 섹션에서 삭제됨</string>
   <string name="saved_to_playlists">재생목록 섹션에 추가됨</string>
   <string name="create_playlist">재생목록 만들기</string>
@@ -685,6 +687,9 @@
   <string name="copy_playlist_to_youtube">YouTube에 복사</string>
   <string name="copied_to_youtube">YouTube에 복사됨</string>
   <string name="export_playlists">재생목록 내보내기</string>
+  <string name="playlists_on_youtube">YouTube의 재생목록</string>
+  <string name="playlists_on_this_device">이 기기의 재생목록</string>
+  <string name="on_this_device">이 기기</string>
   <string name="import_playlists">재생목록 가져오기</string>
   <string name="import_to_device">이 기기로 가져오기</string>
   <string name="import_to_youtube">YouTube로 가져오기</string>
@@ -979,7 +984,6 @@
   <string name="paid_content_notification">유료 콘텐츠 알림</string>
   <string name="you_liked">좋아요</string>
   <string name="original_lang">오리지널</string>
-  <string name="remove_playlist_fmt">%s을(를) 영구적으로 제거할까요\?</string>
   <string name="premium_users_only">프리미엄 사용자만 해당합니다. 불완전한 비디오 형식 목록 수정</string>
   <string name="playback_buffering_fix">재생 버퍼링 수정</string>
   <string name="oculus_quest_fix">오큘러스 퀘스트 수정</string>

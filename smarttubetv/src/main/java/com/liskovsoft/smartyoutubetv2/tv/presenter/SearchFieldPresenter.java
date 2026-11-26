@@ -14,6 +14,7 @@ import androidx.leanback.widget.Presenter;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData;
+import com.liskovsoft.smartyoutubetv2.common.utils.TypingCorrection;
 import com.liskovsoft.smartyoutubetv2.tv.R;
 import com.liskovsoft.smartyoutubetv2.tv.ui.browse.video.GridFragmentHelper;
 import com.liskovsoft.smartyoutubetv2.tv.util.ViewUtil;
@@ -44,6 +45,8 @@ public class SearchFieldPresenter extends Presenter {
 
         EditText editField = contentView.findViewById(R.id.simple_edit_value);
         ViewUtil.setDimensions(editField, mWidth, -1); // don't do auto height
+        // Search setting, as the search screen: no suggestions or corrections from the keyboard
+        TypingCorrection.applySearchSetting(editField);
         contentView.setOnFocusChangeListener((v, hasFocus) -> {
             Log.d(TAG, "On edit field focused");
             if (hasFocus) {
