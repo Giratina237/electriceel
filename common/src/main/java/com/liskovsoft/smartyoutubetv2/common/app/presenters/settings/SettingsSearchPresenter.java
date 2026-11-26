@@ -134,6 +134,12 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         mAnswer = null;
         mError = null;
         mIsModelError = false;
+        mProvider = AiSearchData.instance(context).getReadyProvider();
+
+        // The AI is told the values as they are now: listed again for it, the list kept is updated
+        if (mProvider != null) {
+            SettingsCatalog.clearCache();
+        }
 
         try {
             mCatalog = SettingsCatalog.get(context);
@@ -144,7 +150,6 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         }
 
         mMatches = SettingsSearch.find(mCatalog.getEntries(), question, MAX_MATCHES);
-        mProvider = AiSearchData.instance(context).getReadyProvider();
 
         if (mProvider != null) {
             startRequest(context);
