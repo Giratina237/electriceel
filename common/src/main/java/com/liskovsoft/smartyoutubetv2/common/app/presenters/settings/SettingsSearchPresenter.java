@@ -94,7 +94,7 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
         mQuestion = question;
 
         try {
-            mCatalog = SettingsCatalog.build(context);
+            mCatalog = SettingsCatalog.get(context);
         } catch (RuntimeException e) {
             Log.e(TAG, "Can't list the settings: " + e);
             MessageHelpers.showMessage(context, e.getMessage());
@@ -156,16 +156,15 @@ public class SettingsSearchPresenter extends BasePresenter<Void> {
     }
 
     private OptionItem createRow(Context context, SettingEntry entry) {
+        // Where it is only: the list is kept between searches, the values in it could be old
         String where = TextUtils.join(" › ", entry.path);
-
-        if (entry.kind == SettingEntry.KIND_CHOICE && entry.picked != null) {
-            where = where.isEmpty() ? entry.picked : where + " · " + entry.picked;
-        }
 
         return UiOptionItem.from(entry.title, where, option -> {
             AppDialogPresenter dialog = AppDialogPresenter.instance(context);
 
             if (!SettingsCatalog.open(context, entry, dialog::closeDialog)) {
+                // The settings changed since they were listed
+                SettingsCatalog.clearCache();
                 MessageHelpers.showMessage(context, R.string.find_setting_gone);
             }
         });
