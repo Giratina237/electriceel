@@ -181,6 +181,47 @@ public class ErrorFixerControllerTest {
     }
 
     /**
+     * The stream's formats came from WEB because TV refused the video: its error says why it's WEB's (EENAQFZF: signed out, autoplay
+     * went on WEB after ten videos on TV, and nothing in its 217 errors said what TV had answered)
+     */
+    @Test
+    public void aSourceErrorHasTheClientsTriedBeforeTheOneThatGaveTheFormats() throws Exception {
+        ClientAttempts.clear("skippedTv");
+        ClientAttempts.record("skippedTv", ClientAttempts.Attempt.unplayable("TV", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot"));
+        ClientAttempts.record("skippedTv", ClientAttempts.Attempt.ok("WEB"));
+        TestController controller = new TestController(video("skippedTv"));
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new IOException("Response code: 403"));
+
+        JSONArray attempts = mLog.readAll().get(0).getJSONArray("clientAttempts");
+
+        assertEquals(2, attempts.length());
+        assertEquals("TV", attempts.getJSONObject(0).getString("client"));
+        assertEquals("unplayable", attempts.getJSONObject(0).getString("result"));
+        assertEquals("LOGIN_REQUIRED", attempts.getJSONObject(0).getString("status"));
+        assertEquals("WEB", attempts.getJSONObject(1).getString("client"));
+        assertEquals("ok", attempts.getJSONObject(1).getString("result"));
+        ClientAttempts.clear("skippedTv");
+    }
+
+    /**
+     * The first client tried gave the formats: the player's client says as much, no attempts
+     */
+    @Test
+    public void aSourceErrorOfTheFirstClientTriedHasNoAttempts() throws Exception {
+        ClientAttempts.clear("firstTv");
+        ClientAttempts.record("firstTv", ClientAttempts.Attempt.ok("TV"));
+        TestController controller = new TestController(video("firstTv"));
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new IOException("Response code: 403"));
+
+        assertFalse(mLog.readAll().get(0).has("clientAttempts"));
+        ClientAttempts.clear("firstTv");
+    }
+
+    /**
      * SABR's read timed out while it played: the same client again (it streams from the same servers), three times a video
      */
     @Test

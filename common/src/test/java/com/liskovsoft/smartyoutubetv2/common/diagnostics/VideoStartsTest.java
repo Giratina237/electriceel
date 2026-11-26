@@ -561,6 +561,25 @@ public class VideoStartsTest {
     }
 
     /**
+     * A live stream's wait for its next segment at its head is in the buffering: a live start resumed at the head had 1.25 s with no row
+     * between its first frame and its play (AFQQ49Z4 RJFwMQBXPUQ)
+     */
+    @Test
+    public void liveHeadWaitsAreInTheBuffering() {
+        VideoStarts.sLiveHeadWaits = (fromMs, toMs) -> Collections.singletonList(
+                new VideoStart.Stage(VideoStarts.STAGE_LIVE_HEAD, "video, next asked in 1250 ms", 1, fromMs + 10, fromMs + 1_260));
+        VideoStart start = mFixture.slowStart();
+        boolean isFound = false;
+
+        for (VideoStart.Stage stage : start.stages) {
+            isFound |= VideoStarts.STAGE_LIVE_HEAD.equals(stage.name) && "video, next asked in 1250 ms".equals(stage.detail)
+                    && stage.depth == 1 && stage.getDurationMs() == 1_250 && stage.getCategory() == VideoStart.Category.WAIT;
+        }
+
+        assertTrue(isFound);
+    }
+
+    /**
      * A load that failed is in the buffering: the player's wait before it tried again had no row (S4PGCB6X: 4.4 s with none)
      */
     @Test

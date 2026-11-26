@@ -570,6 +570,7 @@ public final class VideoStart {
             case VideoStarts.STAGE_LOADING_HELD:
             case VideoStarts.STAGE_SERVER_BACKOFF:
             case VideoStarts.STAGE_SERVER_HOLD:
+            case VideoStarts.STAGE_LIVE_HEAD:
             case VideoStarts.STAGE_VIDEO_NOT_READY:
             case VideoStarts.STAGE_AUDIO_NOT_READY:
             case "lock wait":

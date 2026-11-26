@@ -578,12 +578,26 @@ public class MediaServiceManager implements OnAccountChange {
     @Override
     public void onAccountChanged(Account account) {
         // Its poToken was reset with the account: made again when the account's videos are shown, not by the first one opened
-        mIsPlaybackWarmedUp = false;
-        mIsPlaybackWarmUpStarted = false;
+        resetPlaybackWarmUp();
 
         for (AccountChangeListener listener : mAccountListeners) {
             listener.onAccountChanged(account);
         }
+    }
+
+    /**
+     * The caches were cleared (see ViewManager#clearCaches), the poToken and the player's data with them: the warm-up runs again when
+     * the sections load, not by the first video opened. Left and opened again in the same process, two starts made their poToken
+     * themselves (EENAQFZF: 1419 ms of 3058, 961 ms of 2169), the warm-up held back by its last run minutes before (see
+     * #warmUpPlaybackIfExpired).
+     */
+    public void onCachesCleared() {
+        resetPlaybackWarmUp();
+    }
+
+    private void resetPlaybackWarmUp() {
+        mIsPlaybackWarmedUp = false;
+        mIsPlaybackWarmUpStarted = false;
     }
 
     /**
