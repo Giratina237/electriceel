@@ -476,6 +476,7 @@
   <string name="collaborations_desc">頻道顯示為「X and Y」的影片，其中 X 和 Y 都是頻道名稱。每個名稱都會以未登入的頻道搜尋查詢一次。僅限英文。</string>
   <string name="collaborations_sections">區塊</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">合作者</string>
   <string name="watch_later">稍後觀看</string>
   <string name="watch_later_show">顯示</string>
   <string name="watch_later_mark">標記</string>
@@ -635,8 +636,7 @@
   <string name="pressing_home_back">按首頁鍵或返回鍵</string>
   <string name="pressing_back">按返回鍵</string>
   <string name="player_number_key_seek">用數字鍵跳轉</string>
-  <string name="save_remove_playlist">從播放清單區塊新增 / 刪除播放清單</string>
-  <string name="remove_playlist">從播放清單區塊永久刪除播放清單</string>
+  <string name="add_delete_playlist">新增至播放清單區塊/刪除播放清單</string>
   <string name="removed_from_playlists">已從播放清單區塊刪除</string>
   <string name="saved_to_playlists">已新增到播放清單區塊</string>
   <string name="create_playlist">建立播放清單</string>
@@ -884,6 +884,8 @@
   <string name="action_sound_off">靜音</string>
   <string name="remember_position_of_live_videos">記住直播串流的播放位置</string>
   <string name="save_playlist">將播放清單加入到播放清單區塊</string>
+  <string name="delete_playlist">刪除播放清單</string>
+  <string name="delete_playlist_fmt">要刪除播放清單 %s 嗎？</string>
   <string name="dearrow_status">檢查 DeArrow 伺服器狀態</string>
   <string name="old_channel_look">舊版頻道頁面外觀</string>
   <string name="hide_watched_from_notifications">從通知隱藏已觀看的影片</string>
@@ -989,7 +991,6 @@
   <string name="hide_shorts_from_gaming">在遊戲中隱藏 Shorts</string>
   <string name="hide_shorts_from_news">在新聞中隱藏 Shorts</string>
   <string name="hide_shorts_from_music">在音樂中隱藏 Shorts</string>
-  <string name="remove_playlist_fmt">要永久移除 %s 嗎？</string>
   <string name="dont_resize_video_to_fit_dialog">不調整影片大小來配合對話框</string>
   <string name="play_from_start">從頭播放</string>
   <string name="player_chapter_notification2">點選通知即可切換至下一章節</string>

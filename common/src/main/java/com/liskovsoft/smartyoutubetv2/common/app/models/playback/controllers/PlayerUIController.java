@@ -7,6 +7,7 @@ import android.view.KeyEvent;
 import com.liskovsoft.googlecommon.common.helpers.ServiceHelper;
 import com.liskovsoft.mediaserviceinterfaces.MediaItemService;
 import com.liskovsoft.mediaserviceinterfaces.ServiceManager;
+import com.liskovsoft.mediaserviceinterfaces.data.Collaborator;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItem;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItemMetadata;
@@ -29,6 +30,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.SearchPresenter;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.CollaboratorsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.VideoMenuPresenter.VideoMenuCallback;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.AutoFrameRateSettingsPresenter;
@@ -390,7 +392,7 @@ public class PlayerUIController extends BasePlayerController {
 
         getPlayer().setButtonState(R.id.action_thumbs_up, PlayerUI.BUTTON_OFF);
         getPlayer().setButtonState(R.id.action_thumbs_down, PlayerUI.BUTTON_OFF);
-        getPlayer().setChannelIcon(null);
+        getPlayer().setChannelIcons(null);
         getPlayer().setButtonState(R.id.action_playlist_add, PlayerUI.BUTTON_OFF);
         getPlayer().setButtonState(R.id.lb_control_closed_captioning, PlayerUI.BUTTON_OFF);
         getPlayer().setButtonState(R.id.action_video_speed, PlayerUI.BUTTON_OFF);
@@ -420,7 +422,7 @@ public class PlayerUIController extends BasePlayerController {
         mConfirmedLikeStatus = -1;
         setLikeButtons(metadata.getLikeStatus());
         if (getPlayerTweaksData().isRealChannelIconEnabled()) {
-            getPlayer().setChannelIcon(metadata.getAuthorImageUrl());
+            getPlayer().setChannelIcons(getChannelIconUrls(metadata));
         }
         setPlaylistAddButtonStateCached();
         setSubtitleButtonState();
@@ -793,7 +795,13 @@ public class PlayerUIController extends BasePlayerController {
         } else if (buttonId == R.id.action_repeat) {
             applyRepeatMode(buttonState);
         } else if (buttonId == R.id.action_channel) {
-            openChannel();
+            Video video = getVideo();
+
+            if (video != null && video.hasCollaborators()) {
+                showCollaborators(video);
+            } else {
+                openChannel();
+            }
         } else if (buttonId == R.id.action_playback_queue) {
             AppDialogUtil.showPlaybackQueueDialog(getContext(), item -> {
                 VideoStarts.start(item.videoId, VideoStart.TRIGGER_QUEUE);
@@ -1250,6 +1258,7 @@ public class PlayerUIController extends BasePlayerController {
         }
 
         getVideo().isSubscribed = buttonState == PlayerUI.BUTTON_OFF;
+        syncCollaboratorSubscription(getVideo());
         getPlayer().setButtonState(R.id.action_subscribe, buttonState == PlayerUI.BUTTON_OFF ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
     }
 
@@ -1388,8 +1397,15 @@ public class PlayerUIController extends BasePlayerController {
             items.add(UiOptionItem.from(item.getTitle(), optionItem -> {
                 if (optionItem.isSelected()) {
                     MediaServiceManager.instance().setNotificationState(item, error -> MessageHelpers.showMessage(getContext(), error.getLocalizedMessage()));
-                    getVideo().isSubscribed = true;
-                    getPlayer().setButtonState(R.id.action_subscribe, PlayerUI.BUTTON_ON);
+                    // The player may be gone by the time a row is picked (the video is held weakly, see PlaybackPresenter.getVideo)
+                    Video video = getVideo();
+                    if (video != null) {
+                        video.isSubscribed = true;
+                        syncCollaboratorSubscription(video);
+                    }
+                    if (getPlayer() != null) {
+                        getPlayer().setButtonState(R.id.action_subscribe, PlayerUI.BUTTON_ON);
+                    }
                 }
             }, item.isSelected()));
         }
@@ -1434,13 +1450,73 @@ public class PlayerUIController extends BasePlayerController {
     }
 
     private void openChannel() {
-        Video video = getVideo();
+        openChannel(getVideo());
+    }
 
+    /**
+     * @param item the video, or a channel of its collaboration (see Video.collaborators)
+     */
+    private void openChannel(Video item) {
         // Child mode keeps to the subscribed channels. Checked before the player goes to the background.
-        ChildModeManager.instance(getContext()).checkChannel(getContext(), video != null ? video.channelId : null, () -> {
+        ChildModeManager.instance(getContext()).checkChannel(getContext(), item != null ? item.channelId : null, () -> {
             startTempBackgroundMode(ChannelPresenter.class);
-            ChannelPresenter.instance(getContext()).openChannel(video);
+            ChannelPresenter.instance(getContext()).openChannel(item);
         });
+    }
+
+    /**
+     * The channels of the collaboration, as YouTube's Collaborators panel: each one opened, subscribed to or blocked
+     */
+    private void showCollaborators(Video video) {
+        CollaboratorsPresenter.instance(getContext()).show(video.collaborators, new CollaboratorsPresenter.Listener() {
+            @Override
+            public void onOpenChannel(Video channel) {
+                openChannel(channel);
+            }
+
+            @Override
+            public void onSubscriptionChanged(Video channel) {
+                // The Subscribe button is the uploader's
+                if (getPlayer() != null && video == getVideo() && Helpers.equals(channel.channelId, video.channelId)) {
+                    video.isSubscribed = channel.isSubscribed;
+                    getPlayer().setButtonState(R.id.action_subscribe, video.isSubscribed ? PlayerUI.BUTTON_ON : PlayerUI.BUTTON_OFF);
+                }
+            }
+        });
+    }
+
+    /**
+     * The uploader's row of the Collaborators panel follows the Subscribe button
+     */
+    private static void syncCollaboratorSubscription(Video video) {
+        for (Video channel : video.collaborators) {
+            if (Helpers.equals(channel.channelId, video.channelId)) {
+                channel.isSubscribed = video.isSubscribed;
+            }
+        }
+    }
+
+    /**
+     * The uploader's avatar, or the first two of a collaboration's channels
+     */
+    private static List<String> getChannelIconUrls(MediaItemMetadata metadata) {
+        List<String> urls = new ArrayList<>();
+
+        for (Collaborator collaborator : metadata.getCollaborators()) {
+            if (collaborator.getAvatarUrl() != null) {
+                urls.add(collaborator.getAvatarUrl());
+            }
+        }
+
+        if (urls.size() < 2) {
+            urls.clear();
+
+            if (metadata.getAuthorImageUrl() != null) {
+                urls.add(metadata.getAuthorImageUrl());
+            }
+        }
+
+        return urls;
     }
 
     private void showDebugInfo() {

@@ -508,6 +508,7 @@
     <string name="collaborations_desc">Kanalı \"X and Y\" olarak görünen, X ve Y\'nin ikisinin de kanal adı olduğu video. Her ad, oturum açmadan yapılan bir kanal aramasıyla bir kez denetlenir. Yalnızca İngilizce.</string>
     <string name="collaborations_sections">Bölümler</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Ortak çalışanlar</string>
     <string name="watch_later">Daha sonra izle</string>
     <string name="watch_later_show">Göster</string>
     <string name="watch_later_mark">İşaretle</string>
@@ -688,10 +689,10 @@
     <string name="pressing_home_back">ANA EKRAN\'a ya da GERİ\'ye basarak</string>
     <string name="pressing_back">GERİ\'ye basarak</string>
     <string name="player_number_key_seek">Sayı tuşlarıyla arama</string>
-    <string name="save_remove_playlist">Oynatma listesini Oynatma Listeleri bölümüne Ekle/Kaldır</string>
+    <string name="add_delete_playlist">Oynatma Listelerine ekle/Oynatma listesini sil</string>
     <string name="save_playlist">Oynatma listesini Oynatma Listeleri bölümüne Ekle</string>
-    <string name="remove_playlist">Oynatma listesini Oynatma Listeleri bölümünden kalıcı olarak kaldır</string>
-    <string name="remove_playlist_fmt">%s\'yi kalıcı olarak kaldır?</string>
+    <string name="delete_playlist">Oynatma listesini sil</string>
+    <string name="delete_playlist_fmt">%s oynatma listesi silinsin mi?</string>
     <string name="removed_from_playlists">Oynatma Listeleri bölümünden kaldırıldı</string>
     <string name="saved_to_playlists">Oynatma Listeleri bölümüne eklendi</string>
     <string name="create_playlist">Oynatma listesi oluştur</string>

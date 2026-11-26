@@ -61,6 +61,11 @@ public interface OptionItem {
      */
     void setSelectAll(OptionItem... items);
     OptionItem[] getSelectAll();
+    /**
+     * A single button's image, shown round at the start of its row (e.g. a channel's avatar). Null: none.
+     */
+    void setIconUrl(String iconUrl);
+    String getIconUrl();
     ChatReceiver getChatReceiver();
     CommentsReceiver getCommentsReceiver();
 }

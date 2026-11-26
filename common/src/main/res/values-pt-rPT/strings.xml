@@ -507,6 +507,7 @@
     <string name="collaborations_desc">Um vídeo cujo canal aparece como \"X and Y\", em que X e Y são nomes de canais. Cada nome é verificado uma vez com uma pesquisa de canais sem sessão iniciada. Só em inglês.</string>
     <string name="collaborations_sections">Secções</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Colaboradores</string>
     <string name="watch_later">Ver mais tarde</string>
     <string name="watch_later_show">Mostrar</string>
     <string name="watch_later_mark">Marcar</string>
@@ -687,10 +688,10 @@
     <string name="pressing_home_back">ao tocar em HOME ou BACK</string>
     <string name="pressing_back">ao tocar em BACK</string>
     <string name="player_number_key_seek">Avançar/recuar com teclas numéricas</string>
-    <string name="save_remove_playlist">Adicionar/remover esta lista de reprodução da secção Listas de reprodução</string>
+    <string name="add_delete_playlist">Adicionar às Listas de reprodução/Eliminar lista de reprodução</string>
     <string name="save_playlist">Adicionar lista de reprodução à secção Listas de reprodução</string>
-    <string name="remove_playlist">Remover lista de reprodução da secção Listas de reprodução</string>
-    <string name="remove_playlist_fmt">Remover %s permanentemente\?</string>
+    <string name="delete_playlist">Eliminar lista de reprodução</string>
+    <string name="delete_playlist_fmt">Eliminar a lista de reprodução %s?</string>
     <string name="removed_from_playlists">Removido da secção Listas de reprodução</string>
     <string name="saved_to_playlists">Adicionado à secção Listas de reprodução</string>
     <string name="create_playlist">Criar lista de reprodução</string>

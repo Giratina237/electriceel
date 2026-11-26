@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 
 import com.liskovsoft.mediaserviceinterfaces.data.ItemGroup;
 import com.liskovsoft.mediaserviceinterfaces.data.ChapterItem;
+import com.liskovsoft.mediaserviceinterfaces.data.Collaborator;
 import com.liskovsoft.mediaserviceinterfaces.data.DislikeData;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaItem;
@@ -31,6 +32,7 @@ import com.liskovsoft.googlecommon.common.helpers.YouTubeHelper;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
@@ -130,6 +132,11 @@ public final class Video {
     private long durationMs = -1;
     private WeakReference<VideoGroup> group; // Memory leak fix. Used to get next page when scrolling.
     public List<NotificationState> notificationStates;
+    /**
+     * The channels of a collaboration, the uploader's first, as channel items (see from(Collaborator)). Empty for one channel's video.
+     * Once the metadata is synced.
+     */
+    public List<Video> collaborators = Collections.emptyList();
 
     public Video() {
        // NOP
@@ -269,6 +276,28 @@ public final class Video {
         video.cardImageUrl = channel.getIconUrl();
         video.channelId = channel.getChannelId();
         return video;
+    }
+
+    /**
+     * A channel of a collaboration, as a channel item: blocked, subscribed to and opened as one (see CollaboratorsPresenter)
+     */
+    public static Video from(Collaborator collaborator) {
+        Video video = new Video();
+        video.channelId = collaborator.getChannelId();
+        video.title = collaborator.getTitle();
+        video.author = collaborator.getTitle();
+        video.channelHandle = collaborator.getHandle();
+        video.cardImageUrl = collaborator.getAvatarUrl();
+        video.subscriberCount = collaborator.getSubscriberCount();
+        video.isSubscribed = collaborator.isSubscribed();
+        return video;
+    }
+
+    /**
+     * The video is a collaboration of channels (see collaborators)
+     */
+    public boolean hasCollaborators() {
+        return collaborators.size() > 1;
     }
     ///**
     // * Don't change the logic from equality by reference!<br/>
@@ -906,6 +935,7 @@ public final class Video {
         subscriberCount = metadata.getSubscriberCount();
         notificationStates = metadata.getNotificationStates();
         author = metadata.getAuthor();
+        collaborators = fromCollaborators(metadata.getCollaborators());
         durationMs = metadata.getDurationMs();
         // A card may not say it (e.g. the next video of autoplay, a link): the video's own badge does
         if (metadata.getMembersLabel() != null) {
@@ -913,6 +943,25 @@ public final class Video {
         }
         mediaItem = toMediaItem(); // Fix subscribe during playback (see PlayerUIController.callMediaItemObservable)
         isSynced = true;
+    }
+
+    /**
+     * As channel items (see from(Collaborator)). Empty for one channel's video.
+     */
+    public static List<Video> fromCollaborators(List<Collaborator> collaborators) {
+        if (collaborators == null || collaborators.size() < 2) {
+            return Collections.emptyList();
+        }
+
+        List<Video> result = new ArrayList<>();
+
+        for (Collaborator collaborator : collaborators) {
+            if (collaborator != null && collaborator.getChannelId() != null) {
+                result.add(from(collaborator));
+            }
+        }
+
+        return result.size() > 1 ? result : Collections.emptyList();
     }
 
     /**

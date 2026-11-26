@@ -472,6 +472,7 @@
     <string name="collaborations_desc">วิดีโอที่ช่องแสดงเป็น \"X and Y\" โดย X และ Y เป็นชื่อช่องทั้งคู่ แต่ละชื่อจะถูกตรวจสอบหนึ่งครั้งด้วยการค้นหาช่องโดยไม่ลงชื่อเข้าใช้ ภาษาอังกฤษเท่านั้น</string>
     <string name="collaborations_sections">ส่วน</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">ผู้ร่วมงาน</string>
     <string name="watch_later">ดูภายหลัง</string>
     <string name="watch_later_show">แสดง</string>
     <string name="watch_later_mark">ทำเครื่องหมาย</string>
@@ -686,10 +687,10 @@
     <string name="pressing_home_back">โดยกด HOME หรือ BACK</string>
     <string name="pressing_back">โดยกด BACK</string>
     <string name="player_number_key_seek">ข้ามด้วยปุ่มตัวเลข</string>
-    <string name="save_remove_playlist">เพิ่ม/ลบเพลย์ลิสต์ในส่วนเพลย์ลิสต์</string>
+    <string name="add_delete_playlist">เพิ่มในส่วนเพลย์ลิสต์/ลบเพลย์ลิสต์</string>
     <string name="save_playlist">เพิ่มเพลย์ลิสต์ในส่วนเพลย์ลิสต์</string>
-    <string name="remove_playlist">ลบเพลย์ลิสต์ออกจากส่วนเพลย์ลิสต์อย่างถาวร</string>
-    <string name="remove_playlist_fmt">ลบ %s อย่างถาวรหรือไม่?</string>
+    <string name="delete_playlist">ลบเพลย์ลิสต์</string>
+    <string name="delete_playlist_fmt">ลบเพลย์ลิสต์ %s หรือไม่?</string>
     <string name="removed_from_playlists">ลบออกจากส่วนเพลย์ลิสต์แล้ว</string>
     <string name="saved_to_playlists">เพิ่มในส่วนเพลย์ลิสต์แล้ว</string>
     <string name="create_playlist">สร้างเพลย์ลิสต์</string>

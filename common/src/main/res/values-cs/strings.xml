@@ -512,6 +512,7 @@
     <string name="collaborations_desc">Video, jehož kanál je zobrazen jako \"X and Y\", kde X i Y jsou názvy kanálů. Každý název se jednou ověří vyhledáním kanálu bez přihlášení. Jen v angličtině.</string>
     <string name="collaborations_sections">Sekce</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Spolupracovníci</string>
     <string name="watch_later">Přehrát později</string>
     <string name="watch_later_show">Zobrazit</string>
     <string name="watch_later_mark">Označit</string>
@@ -692,10 +693,10 @@
     <string name="pressing_home_back">stisknutím tlačítka DOMŮ nebo ZPĚT</string>
     <string name="pressing_back">stisknutím tlačítka ZPĚT</string>
     <string name="player_number_key_seek">Posuv pomocí čísel</string>
-    <string name="save_remove_playlist">Přidat/Odebrat playlist ze sekce Playlisty</string>
+    <string name="add_delete_playlist">Přidat do sekce Playlisty/smazat playlist</string>
     <string name="save_playlist">Přidat playlist do sekce Playlisty</string>
-    <string name="remove_playlist">Odstranit playlist ze sekce Playlisty natrvalo</string>
-    <string name="remove_playlist_fmt">Trvale smazat %s ?</string>
+    <string name="delete_playlist">Smazat playlist</string>
+    <string name="delete_playlist_fmt">Smazat playlist %s?</string>
     <string name="removed_from_playlists">Odstraněno ze sekce Playlisty</string>
     <string name="saved_to_playlists">Přidáno do sekce Playlisty</string>
     <string name="create_playlist">Vytvořit playlist</string>

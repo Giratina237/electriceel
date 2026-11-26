@@ -479,6 +479,7 @@
     <string name="collaborations_desc">Vaizdo įrašas, kurio kanalas rodomas kaip \"X and Y\", kur X ir Y abu yra kanalų pavadinimai. Kiekvienas pavadinimas patikrinamas vieną kartą kanalų paieška neprisijungus. Tik anglų kalba.</string>
     <string name="collaborations_sections">Skiltys</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Bendradarbiai</string>
     <string name="watch_later">Žiūrėti vėliau</string>
     <string name="watch_later_show">Rodyti</string>
     <string name="watch_later_mark">Žymėti</string>
@@ -646,8 +647,7 @@
     <string name="pressing_home">spaudžiant mygtuką \„Namai\“</string>
     <string name="pressing_home_back">spaudžiant mygtuką \„Namai\“ arba \„Atgal\“</string>
     <string name="player_number_key_seek">Vaizdą prasukti skaičių klavišais</string>
-    <string name="save_remove_playlist">Pridėti/pašalinti grojaraštį iš grojaraščių skyriaus</string>
-    <string name="remove_playlist">Pašalinti grojaraštį iš grojaraščių skyriaus</string>
+    <string name="add_delete_playlist">Pridėti prie skilties Grojaraščiai/ištrinti grojaraštį</string>
     <string name="removed_from_playlists">Grojaraštis pašalintas iš grojaraščių skyriaus</string>
     <string name="saved_to_playlists">Grojaraštis pridėtas prie grojaraščių skyriaus</string>
     <string name="create_playlist">Sukurti grojaraštį</string>
@@ -734,7 +734,8 @@
     <string name="remember_position_of_live_videos">Atsiminti tiesioginės transliacijos poziciją</string>
     <string name="pressing_back">paspaudus BACK</string>
     <string name="save_playlist">Pridėti grojaraštį prie skilties Grojaraščiai</string>
-    <string name="remove_playlist_fmt">Visam laikui pašalinti %s?</string>
+    <string name="delete_playlist">Ištrinti grojaraštį</string>
+    <string name="delete_playlist_fmt">Ištrinti grojaraštį %s?</string>
     <string name="create_playlist_note">PASTABA: jo nebus matyti „YouTube“ programoje</string>
     <string name="playlist_order">Rūšiuoti grojaraštį</string>
     <string name="playlist_order_added_date_newer_first">Pridėjimo data (naujesni pirmi)</string>

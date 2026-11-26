@@ -470,6 +470,7 @@
   <string name="collaborations_desc">Video, jonka kanava näytetään muodossa \"X and Y\", jossa X ja Y ovat molemmat kanavien nimiä. Jokainen nimi tarkistetaan kerran kanavahaulla ilman kirjautumista. Vain englanniksi.</string>
   <string name="collaborations_sections">Osiot</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Yhteistyökumppanit</string>
   <string name="watch_later">Katso myöhemmin</string>
   <string name="watch_later_show">Näytä</string>
   <string name="watch_later_mark">Merkitse</string>
@@ -635,8 +636,7 @@
   <string name="pressing_home">painamalla Koti</string>
   <string name="pressing_home_back">painamalla Koti tai takaisin</string>
   <string name="player_number_key_seek">Etsi numeronäppäimillä</string>
-  <string name="save_remove_playlist">Lisää/poista soittolista soittolistat-osiosta</string>
-  <string name="remove_playlist">Poista soittolista</string>
+  <string name="add_delete_playlist">Lisää soittolistat-osioon/poista soittolista</string>
   <string name="removed_from_playlists">Soittolista poistettu</string>
   <string name="saved_to_playlists">Lisätty soittolistat-osioon</string>
   <string name="create_playlist">Luo soittolista</string>
@@ -902,6 +902,8 @@
   <string name="action_sound_off">Ääni pois</string>
   <string name="remember_position_of_live_videos">Muista livestriimin kohta</string>
   <string name="save_playlist">Lisää soittolista soittolistat-osioon</string>
+  <string name="delete_playlist">Poista soittolista</string>
+  <string name="delete_playlist_fmt">Poistetaanko soittolista %s?</string>
   <string name="skip_shorts">Ohita shortit</string>
   <string name="speech_engine">Äänihaun tekniikka</string>
   <string name="dearrow_status">Tarkista DeArrow-palvelimen tilanne</string>
@@ -992,7 +994,6 @@
   <string name="hide_shorts_from_gaming">Piilota Short-videot Peleistä</string>
   <string name="hide_shorts_from_news">Piilota Short-videot Uutisista</string>
   <string name="hide_shorts_from_music">Piilota Short-videot Musiikista</string>
-  <string name="remove_playlist_fmt">Poistetaanko %s pysyvästi\?</string>
   <string name="typing_corrections">Poista automaattinen korjaus käytöstä tekstiä kirjoitettaessa</string>
   <string name="suggestions_horizontally_scrolled">Vaakasuunnassa vieritettävät ehdotukset</string>
   <string name="stable_restore">Palauta vakaa versio (kaikki Electric Eelin tiedot menetetään)</string>

@@ -474,6 +474,7 @@
   <string name="collaborations_desc">En video, hvis kanal vises som \"X and Y\", hvor X og Y begge er kanalnavne. Hvert navn slås op én gang med en kanalsøgning uden login. Kun engelsk.</string>
   <string name="collaborations_sections">Sektioner</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Samarbejdspartnere</string>
   <string name="watch_later">Se senere</string>
   <string name="watch_later_show">Vis</string>
   <string name="watch_later_mark">Markér</string>
@@ -708,8 +709,7 @@
   <string name="pressing_home_back">ved at trykke på HJEM eller TILBAGE</string>
   <string name="pressing_back">ved at trykke på TILBAGE</string>
   <string name="player_number_key_seek">Spol med numeriske taster</string>
-  <string name="save_remove_playlist">Tilføj/fjern playliste fra Playlister-sektionen</string>
-  <string name="remove_playlist">Fjern playliste fra Playlister-sektionen permanent</string>
+  <string name="add_delete_playlist">Føj til Playlister/slet playliste</string>
   <string name="removed_from_playlists">Fjernet fra Playlister-sektionen</string>
   <string name="saved_to_playlists">Føjet til Playlister-sektionen</string>
   <string name="create_playlist">Opret playliste</string>
@@ -893,6 +893,8 @@
   <string name="hide_shorts_from_music">Skjul Shorts i Musik</string>
   <string name="remember_position_of_live_videos">Husk position af livestreams</string>
   <string name="save_playlist">Føj playliste til Playlister-sektionen</string>
+  <string name="delete_playlist">Slet playliste</string>
+  <string name="delete_playlist_fmt">Slet playlisten %s?</string>
   <string name="skip_shorts">Spring shorts over</string>
   <string name="suggestions">Forslag</string>
   <string name="place_comments_left">Placer kommentarer til venstre</string>
@@ -980,7 +982,6 @@
   <string name="long_press_for_options">LANGT TRYK FOR VALGMULIGHEDER</string>
   <string name="original_lang">Original</string>
   <string name="search_exit_shortcut">Afslut søgning</string>
-  <string name="remove_playlist_fmt">Fjern %s permanent\?</string>
   <string name="video_flip">Vend (spejl)</string>
   <string name="player_chapter_notification2">Skift til næste kapitel ved at klikke på notifikationen</string>
   <string name="player_audio_focus">Lydfokus (pause, hvis andre afspillere registreres)</string>

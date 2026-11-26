@@ -504,6 +504,7 @@
   <string name="collaborations_desc">Film, którego kanał jest pokazany jako \"X and Y\", gdzie X i Y to nazwy kanałów. Każda nazwa jest sprawdzana raz wyszukiwaniem kanałów bez logowania. Tylko po angielsku.</string>
   <string name="collaborations_sections">Sekcje</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Współpracownicy</string>
   <string name="watch_later">Do obejrzenia</string>
   <string name="watch_later_show">Pokazuj</string>
   <string name="watch_later_mark">Oznaczaj</string>
@@ -676,9 +677,10 @@
   <string name="pressing_home_back">naciskając DOM lub WSTECZ</string>
   <string name="pressing_back">naciskając WSTECZ</string>
   <string name="player_number_key_seek">Przewijaj za pomocą klawiszy numerycznych</string>
-  <string name="save_remove_playlist">Zapisz/Usuń tę playlistę z sekcji playlist</string>
+  <string name="add_delete_playlist">Dodaj do sekcji Playlisty/Usuń playlistę</string>
   <string name="save_playlist">Dodaj playlistę odtwarzania do sekcji playlisty</string>
-  <string name="remove_playlist">Skasuj na zawsze listę odtwarzania z sekcji listy odtwarzania</string>
+  <string name="delete_playlist">Usuń playlistę</string>
+  <string name="delete_playlist_fmt">Usunąć playlistę %s?</string>
   <string name="removed_from_playlists">Usunięto z sekcji listy odtwarzania</string>
   <string name="saved_to_playlists">Dodano do sekcji listy odtwarzania</string>
   <string name="create_playlist">Stwórz listę odtwarzania</string>
@@ -1004,7 +1006,6 @@
   <string name="once_a_week">Raz w tygodniu</string>
   <string name="once_a_month">Raz w miesiącu</string>
   <string name="create_playlist_note">Nie będzie widoczne w aplikacji YouTube</string>
-  <string name="remove_playlist_fmt">Usunąć %s na zawsze\?</string>
   <string name="play_from_start">Odtwórz od początku</string>
   <string name="player_chapter_notification2">Przejdź do następnego rozdziału, klikając powiadomienie</string>
   <string name="player_toggle_speed">Przełącz prędkość odtwarzania</string>

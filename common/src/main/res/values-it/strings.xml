@@ -508,6 +508,7 @@
     <string name="collaborations_desc">Un video il cui canale appare come \"X and Y\", dove X e Y sono entrambi nomi di canali. Ogni nome viene cercato una volta con una ricerca di canali senza accesso. Solo in inglese.</string>
     <string name="collaborations_sections">Sezioni</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Collaboratori</string>
     <string name="watch_later">Guarda più tardi</string>
     <string name="watch_later_show">Mostra</string>
     <string name="watch_later_mark">Contrassegna</string>
@@ -688,10 +689,10 @@
     <string name="pressing_home_back">premendo HOME o INDIETRO</string>
     <string name="pressing_back">premendo INDIETRO</string>
     <string name="player_number_key_seek">Ricerca con i tasti numerici</string>
-    <string name="save_remove_playlist">Aggiungi/Rimuovi playlist dalla sezione Playlist</string>
+    <string name="add_delete_playlist">Aggiungi alla sezione Playlist/Elimina playlist</string>
     <string name="save_playlist">Aggiungi la playlist alla sezione Playlist</string>
-    <string name="remove_playlist">Rimuovi definitivamente la playlist dalla sezione Playlist</string>
-    <string name="remove_playlist_fmt">Rimuovere %s definitivamente?</string>
+    <string name="delete_playlist">Elimina playlist</string>
+    <string name="delete_playlist_fmt">Eliminare la playlist %s?</string>
     <string name="removed_from_playlists">Rimossa dalla sezione Playlist</string>
     <string name="saved_to_playlists">Aggiunta alla sezione Playlist</string>
     <string name="create_playlist">Crea playlist</string>

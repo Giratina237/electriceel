@@ -500,6 +500,7 @@
   <string name="collaborations_desc">Një video, kanali i së cilës shfaqet si \"X and Y\", ku X dhe Y janë të dy emra kanalesh. Çdo emër kontrollohet një herë me një kërkim kanalesh pa hyrë. Vetëm në anglisht.</string>
   <string name="collaborations_sections">Seksionet</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Bashkëpunëtorët</string>
   <string name="watch_later">Shiko më vonë</string>
   <string name="watch_later_show">Shfaq</string>
   <string name="watch_later_mark">Shëno</string>
@@ -672,9 +673,10 @@
   <string name="pressing_home_back">duke shtypur KRYEFAQE ose PRAPA</string>
   <string name="pressing_back">duke shtypur PRAPA</string>
   <string name="player_number_key_seek">Kërko me butonët numerikë</string>
-  <string name="save_remove_playlist">Shto/Hiq listën e luajtjes nga seksioni Listat e luajtjes</string>
+  <string name="add_delete_playlist">Shto te Listat e luajtjes/Fshi listën e luajtjes</string>
   <string name="save_playlist">Shto listën e luajtjes në seksionin e Listat e luajtjes</string>
-  <string name="remove_playlist">Hiq përgjithmonë listën e luajtjes nga seksioni Listat e luajtjes</string>
+  <string name="delete_playlist">Fshi listën e luajtjes</string>
+  <string name="delete_playlist_fmt">Do ta fshish listën e luajtjes %s?</string>
   <string name="removed_from_playlists">U hoq nga seksioni Listat e luajtjes</string>
   <string name="saved_to_playlists">U shtua në seksionin Listat e luajtjes</string>
   <string name="create_playlist">Krijo listë për luajtje</string>
@@ -993,7 +995,6 @@
   <string name="original_lang">Origjinale</string>
   <string name="dont_resize_video_to_fit_dialog">Mos ndrysho madhësinë e videos për t\'u përshtatur me dritaren e dialogut</string>
   <string name="typing_corrections">Çaktivizo vetë-korrigjimin gjatë shtypjes së tekstit</string>
-  <string name="remove_playlist_fmt">Do ta fshish %s përgjithmonë?</string>
   <string name="player_chapter_notification2">Kalo te kapitulli tjetër duke klikuar mbi njoftimin</string>
   <string name="suggestions_horizontally_scrolled">Sugjerime të lëvizura horizontalisht</string>
   <string name="player_toggle_speed">Ndrysho shpejtësinë aktiv/joaktiv</string>

@@ -513,6 +513,7 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="collaborations_desc">סרטון שהערוץ שלו מוצג כ-\"X and Y\", כאשר X ו-Y הם שמות ערוצים. כל שם נבדק פעם אחת בחיפוש ערוצים ללא כניסה לחשבון. אנגלית בלבד.</string>
     <string name="collaborations_sections">מדורים</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">משתפי פעולה</string>
     <string name="watch_later">לצפייה בהמשך</string>
     <string name="watch_later_show">הצגה</string>
     <string name="watch_later_mark">סימון</string>
@@ -693,10 +694,10 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="pressing_home_back">על ידי לחיצה על לחצן הבית או החזרה</string>
     <string name="pressing_back">על ידי לחיצה על לחצן החזרה</string>
     <string name="player_number_key_seek">דילוג עם מקשי מספרים</string>
-    <string name="save_remove_playlist">הוספת/הסרת פלייליסט ממדור הפלייליסטים</string>
+    <string name="add_delete_playlist">הוספה לפלייליסטים/מחיקת הפלייליסט</string>
     <string name="save_playlist">הוספת פלייליסט למדור הפלייליסטים</string>
-    <string name="remove_playlist">הסרת פלייליסט ממדור הפלייליסטים לצמיתות</string>
-    <string name="remove_playlist_fmt">להסיר את %s לצמיתות?</string>
+    <string name="delete_playlist">מחיקת הפלייליסט</string>
+    <string name="delete_playlist_fmt">למחוק את הפלייליסט %s?</string>
     <string name="removed_from_playlists">הוסר ממדור הפלייליסטים</string>
     <string name="saved_to_playlists">נוסף למדור הפלייליסטים</string>
     <string name="create_playlist">יצירת פלייליסט</string>

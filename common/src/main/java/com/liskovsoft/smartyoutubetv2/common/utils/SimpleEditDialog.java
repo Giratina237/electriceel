@@ -55,6 +55,13 @@ public class SimpleEditDialog {
     }
 
     /**
+     * A search, e.g. inside a channel: the keyboard's corrections as the search setting has them (off by default)
+     */
+    public static void showSearch(Context context, String dialogTitle, String defaultValue, OnChange onChange) {
+        show(context, dialogTitle, dialogTitle, defaultValue, onChange, null, InputType.TYPE_NULL, null, null, false, true);
+    }
+
+    /**
      * A name, e.g. of a subscription group: the keyboard starts with a capital letter
      */
     public static void showName(Context context, String dialogTitle, String defaultValue, OnChange onChange) {
@@ -77,7 +84,7 @@ public class SimpleEditDialog {
                                Runnable onDismiss, boolean isEmptyAllowed) {
         show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss,
                 InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, null, NO_MICROPHONE,
-                isEmptyAllowed);
+                isEmptyAllowed, false);
     }
 
     /**
@@ -91,20 +98,21 @@ public class SimpleEditDialog {
     public static void showIpv4Address(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange,
                                        Runnable onDismiss, boolean isEmptyAllowed) {
         show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss,
-                IPV4_INPUT_TYPE, IPV4_CHARACTERS, NO_MICROPHONE, isEmptyAllowed);
+                IPV4_INPUT_TYPE, IPV4_CHARACTERS, NO_MICROPHONE, isEmptyAllowed, false);
     }
 
     private static void show(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange, Runnable onDismiss, int inputType) {
-        show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss, inputType, null, null, false);
+        show(context, dialogTitle, dialogHint, defaultValue, onChange, onDismiss, inputType, null, null, false, false);
     }
 
     /**
      * @param inputType the InputType.TYPE_* of the field, or {@link InputType#TYPE_NULL} for the one of the layout
      * @param characters the only ones the field takes, typed or pasted, null for any. The keyboard is still the inputType's.
      * @param privateImeOptions for the keyboard (see EditorInfo.privateImeOptions), null for none
+     * @param isSearch the search setting turns the keyboard's corrections off (see {@link TypingCorrection})
      */
     private static void show(Context context, String dialogTitle, String dialogHint, String defaultValue, OnChange onChange, Runnable onDismiss,
-                             int inputType, String characters, String privateImeOptions, boolean isEmptyAllowed) {
+                             int inputType, String characters, String privateImeOptions, boolean isEmptyAllowed, boolean isSearch) {
         AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.AppDialog);
         LayoutInflater inflater = LayoutInflater.from(context);
         View contentView = inflater.inflate(R.layout.simple_edit_dialog, null);
@@ -114,6 +122,9 @@ public class SimpleEditDialog {
             setCharacters(editField, characters, inputType);
         } else if (inputType != InputType.TYPE_NULL) {
             editField.setInputType(inputType);
+        }
+        if (isSearch) {
+            TypingCorrection.applySearchSetting(editField);
         }
         if (privateImeOptions != null) {
             editField.setPrivateImeOptions(privateImeOptions);

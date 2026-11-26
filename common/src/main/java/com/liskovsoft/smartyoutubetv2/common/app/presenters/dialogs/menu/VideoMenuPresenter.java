@@ -30,6 +30,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.ChannelUploadsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.AiSListReportPresenter;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.CollaboratorsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.providers.ContextMenuManager;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.providers.ContextMenuProvider;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.FilterExclusionSettingsPresenter;
@@ -37,6 +38,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.KeywordFilt
 import com.liskovsoft.smartyoutubetv2.common.app.views.ChannelUploadsView;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.smartyoutubetv2.common.misc.BlockedChannelManager;
+import com.liskovsoft.smartyoutubetv2.common.misc.CollaborationManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.KeywordFilter;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.NotInterestedManager;
@@ -628,7 +630,6 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
 
         // A card that has the channel name alone (e.g. of Home) by the channel its video has
         BlockedChannelManager blockedChannelManager = BlockedChannelManager.instance(getContext());
-        BlockedChannelData blockedChannelData = BlockedChannelData.instance(getContext());
         boolean isBlocked = blockedChannelManager.isBlocked(mVideo);
 
         String buttonText = isBlocked
@@ -637,20 +638,67 @@ public class VideoMenuPresenter extends BaseMenuPresenter {
 
         mDialogPresenter.appendSingleButton(
                 UiOptionItem.from(buttonText, optionItem -> {
-                    if (isBlocked) {
-                        blockedChannelManager.unblock(mVideo);
-                        MessageHelpers.showMessage(getContext(), R.string.channel_unblocked);
-                    } else {
-                        blockedChannelManager.block(mVideo);
-                        MessageHelpers.showMessage(getContext(), R.string.channel_blocked);
-                    }
+                    // The menu may be shown for another video by the time a collaboration's channels are known
+                    Video video = mVideo;
+                    VideoMenuCallback callback = mCallback;
 
-                    if (mCallback != null) {
-                        mCallback.onItemAction(mVideo, VideoMenuCallback.ACTION_REMOVE);
+                    if (isBlocked) {
+                        blockedChannelManager.unblock(video);
+                        onBlockChanged(video, callback, R.string.channel_unblocked);
+                    } else {
+                        blockChannel(video, callback);
                     }
-                    mDialogPresenter.closeDialog();
-                    showHideBlockedChannelsSection(blockedChannelData);
                 }));
+    }
+
+    /**
+     * A collaboration's channel is picked first, among its channels (see CollaboratorsPresenter.pickChannel): the one picked is
+     * blocked, not the uploader alone. A card tells its channels with its metadata only.
+     */
+    private void blockChannel(Video video, VideoMenuCallback callback) {
+        if (video.hasCollaborators()) {
+            pickChannelToBlock(video, video.collaborators, callback);
+            return;
+        }
+
+        if (!video.hasVideo() || !(video.isCollaboration || CollaborationManager.isCandidate(video.getAuthor()))) {
+            blockVideoChannel(video, callback);
+            return;
+        }
+
+        MessageHelpers.showMessage(getContext(), R.string.wait_data_loading);
+        mServiceManager.loadMetadata(video, metadata -> {
+            List<Video> channels = Video.fromCollaborators(metadata.getCollaborators());
+
+            if (channels.isEmpty()) {
+                blockVideoChannel(video, callback); // one channel's, e.g. "Dan and Phil"
+            } else {
+                pickChannelToBlock(video, channels, callback);
+            }
+        }, error -> blockVideoChannel(video, callback), null); // as before the channels were picked
+    }
+
+    private void blockVideoChannel(Video video, VideoMenuCallback callback) {
+        BlockedChannelManager.instance(getContext()).block(video);
+        onBlockChanged(video, callback, R.string.channel_blocked);
+    }
+
+    private void pickChannelToBlock(Video video, List<Video> channels, VideoMenuCallback callback) {
+        CollaboratorsPresenter.instance(getContext()).pickChannel(channels, getContext().getString(R.string.dialog_block_channel), channel -> {
+            // By its id: the collaborations it's in go too (see BlockedChannelManager.isBlocked)
+            BlockedChannelManager.instance(getContext()).block(channel);
+            onBlockChanged(video, callback, R.string.channel_blocked);
+        });
+    }
+
+    private void onBlockChanged(Video video, VideoMenuCallback callback, int messageResId) {
+        MessageHelpers.showMessage(getContext(), messageResId);
+
+        if (callback != null) {
+            callback.onItemAction(video, VideoMenuCallback.ACTION_REMOVE);
+        }
+        mDialogPresenter.closeDialog();
+        showHideBlockedChannelsSection(BlockedChannelData.instance(getContext()));
     }
 
     /**

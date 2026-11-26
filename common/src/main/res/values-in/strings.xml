@@ -498,6 +498,7 @@
   <string name="collaborations_desc">Video yang channel-nya ditampilkan sebagai \"X and Y\", dengan X dan Y sama-sama nama channel. Setiap nama dicek sekali dengan pencarian channel tanpa login. Khusus bahasa Inggris.</string>
   <string name="collaborations_sections">Bagian</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Kolaborator</string>
   <string name="watch_later">Tonton nanti</string>
   <string name="watch_later_show">Tampilkan</string>
   <string name="watch_later_mark">Tandai</string>
@@ -673,9 +674,10 @@
   <string name="pressing_home_back">dengan menekan HOME atau BACK</string>
   <string name="pressing_back">dengan menekan BACK</string>
   <string name="player_number_key_seek">Cari dengan tombol angka</string>
-  <string name="save_remove_playlist">Simpan/Hapus playlist dari bagian Playlist</string>
+  <string name="add_delete_playlist">Tambahkan ke Playlist/Hapus playlist</string>
   <string name="save_playlist">Tambahkan playlist ke bagian Playlist</string>
-  <string name="remove_playlist">Hapus playlist dari bagian Playlist secara permanen</string>
+  <string name="delete_playlist">Hapus playlist</string>
+  <string name="delete_playlist_fmt">Hapus playlist %s?</string>
   <string name="removed_from_playlists">Dihapus dari Playlist</string>
   <string name="saved_to_playlists">Ditambahkan ke Playlist</string>
   <string name="create_playlist">Buat playlist</string>
@@ -980,7 +982,6 @@
   <string name="proxy_test_error">Eror #%1$d: %2$s</string>
   <string name="proxy_test_status">Status #%1$d: %2$s %3$d %4$s</string>
   <string name="player_volume">Volume</string>
-  <string name="remove_playlist_fmt">Hapus permanen %s\?</string>
   <string name="create_playlist_note">CATATAN: Tidak akan terlihat di aplikasi resmi YouTube</string>
   <string name="badge_live">LIVE</string>
   <string name="add_device_view_error">Tidak dapat memperoleh kode penyandingan</string>

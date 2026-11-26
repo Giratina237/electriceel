@@ -509,6 +509,7 @@
     <string name="collaborations_desc">Video, kura kanāls parādīts kā \"X and Y\", kur X un Y ir kanālu nosaukumi. Katru nosaukumu vienreiz pārbauda ar kanālu meklēšanu bez pierakstīšanās. Tikai angļu valodā.</string>
     <string name="collaborations_sections">Sadaļas</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Sadarbības partneri</string>
     <string name="watch_later">Skatīties vēlāk</string>
     <string name="watch_later_show">Rādīt</string>
     <string name="watch_later_mark">Atzīmēt</string>
@@ -689,10 +690,10 @@
     <string name="pressing_home_back">nospiežot HOME vai BACK</string>
     <string name="pressing_back">nospiežot BACK</string>
     <string name="player_number_key_seek">Pārtīt ar ciparu taustiņiem</string>
-    <string name="save_remove_playlist">Pievienot atskaņošanas sarakstu sadaļai Atskaņošanas saraksti/noņemt no tās</string>
+    <string name="add_delete_playlist">Pievienot sadaļai Atskaņošanas saraksti/dzēst atskaņošanas sarakstu</string>
     <string name="save_playlist">Pievienot atskaņošanas sarakstu sadaļai Atskaņošanas saraksti</string>
-    <string name="remove_playlist">Neatgriezeniski noņemt atskaņošanas sarakstu no sadaļas Atskaņošanas saraksti</string>
-    <string name="remove_playlist_fmt">Neatgriezeniski noņemt %s?</string>
+    <string name="delete_playlist">Dzēst atskaņošanas sarakstu</string>
+    <string name="delete_playlist_fmt">Dzēst atskaņošanas sarakstu %s?</string>
     <string name="removed_from_playlists">Noņemts no sadaļas Atskaņošanas saraksti</string>
     <string name="saved_to_playlists">Pievienots sadaļai Atskaņošanas saraksti</string>
     <string name="create_playlist">Izveidot atskaņošanas sarakstu</string>

@@ -496,6 +496,7 @@
   <string name="collaborations_desc">Video, mille kanal on kuvatud kujul \"X and Y\", kus X ja Y on mõlemad kanalite nimed. Iga nime kontrollitakse üks kord sisselogimata kanaliotsinguga. Ainult inglise keeles.</string>
   <string name="collaborations_sections">Jaotised</string>
   <string name="collaboration_mark">Collab</string>
+  <string name="collaborators">Kaastöötajad</string>
   <string name="watch_later">Vaata hiljem</string>
   <string name="watch_later_show">Näita</string>
   <string name="watch_later_mark">Märgista</string>
@@ -667,8 +668,7 @@
   <string name="pressing_home_back">nupp KODU või TAGASI</string>
   <string name="pressing_back">nupp TAGASI</string>
   <string name="player_number_key_seek">Keri numbriklahvidega</string>
-  <string name="save_remove_playlist">Lisa/Eemalda esitusloend esitusloendite jaotisest</string>
-  <string name="remove_playlist">Kustuta esitusloend</string>
+  <string name="add_delete_playlist">Lisa jaotisse Esitusloendid/kustuta esitusloend</string>
   <string name="removed_from_playlists">Eemaldatud esitusloendite jaotisest</string>
   <string name="saved_to_playlists">Lisatud esitusloendite jaotisesse</string>
   <string name="create_playlist">Loo uus esitusloend</string>
@@ -915,7 +915,8 @@
   <string name="hide_shorts_from_music">Peida lühivideod jaotisest Muusika</string>
   <string name="remember_position_of_live_videos">Jäta otseülekande asukoht meelde</string>
   <string name="save_playlist">Lisa esitusloend jaotisse Esitusloendid</string>
-  <string name="remove_playlist_fmt">Kas eemaldada %s jäädavalt?</string>
+  <string name="delete_playlist">Kustuta esitusloend</string>
+  <string name="delete_playlist_fmt">Kas kustutada esitusloend %s?</string>
   <string name="create_playlist_note">MÄRKUS. Seda ei näe YouTube\'i rakenduses</string>
   <string name="skip_shorts">Jäta Shortsid vahele</string>
   <string name="suggestions">Soovitused</string>

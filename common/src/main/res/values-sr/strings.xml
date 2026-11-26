@@ -440,6 +440,7 @@
     <string name="collaborations_desc">Видео чији је канал приказан као \"X and Y\", где су X и Y називи канала. Сваки назив се једном проверава претрагом канала без пријаве. Само на енглеском.</string>
     <string name="collaborations_sections">Одељци</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">Сарадници</string>
     <string name="watch_later">Гледај касније</string>
     <string name="watch_later_show">Прикажи</string>
     <string name="watch_later_mark">Означи</string>
@@ -575,10 +576,10 @@
     <string name="pressing_home_back">притиском на ПОЧЕТНА или НАЗАД</string>
     <string name="pressing_back">пристиском на НАЗАД</string>
     <string name="player_number_key_seek">Премотај са тастерима бројева</string>
-    <string name="save_remove_playlist">Додај/Обриши листу из одељка Листе</string>
-    <string name="remove_playlist_fmt">Обриши %s трајно?</string>
+    <string name="add_delete_playlist">Додај у Листе/Обриши листу</string>
     <string name="save_playlist">Сачувај листу на одељку Листе</string>
-    <string name="remove_playlist">Обриши листу трајно из одељка Листе</string>
+    <string name="delete_playlist">Обриши листу</string>
+    <string name="delete_playlist_fmt">Обрисати листу %s?</string>
     <string name="removed_from_playlists">Обрисана из одељка Листе</string>
     <string name="saved_to_playlists">Додата у одељак Листе</string>
     <string name="create_playlist">Направи листу пуштања</string>

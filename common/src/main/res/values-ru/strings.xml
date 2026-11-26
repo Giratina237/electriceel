@@ -508,6 +508,7 @@
     <string name="collaborations_desc">Видео, канал которого показан как «X and Y», где X и Y — оба названия каналов. Каждое название проверяется один раз поиском каналов без входа в аккаунт. Только на английском.</string>
     <string name="collaborations_sections">Разделы</string>
     <string name="collaboration_mark">Коллаб</string>
+    <string name="collaborators">Соавторы</string>
     <string name="watch_later">Смотреть позже</string>
     <string name="watch_later_show">Показывать</string>
     <string name="watch_later_mark">Помечать</string>
@@ -688,10 +689,10 @@
     <string name="pressing_home_back">по нажатию ДОМОЙ или НАЗАД</string>
     <string name="pressing_back">по нажатию НАЗАД</string>
     <string name="player_number_key_seek">Перематывать цифровыми клавишами</string>
-    <string name="save_remove_playlist">Добавить/Удалить плейлист из раздела Плейлисты</string>
+    <string name="add_delete_playlist">Добавить в Плейлисты/Удалить плейлист</string>
     <string name="save_playlist">Добавить плейлист в раздел Плейлисты</string>
-    <string name="remove_playlist">Удалить плейлист из раздела Плейлисты навсегда</string>
-    <string name="remove_playlist_fmt">Удалить %s навсегда?</string>
+    <string name="delete_playlist">Удалить плейлист</string>
+    <string name="delete_playlist_fmt">Удалить плейлист %s?</string>
     <string name="removed_from_playlists">Удалено из раздела Плейлисты</string>
     <string name="saved_to_playlists">Добавлено в раздел Плейлисты</string>
     <string name="create_playlist">Создать плейлист</string>

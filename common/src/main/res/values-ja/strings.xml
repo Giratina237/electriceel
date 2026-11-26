@@ -506,6 +506,7 @@
     <string name="collaborations_desc">チャンネルが「X and Y」と表示され、X と Y がどちらもチャンネル名である動画。各名前はログインなしのチャンネル検索で一度だけ確認されます。英語のみ。</string>
     <string name="collaborations_sections">セクション</string>
     <string name="collaboration_mark">Collab</string>
+    <string name="collaborators">コラボレーター</string>
     <string name="watch_later">後で見る</string>
     <string name="watch_later_show">表示</string>
     <string name="watch_later_mark">マーク</string>
@@ -686,10 +687,10 @@
     <string name="pressing_home_back">ホームボタンか戻るボタンを押下</string>
     <string name="pressing_back">戻るボタンを押下</string>
     <string name="player_number_key_seek">数字ボタンでシーク</string>
-    <string name="save_remove_playlist">再生リストのセクションに追加または削除</string>
+    <string name="add_delete_playlist">再生リストのセクションに追加/再生リストを削除</string>
     <string name="save_playlist">再生リストのセクションに追加</string>
-    <string name="remove_playlist">再生リストのセクションから永久的に削除</string>
-    <string name="remove_playlist_fmt">「%s」を完全に消去しますか？</string>
+    <string name="delete_playlist">再生リストを削除</string>
+    <string name="delete_playlist_fmt">再生リスト「%s」を削除しますか？</string>
     <string name="removed_from_playlists">再生リストのセクションから削除しました</string>
     <string name="saved_to_playlists">再生リストのセクションに追加しました</string>
     <string name="create_playlist">再生リストを作成</string>
