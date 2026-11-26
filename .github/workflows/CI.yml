@@ -2,17 +2,8 @@ name: Build Debug APK
 
 on:
   push:
-    branches: [ "**" ]
+    branches: [ "master" ]
   workflow_dispatch:
-
-# A newer push to the same branch replaces the build of the older one
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  # settings.gradle builds against MediaServiceCore and SharedModules cloned next to this repo (see Build in README.md)
-  SIBLINGS_OWNER: cygnusx-1-org
 
 jobs:
   build:
@@ -20,33 +11,17 @@ jobs:
     env:
       HAS_SIGNING_KEY: ${{ secrets.SIGNING_KEY != '' }}
       HAS_VT_KEY: ${{ secrets.VIRUS_TOTAL_API_KEY != '' }}
-    defaults:
-      run:
-        working-directory: electriceel
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          path: electriceel
+          submodules: recursive
 
-      - name: Checkout MediaServiceCore
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          repository: ${{ env.SIBLINGS_OWNER }}/MediaServiceCore
-          path: MediaServiceCore
-
-      - name: Checkout SharedModules
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          repository: ${{ env.SIBLINGS_OWNER }}/SharedModules
-          path: SharedModules
-
-      # Java 24 sources (e.g. commons-io), and Gradle 9.6 doesn't run on a newer one than 25
-      - name: Set up JDK 25
+      - name: Set up JDK 17
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
-          java-version: '25'
+          java-version: '17'
           distribution: 'temurin'
           cache: 'gradle'
 
@@ -65,28 +40,23 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> keystore.properties
           echo "storeFile=${{ github.workspace }}/key.jks" >> keystore.properties
           echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > ${{ github.workspace }}/key.jks
-
+    
       - name: Grant Gradle permissions
         run: chmod +x gradlew
 
       - name: Lint with Gradle
-        if: github.ref == 'refs/heads/master'
         run: ./gradlew lintStbetaRelease
 
       - name: Upload Lint Report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: always() && github.ref == 'refs/heads/master'
+        if: always()
         with:
           name: lint-report
           path: '**/build/reports/lint-results-*.html'
           if-no-files-found: warn
 
-      # Without the signing key a release APK is unsigned and doesn't install: the debug one is signed with the key of the build
       - name: Build with Gradle
-        run: |
-          if [ "$HAS_SIGNING_KEY" = "true" ]; then VARIANT=Release; else VARIANT=Debug; fi
-          ./gradlew assembleStbeta$VARIANT
-          echo "APK_DIR=electriceel/smarttubetv/build/outputs/apk/stbeta/${VARIANT,,}" >> $GITHUB_ENV
+        run: ./gradlew clean assembleStbetaRelease
 
       - name: VirusTotal Scan
         if: ${{ env.HAS_VT_KEY == 'true' }}
@@ -95,12 +65,11 @@ jobs:
         with:
           vt_api_key: ${{ secrets.VIRUS_TOTAL_API_KEY }}
           files: |
-            ./${{ env.APK_DIR }}/*.apk
+            ./smarttubetv/build/outputs/apk/stbeta/release/*.apk
           request_rate: 4
 
       - name: VirusTotal Summary
         if: steps.vt.outcome == 'success'
-        working-directory: .
         run: |
           echo "Waiting 150s for VirusTotal engines to report..."
           sleep 150
@@ -109,7 +78,7 @@ jobs:
           echo "| Artifact Name | VirusTotal Status | Detailed Report |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
 
-          for apk in ./${{ env.APK_DIR }}/*.apk; do
+          for apk in ./smarttubetv/build/outputs/apk/stbeta/release/*.apk; do
             filename=$(basename "$apk")
             sha256=$(sha256sum "$apk" | awk '{print $1}')
 
@@ -124,26 +93,26 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: SmartTube_${{ steps.get_version.outputs.VERSION_NAME }}_arm64
-          path: ${{ env.APK_DIR }}/*_arm64-v8a.apk
+          path: ./smarttubetv/build/outputs/apk/stbeta/release/*_arm64-v8a.apk
           if-no-files-found: error
 
       - name: Upload ARMv7 APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: SmartTube_${{ steps.get_version.outputs.VERSION_NAME }}_armeabi-v7a
-          path: ${{ env.APK_DIR }}/*_armeabi-v7a.apk
+          path: ./smarttubetv/build/outputs/apk/stbeta/release/*_armeabi-v7a.apk
           if-no-files-found: error
 
       - name: Upload Universal APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: SmartTube_${{ steps.get_version.outputs.VERSION_NAME }}_universal
-          path: ${{ env.APK_DIR }}/*_universal.apk
+          path: ./smarttubetv/build/outputs/apk/stbeta/release/*_universal.apk
           if-no-files-found: error
 
       - name: Upload x86 APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: SmartTube_${{ steps.get_version.outputs.VERSION_NAME }}_x86
-          path: ${{ env.APK_DIR }}/*_x86.apk
+          path: ./smarttubetv/build/outputs/apk/stbeta/release/*_x86.apk
           if-no-files-found: error
