@@ -1,5 +1,6 @@
 package com.liskovsoft.smartyoutubetv2.tv.ui.widgets.embedplayer;
 
+import android.animation.TimeInterpolator;
 import android.content.Context;
 import android.util.AttributeSet;
 
@@ -50,6 +51,8 @@ public class EmbedPlayerView extends PlayerView implements PlaybackView {
     private final Runnable mStopPlayback = this::finish;
     private int mQuality;
     private float mPercentWatched;
+    private long mFadeInMs;
+    private TimeInterpolator mFadeInInterpolator;
 
     public EmbedPlayerView(Context context) {
         super(context);
@@ -67,11 +70,32 @@ public class EmbedPlayerView extends PlayerView implements PlaybackView {
     }
 
     private void hideView() {
+        animate().cancel();
         setAlpha(0);
     }
 
     private void showView() {
-        setAlpha(1);
+        if (mFadeInMs > 0) {
+            animate().alpha(1).setDuration(mFadeInMs).setInterpolator(mFadeInInterpolator);
+        } else {
+            setAlpha(1);
+        }
+    }
+
+    /**
+     * The preview fades in when it shows (see onVideoLoaded), not at once
+     */
+    public void setFadeIn(long durationMs, @Nullable TimeInterpolator interpolator) {
+        mFadeInMs = durationMs;
+        mFadeInInterpolator = interpolator;
+    }
+
+    /**
+     * Fades the preview out and keeps it from showing while it's being stopped
+     */
+    public void fadeOut(long durationMs) {
+        Utils.removeCallbacks(mShowView);
+        animate().alpha(0).setDuration(durationMs);
     }
 
     @Override
@@ -566,15 +590,23 @@ public class EmbedPlayerView extends PlayerView implements PlaybackView {
             mPlaybackPresenter = getPlaybackPresenter();
         }
 
-        // Fullscreen playback is running. Skipping
-        // Fix Android TV 12 playing on Home (top view check)
-        PlaybackView view = mPlaybackPresenter.getView();
-        if (view == null || view instanceof EmbedPlayerView || (!mPlaybackPresenter.isEngineInitialized() && getViewManager().getTopView() != PlaybackView.class)) {
+        if (canOpen(getContext())) {
             initPlayer();
             createPlayerObjects();
             mPlaybackPresenter.onNewVideo(video);
             mPercentWatched = video.percentWatched;
         }
+    }
+
+    /**
+     * A preview may play: the fullscreen playback isn't running (a card in the player's suggestions doesn't play)
+     */
+    public static boolean canOpen(Context context) {
+        PlaybackPresenter presenter = PlaybackPresenter.instance(context);
+        PlaybackView view = presenter.getView();
+        // Fix Android TV 12 playing on Home (top view check)
+        return view == null || view instanceof EmbedPlayerView ||
+                (!presenter.isEngineInitialized() && ViewManager.instance(context).getTopView() != PlaybackView.class);
     }
 
     private void initPlayer() {

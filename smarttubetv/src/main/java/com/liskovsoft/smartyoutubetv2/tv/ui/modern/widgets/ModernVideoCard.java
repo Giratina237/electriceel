@@ -398,6 +398,19 @@ public class ModernVideoCard extends LinearLayout {
     }
 
     /**
+     * As the classic cards (see ComplexImageView): Home, a dialog or another app stops the preview. The card keeps its focus
+     * then, and the preview doesn't start again when the window gets it back.
+     */
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        super.onWindowFocusChanged(hasWindowFocus);
+
+        if (!hasWindowFocus) {
+            stopPreview(false);
+        }
+    }
+
+    /**
      * The focus rests on the video: load its formats so it opens without waiting.
      */
     private void prefetch() {
@@ -407,7 +420,9 @@ public class ModernVideoCard extends LinearLayout {
     }
 
     private void startPreview() {
-        if (mVideo == null || !hasFocus() && !isFocused()) {
+        // The card keeps its focus on Home: the window's is needed too.
+        // In the player the fullscreen video plays: no preview, the thumbnail stays (not a black player).
+        if (mVideo == null || !hasFocus() && !isFocused() || !hasWindowFocus() || !EmbedPlayerView.canOpen(getContext())) {
             return;
         }
 
@@ -417,10 +432,10 @@ public class ModernVideoCard extends LinearLayout {
             mPreviewPlayer.setUseController(false);
             mPreviewPlayer.setMute(mPreviewType == MainUIData.CARD_PREVIEW_MUTED);
             mPreviewPlayer.setBackgroundColor(Color.BLACK);
-            mPreviewPlayer.setAlpha(0f);
+            // Fades in once its video shows, over the thumbnail till then
+            mPreviewPlayer.setFadeIn(ModernTheme.ANIM_PREVIEW_FADE_MS, ModernTheme.previewFadeInterpolator());
             // Below the duration badge and the resume bar
             mThumbFrame.addView(mPreviewPlayer, 1, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            mPreviewPlayer.animate().alpha(1f).setDuration(ModernTheme.ANIM_PREVIEW_FADE_MS).setInterpolator(ModernTheme.previewFadeInterpolator());
         }
 
         mPreviewPlayer.openVideo(mVideo);
@@ -441,7 +456,7 @@ public class ModernVideoCard extends LinearLayout {
             mThumbFrame.removeView(player);
         } else {
             player.setMute(true);
-            player.animate().alpha(0f).setDuration(ModernTheme.ANIM_FAST_MS);
+            player.fadeOut(ModernTheme.ANIM_FAST_MS);
             Utils.postDelayed(() -> {
                 player.finish();
                 mThumbFrame.removeView(player);
