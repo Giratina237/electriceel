@@ -138,6 +138,11 @@ public final class Plays {
          */
         long playingSinceMs = -1;
         /**
+         * How long it played at each speed (see PlaybackSpeed): 21 min of a 33 min video played to its end in 20 min 45 s, at 1.5x
+         * (0HCC641V -LPIayq78Zw)
+         */
+        final SpeedTimes speeds = new SpeedTimes();
+        /**
          * By what asked for them (see PlayerCommands#SOURCE_APP), in the order each first did
          */
         final Map<String, Integer> pauseCounts = new LinkedHashMap<>();
@@ -264,6 +269,19 @@ public final class Plays {
     }
 
     /**
+     * The player's speed changes (see PlaybackSpeed#onChanged): the time played till now was at the speed before
+     */
+    static void onSpeedChanged() {
+        Play play = sPlay;
+
+        if (play != null && play.playingSinceMs >= 0) {
+            long nowMs = sClock.now();
+            addPlayed(play, nowMs - play.playingSinceMs);
+            play.playingSinceMs = nowMs;
+        }
+    }
+
+    /**
      * The player was told to go to a position (see PlayerCommands#onSeek): kept with the play, written with it. A resume from 0:07 was
      * left at 0:00.711 after 858 ms played, the position the player itself gave, and nothing said what had sent it back (XF9KYTK1
      * 0zujjiTyeiA): a start's seeks are recorded only till its first frame.
@@ -379,9 +397,18 @@ public final class Plays {
 
     private static void stop(Play play) {
         if (play.playingSinceMs >= 0) {
-            play.playedMs += Math.max(0, sClock.now() - play.playingSinceMs);
+            addPlayed(play, sClock.now() - play.playingSinceMs);
             play.playingSinceMs = -1;
         }
+    }
+
+    /**
+     * Played this long at the speed it plays at now (see #onSpeedChanged)
+     */
+    private static void addPlayed(Play play, long playedMs) {
+        long addedMs = Math.max(0, playedMs);
+        play.playedMs += addedMs;
+        play.speeds.add(PlaybackSpeed.get(), addedMs);
     }
 
     private static void setPosition(Play play, long positionMs) {
@@ -400,15 +427,17 @@ public final class Plays {
     }
 
     /**
-     * {"playedMs", "end", "endPositionMs", "pauseCounts": {source: count}, "pauses": [{"ts", "positionMs", "source", "sender",
-     * "resumedAfterMs", "resumedBy"}], "seekCount", "seeks": [{"ts", "positionMs", "source", "caller"}]}: as it is now, its time played
-     * up to now
+     * {"playedMs", "speeds": [{"speed", "playedMs"}], "end", "endPositionMs", "pauseCounts": {source: count}, "pauses": [{"ts",
+     * "positionMs", "source", "sender", "resumedAfterMs", "resumedBy"}], "seekCount", "seeks": [{"ts", "positionMs", "source",
+     * "caller"}]}: as it is now, its time played up to now
      */
     private static JSONObject toJson(Play play) {
         JSONObject result = new JSONObject();
 
         try {
-            result.put("playedMs", play.playedMs + (play.playingSinceMs >= 0 ? Math.max(0, sClock.now() - play.playingSinceMs) : 0));
+            long goingOnMs = play.playingSinceMs >= 0 ? Math.max(0, sClock.now() - play.playingSinceMs) : 0;
+            result.put("playedMs", play.playedMs + goingOnMs);
+            result.put("speeds", play.speeds.toJson(goingOnMs));
 
             if (play.end != null) {
                 result.put("end", play.end);

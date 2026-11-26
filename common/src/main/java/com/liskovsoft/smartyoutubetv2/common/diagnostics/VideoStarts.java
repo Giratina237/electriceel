@@ -83,6 +83,14 @@ public final class VideoStarts {
      */
     static final long MAX_RECOVERY_MS = 10 * 60 * 1_000;
     static final String STAGE_PLAYER_SCREEN = "player screen";
+    /**
+     * The player's screen was behind another and came back (see onViewPaused), as one row from when it went
+     */
+    static final String STAGE_SCREEN_BEHIND = "screen behind";
+    /**
+     * Behind another screen this long, the start was left (see onViewPaused)
+     */
+    static final long VIEW_PAUSED_MS = 5_000;
     static final String STAGE_ENGINE_RESTART = "engine restart";
     static final String STAGE_FORMATS = "formats";
     static final String STAGE_QUEUE = "queue";
@@ -240,7 +248,7 @@ public final class VideoStarts {
      * The methods that pass a seek on to the player (see describeSeekCaller): not what made it
      */
     private static final java.util.Set<String> SEEK_PASS_THROUGHS = new java.util.HashSet<>(java.util.Arrays.asList(
-            "setPositionMs", "setResumePositionMs", "seekTo", "onSeek", "run", "handleMessage", "dispatchMessage"));
+            "setPositionMs", "setResumePositionMs", "seekTo", "onSeek", "run", "handleMessage", "dispatchMessage", "dispatchSeekTo"));
     /**
      * The whole of a fetch (see FetchStages#open): its stages are shown, not it
      */
@@ -290,6 +298,8 @@ public final class VideoStarts {
      * (e.g. a request hangs)
      */
     private static final Runnable sGiveUp = VideoStarts::giveUp;
+    @VisibleForTesting
+    static final Runnable sLeaveBehind = VideoStarts::leaveBehind;
     /**
      * The network engine the player uses (see Utils#getEffectiveNetworkEngine)
      */
@@ -522,6 +532,10 @@ public final class VideoStarts {
          * Since it's been ready and paused (see #onPlayerState), -1 when it isn't
          */
         long pausedMs = -1;
+        /**
+         * Since its screen has been behind another (see #onViewPaused), -1 when it isn't
+         */
+        long behindMs = -1;
         long modeSwitchMs = -1;
         /**
          * Of the mode switch going on: the mode asked for, and the ones the display reported (see onDisplayModeReported)
@@ -1548,6 +1562,8 @@ public final class VideoStarts {
 
         try {
             result.put("playedMs", frames.playedMs);
+            // A 50 fps video's first 10 s at 1.5x are 75 frames a second: its drops are of that rate (0HCC641V)
+            result.put("speed", Double.parseDouble(Float.toString(PlaybackSpeed.get())));
             result.put("rendered", frames.renderedFrames);
             result.put("dropped", frames.droppedFrames);
             result.put("droppedToKeyframes", frames.droppedToKeyframes);
@@ -1583,9 +1599,62 @@ public final class VideoStarts {
     }
 
     /**
+     * The player's screen went behind another while the video starts (not a dialog of its own, nor PIP, see
+     * VideoStartController#onViewPaused): left, unless it's back within VIEW_PAUSED_MS, as of when it went. A remote's start into a
+     * process just begun was recorded as left at 2.2 s, and the video played on to its end: the next start of that process, 15.6 min
+     * later, was the autoplay of a video prefetched while it played (0HCC641V gN3LBlDbUjs). Its screen came up, was behind something
+     * for a moment as the app came up, and the start was over for good.
+     */
+    public static void onViewPaused() {
+        Timer timer = sTimer;
+
+        if (timer == null || timer.behindMs >= 0) {
+            return;
+        }
+
+        timer.behindMs = sClock.now();
+        sScheduler.cancel(sLeaveBehind);
+        sScheduler.schedule(sLeaveBehind, VIEW_PAUSED_MS);
+    }
+
+    /**
+     * The player's screen is in front again: its start goes on, the time behind as a row of its own
+     */
+    public static void onViewResumed() {
+        sScheduler.cancel(sLeaveBehind);
+        Timer timer = sTimer;
+
+        if (timer == null || timer.behindMs < 0) {
+            return;
+        }
+
+        timer.open(STAGE_SCREEN_BEHIND, null, timer.behindMs).endMs = sClock.now();
+        timer.behindMs = -1;
+    }
+
+    private static void leaveBehind() {
+        Timer timer = sTimer;
+
+        if (timer != null && timer.behindMs >= 0) {
+            abandon(VideoStart.OUTCOME_LEFT, timer.behindMs);
+        }
+    }
+
+    /**
      * The start going on never played: it's recorded as it is, with why (see VideoStart#OUTCOME_LEFT), unless it was left at once
      */
     public static void abandon(String outcome) {
+        Timer timer = sTimer;
+        // Left with its screen behind another (e.g. the player closed there): as of when it went. The app's own verdicts (unplayable,
+        // upcoming) and another video's start are as of now.
+        boolean isLeftBehind = timer != null && timer.behindMs >= 0 && VideoStart.OUTCOME_LEFT.equals(outcome);
+        abandon(outcome, isLeftBehind ? timer.behindMs : -1);
+    }
+
+    /**
+     * @param atMs when it was left, in the clock's time (e.g. when its screen went behind another, see #onViewPaused), -1 for now
+     */
+    private static void abandon(String outcome, long atMs) {
         Timer timer = sTimer;
 
         if (timer == null) {
@@ -1594,7 +1663,8 @@ public final class VideoStarts {
 
         sTimer = null;
         sScheduler.cancel(sGiveUp);
-        long now = sClock.now();
+        sScheduler.cancel(sLeaveBehind);
+        long now = atMs >= 0 ? atMs : sClock.now();
 
         // A reload after a start that gave up, that didn't play either: counted, not recorded (see #onReload)
         if (timer.isRecovery) {
@@ -1668,7 +1738,8 @@ public final class VideoStarts {
             return;
         }
 
-        abandon(VideoStart.OUTCOME_GAVE_UP);
+        // Its screen behind another before its time was up (see #onViewPaused): the user left it then, it didn't give up
+        abandon(timer.behindMs >= 0 ? VideoStart.OUTCOME_LEFT : VideoStart.OUTCOME_GAVE_UP);
     }
 
     /**
@@ -1677,6 +1748,7 @@ public final class VideoStarts {
     private static void finish(Timer timer, long endMs, String outcome) {
         sTimer = null;
         sScheduler.cancel(sGiveUp);
+        sScheduler.cancel(sLeaveBehind);
         sReloadableId = timer.videoId;
 
         if (timer.isRecovery) {

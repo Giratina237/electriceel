@@ -54,6 +54,7 @@ public class FormatAttemptsTest {
     public void tearDown() {
         FormatAttempts.sClock = System::currentTimeMillis;
         FormatAttempts.resetForTesting();
+        PlaybackSpeed.resetForTesting();
         PlayerFailureLog.useForTesting(null);
         PlayerTweaksData.instance(getContext()).setPlayerDataSource(mSavedEngine);
     }
@@ -146,6 +147,68 @@ public class FormatAttemptsTest {
 
         assertEquals(25_300, attempt.getLong("soundBackMs"));
         assertEquals(FormatAttempts.STATUS_FAILED, attempt.getString("audioStatus"));
+    }
+
+    /**
+     * 0HCC641V: a 50 fps format's drops at 1.5x are 75 frames a second's. An attempt says how long it played at each speed, the time
+     * going on at the speed it plays at now.
+     */
+    @Test
+    public void anAttemptSaysHowLongItPlayedAtEachSpeed() throws Exception {
+        long[] now = {1_000_000};
+        FormatAttempts.sClock = () -> now[0];
+        FormatAttempts.onNewVideo(getContext(), "-LPIayq78Zw");
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onPlaying(true);
+        now[0] += 4_000;
+        PlaybackSpeed.onChanged(1.5f);
+        now[0] += 10_000;
+        FormatAttempts.onPlaying(false);
+        // Not playing: nothing more at any speed
+        now[0] += 5_000;
+        PlaybackSpeed.onChanged(1.25f);
+        FormatAttempts.onPlaying(true);
+        now[0] += 2_000;
+        failure("-LPIayq78Zw").record();
+
+        JSONObject attempt = mLog.readAll().get(0).getJSONObject("formats").getJSONArray("attempted").getJSONObject(0);
+        JSONArray speeds = attempt.getJSONArray("speeds");
+
+        assertEquals(16_000, attempt.getLong("playedMs"));
+        assertEquals(3, speeds.length());
+        assertEquals(1.0, speeds.getJSONObject(0).getDouble("speed"), 0);
+        assertEquals(4_000, speeds.getJSONObject(0).getLong("playedMs"));
+        assertEquals(1.5, speeds.getJSONObject(1).getDouble("speed"), 0);
+        assertEquals(10_000, speeds.getJSONObject(1).getLong("playedMs"));
+        assertEquals(1.25, speeds.getJSONObject(2).getDouble("speed"), 0);
+        assertEquals(2_000, speeds.getJSONObject(2).getLong("playedMs"));
+    }
+
+    /**
+     * 0HCC641V #1, #2: AV1 to AVC with no failure nor command before it read as a guess. The user's pick in the quality menu, and the
+     * app's for the speed, say so; a reason told long before the tracks change, or a pick of the formats playing, isn't the next one's.
+     */
+    @Test
+    public void otherFormatsPickedSayWhoPickedThem() throws Exception {
+        long[] now = {1_000_000};
+        FormatAttempts.sClock = () -> now[0];
+        FormatAttempts.onNewVideo(getContext(), "nnwnqpQ_Gho");
+        FormatAttempts.onTracks(VP9_4K, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onSelected(FormatAttempts.REASON_USER_SELECTED);
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onSelected(FormatAttempts.REASON_SPEED_CODEC);
+        FormatAttempts.onTracks(VP9_4K, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onSelected(FormatAttempts.REASON_USER_SELECTED);
+        now[0] += 60_000;
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        failure("nnwnqpQ_Gho").record();
+
+        JSONArray attempted = mLog.readAll().get(0).getJSONObject("formats").getJSONArray("attempted");
+
+        assertEquals(FormatAttempts.REASON_FIRST, attempted.getJSONObject(0).getString("reason"));
+        assertEquals(FormatAttempts.REASON_USER_SELECTED, attempted.getJSONObject(1).getString("reason"));
+        assertEquals(FormatAttempts.REASON_SPEED_CODEC, attempted.getJSONObject(2).getString("reason"));
+        assertEquals(FormatAttempts.REASON_FORMATS_CHANGED, attempted.getJSONObject(3).getString("reason"));
     }
 
     /**

@@ -88,6 +88,8 @@ public class DiagnosticsContractTest {
         FormatAttempts.sClock = System::currentTimeMillis;
         FormatAttempts.resetForTesting();
         PlayerCommands.resetForTesting();
+        PlaybackSpeed.resetForTesting();
+        Plays.resetForTesting();
         ProtectionStatuses.resetForTesting(null);
         PlayerFailureLog.useForTesting(null);
         VideoStartLog.useForTesting(null);
@@ -174,6 +176,13 @@ public class DiagnosticsContractTest {
         assertTrue(failures.toString().contains("\"" + PlayerFailure.TRACK_TEXT + "\""));
         assertTrue(failures.toString().contains("\"host\""));
         assertTrue(report.getJSONObject("app").getJSONObject("settings").has("subtitles"));
+        // The playback speed: of the failure, of the time each attempt and each play played, of a start's first seconds
+        assertEquals(1.5, failures.getJSONObject(0).getJSONObject("settings").getDouble("speed"), 0);
+        assertTrue(failures.toString().contains("\"speeds\":[{\"speed\":1.5,\"playedMs\":"));
+        assertTrue(starts.contains("\"speeds\":[{\"speed\":1.5,\"playedMs\":"));
+        assertTrue(starts.contains("\"speed\":1.5,\"rendered\""));
+        // A command to play other formats
+        assertTrue(failures.toString().contains("\"event\":\"format\""));
         // A resume: where it started, with what, and the frames decoded to get there
         assertTrue(report.getJSONArray("videoStarts").toString().contains("\"positionMs\""));
         assertTrue(report.getJSONArray("videoStarts").toString().contains("\"" + VideoStarts.STAGE_TO_POSITION + "\""));
@@ -257,8 +266,9 @@ public class DiagnosticsContractTest {
             mVideoStarts.record(start);
         };
         VideoStarts.sFramesRecorder = mVideoStarts::addFrames;
-        // How a start's play went on, added to it as its frames are
+        // How a start's play went on, added to it as its frames are, timed on the starts' clock
         Plays.sWriter = mVideoStarts::addPlay;
+        Plays.sClock = () -> fixture.now;
         // What the server made of the poToken, in the buffering
         VideoStarts.sProtection = (videoId, fromMs, toMs) -> Collections.singletonList(
                 new VideoStart.Stage(VideoStarts.STAGE_PROTECTION, PoTokenStatus.OK.name(), 1, fromMs + 400, fromMs + 400));
@@ -321,6 +331,24 @@ public class DiagnosticsContractTest {
     }
 
     /**
+     * Each reason an attempt began the schema has is one the app records, and the other way round
+     */
+    @Test
+    public void theSchemasAttemptReasonsAreTheAppsReasons() throws Exception {
+        JSONArray reasons = readSchema().getJSONObject("$defs").getJSONObject("FormatPair").getJSONObject("properties")
+                .getJSONObject("reason").getJSONArray("enum");
+        Set<String> schemaReasons = new HashSet<>();
+
+        for (int i = 0; i < reasons.length(); i++) {
+            schemaReasons.add(reasons.getString(i));
+        }
+
+        assertEquals(new HashSet<>(Arrays.asList(FormatAttempts.REASON_FIRST, FormatAttempts.REASON_FORMATS_CHANGED,
+                FormatAttempts.REASON_AFTER_FAILURE, FormatAttempts.REASON_USER_SELECTED, FormatAttempts.REASON_SPEED_CODEC)),
+                schemaReasons);
+    }
+
+    /**
      * Each outcome of a start the schema has is one the app records, and the other way round
      */
     @Test
@@ -355,6 +383,8 @@ public class DiagnosticsContractTest {
         FormatAttempts.onDecoder(false, "c2.android.eac3.decoder");
         FormatAttempts.onVideoRendered();
         FormatAttempts.onLoad(500_000, 100);
+        // At 1.5x: the time at each speed, in the attempts, the failures' settings, a start's frames and its play
+        PlaybackSpeed.onChanged(1.5f);
         FormatAttempts.onPlaying(true);
         now[0] += 15_000;
         FormatAttempts.onDroppedFrames(4);
@@ -369,6 +399,8 @@ public class DiagnosticsContractTest {
         PlayerCommands.onState(com.google.android.exoplayer2.Player.STATE_BUFFERING, 211_000);
         PlayerCommands.onState(com.google.android.exoplayer2.Player.STATE_ENDED, 212_000);
         PlayerCommands.onPlayWhenReady(true, PlayerCommands.SOURCE_MEDIA_SESSION, "com.android.bluetooth", 212_000);
+        // Told to play other formats (the user's pick in the quality menu)
+        PlayerCommands.onFormat(PlayerCommands.SOURCE_APP, 212_000);
         // Streamed by SABR: the server took the poToken, then wanted it again
         ProtectionStatuses.onStatus("video", PoTokenStatus.OK);
         ProtectionStatuses.onStatus("video", PoTokenStatus.PENDING);

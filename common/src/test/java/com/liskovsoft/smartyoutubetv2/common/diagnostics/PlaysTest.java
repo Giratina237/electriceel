@@ -42,6 +42,31 @@ public class PlaysTest {
         VideoStarts.resetForTesting();
         Plays.resetForTesting();
         PlayerCommands.resetForTesting();
+        PlaybackSpeed.resetForTesting();
+    }
+
+    /**
+     * 0HCC641V -LPIayq78Zw: 33 min of video played to its end in 20 min 45 s, at 1.5x, which nothing said. A play says how long it
+     * played at each speed.
+     */
+    @Test
+    public void aPlaySaysHowLongItPlayedAtEachSpeed() throws Exception {
+        Plays.onStarted("-LPIayq78Zw", START_TS, true);
+        mNow.addAndGet(3_000);
+        PlaybackSpeed.onChanged(1.5f);
+        mNow.addAndGet(60_000);
+        Plays.onEnded(1_996_000);
+
+        JSONArray speeds = mPlays.get(mPlays.size() - 1).getJSONArray("speeds");
+
+        assertEquals(2, speeds.length());
+        assertEquals(1.0, speeds.getJSONObject(0).getDouble("speed"), 0);
+        assertEquals(3_000, speeds.getJSONObject(0).getLong("playedMs"));
+        assertEquals(1.5, speeds.getJSONObject(1).getDouble("speed"), 0);
+        assertEquals(60_000, speeds.getJSONObject(1).getLong("playedMs"));
+        // A speed that's the same, rounded to the hundredth, isn't another
+        PlaybackSpeed.onChanged(1.500001f);
+        assertEquals(1.5f, PlaybackSpeed.get(), 0);
     }
 
     /**

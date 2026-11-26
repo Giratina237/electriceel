@@ -38,6 +38,7 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LastState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackSpeed;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.RendererWaits;
@@ -1210,6 +1211,14 @@ public class ExoPlayerController implements Player.EventListener {
     @Override
     public void onSeekProcessed() {
         mEventListener.onSeekEnd();
+    }
+
+    /**
+     * Its speed changed (see #setSpeed): the diagnostics' time played goes on at it
+     */
+    @Override
+    public void onPlaybackParametersChanged(PlaybackParameters playbackParameters) {
+        PlaybackSpeed.onChanged(playbackParameters.speed);
     }
 
     public float getSpeed() {

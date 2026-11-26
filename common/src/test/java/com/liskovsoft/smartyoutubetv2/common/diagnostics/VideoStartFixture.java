@@ -31,6 +31,11 @@ final class VideoStartFixture {
     Runnable giveUp;
     long giveUpDelayMs = -1;
     /**
+     * The start left once its screen has been behind another a while (see VideoStarts#sLeaveBehind), null when cancelled
+     */
+    Runnable leaveBehind;
+    long leaveBehindDelayMs = -1;
+    /**
      * Of the player not loading, in ms since T0: {startMs, endMs}
      */
     final List<long[]> loadHolds = new ArrayList<>();
@@ -68,6 +73,12 @@ final class VideoStartFixture {
         VideoStarts.sScheduler = new VideoStarts.Scheduler() {
             @Override
             public void schedule(Runnable task, long delayMs) {
+                if (task == VideoStarts.sLeaveBehind) {
+                    leaveBehind = task;
+                    leaveBehindDelayMs = delayMs;
+                    return;
+                }
+
                 giveUp = task;
                 giveUpDelayMs = delayMs;
             }
@@ -76,6 +87,10 @@ final class VideoStartFixture {
             public void cancel(Runnable task) {
                 if (giveUp == task) {
                     giveUp = null;
+                }
+
+                if (leaveBehind == task) {
+                    leaveBehind = null;
                 }
             }
         };
@@ -115,6 +130,15 @@ final class VideoStartFixture {
     void fireGiveUp() {
         Runnable task = giveUp;
         giveUp = null;
+        task.run();
+    }
+
+    /**
+     * The start's screen has been behind another long enough
+     */
+    void fireLeaveBehind() {
+        Runnable task = leaveBehind;
+        leaveBehind = null;
         task.run();
     }
 
