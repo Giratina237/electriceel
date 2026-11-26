@@ -192,7 +192,7 @@ public final class SettingsCatalog {
                     dialog.setFocusedItemMatcher(entry::matches);
                 }
 
-                menu.onSelect(true);
+                menu.onSelect(isPressedSelected(dialog.getCategories(), menu));
             }));
         } else if (entry.isRow) {
             dialog.setFocusedItemMatcher(entry::matches);
@@ -212,6 +212,21 @@ public final class SettingsCatalog {
     }
 
     @Nullable
+    /**
+     * As the row is pressed on the screen (see AppPreferenceManager): a button selected, a menu of a list not
+     */
+    private static boolean isPressedSelected(@Nullable List<OptionCategory> categories, OptionItem item) {
+        if (categories != null) {
+            for (OptionCategory category : categories) {
+                if (category.options != null && category.options.contains(item)) {
+                    return category.type == OptionCategory.TYPE_SINGLE_BUTTON;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private static SettingsCardsPresenter.Cards captureCards(SettingsItem card) {
         return card.onClick != null ? SettingsCapture.capture(card.onClick).cards : null;
     }
@@ -331,7 +346,7 @@ public final class SettingsCatalog {
 
                             boolean isSwitch = category.type == OptionCategory.TYPE_SINGLE_SWITCH;
                             // A button that opens a list (e.g. Order of the sidebar, Set-up sections)
-                            List<OptionCategory> opened = !isSwitch && item.isMenu() && mMenuItemTitle == null ? captureClick(item) : null;
+                            List<OptionCategory> opened = !isSwitch && item.isMenu() && mMenuItemTitle == null ? captureClick(item, true) : null;
                             // To put in order: its items, as its choices
                             List<String> items = opened != null ? getOrderItems(opened) : Collections.emptyList();
                             add(isSwitch ? SettingEntry.KIND_TOGGLE : SettingEntry.KIND_BUTTON, title, path, toText(item.getDescription()),
@@ -430,11 +445,11 @@ public final class SettingsCatalog {
          * What a row opens when clicked, null when it opens no panel
          */
         @Nullable
-        private List<OptionCategory> captureClick(OptionItem item) {
+        private List<OptionCategory> captureClick(OptionItem item, boolean selected) {
             AppDialogPresenter dialog = AppDialogPresenter.instance(mContext);
 
             try {
-                return SettingsCapture.capture(() -> item.onSelect(true)).panel;
+                return SettingsCapture.capture(() -> item.onSelect(selected)).panel;
             } catch (RuntimeException e) {
                 Log.e(TAG, "Can't look through what " + item.getTitle() + " opens: " + e);
                 return null;
@@ -470,7 +485,8 @@ public final class SettingsCatalog {
          * The rows of the menu a row opens, under the row
          */
         private void addMenu(OptionItem item, @Nullable String categoryTitle, String title, int[] cards, List<String> path) {
-            List<OptionCategory> panel = captureClick(item);
+            // A menu of a list stays unchecked as it's pressed (see AppPreferenceManager)
+            List<OptionCategory> panel = captureClick(item, false);
 
             if (panel != null) {
                 addMenuRows(panel, categoryTitle, title, cards, path);
