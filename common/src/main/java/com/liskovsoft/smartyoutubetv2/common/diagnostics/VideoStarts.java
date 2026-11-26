@@ -13,6 +13,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.RendererReadiness;
+import com.google.android.exoplayer2.source.sabr.DefaultSabrChunkSource;
 import com.google.android.exoplayer2.source.sabr.parser.SabrStream;
 import com.liskovsoft.sharedutils.cronet.CronetManager;
 import com.liskovsoft.sharedutils.helpers.Helpers;
@@ -133,6 +134,11 @@ public final class VideoStarts {
      * and the first and last asked (see ServerBackoffs)
      */
     static final String STAGE_SERVER_HOLD = "server hold";
+    /**
+     * A live stream at its head: its request for the next segment got none, and the next one waits, from then for as long (see
+     * LiveHeadWaits)
+     */
+    static final String STAGE_LIVE_HEAD = "live head";
     /**
      * What SABR's server made of the poToken when it said so, a moment: the first, then each change (see ProtectionStatuses)
      */
@@ -295,6 +301,8 @@ public final class VideoStarts {
     static LoadHoldSource sConnections = Connections::take;
     @VisibleForTesting
     static LoadHoldSource sBackoffs = ServerBackoffs::take;
+    @VisibleForTesting
+    static LoadHoldSource sLiveHeadWaits = LiveHeadWaits::take;
     @VisibleForTesting
     static ProtectionSource sProtection = ProtectionStatuses::take;
     @VisibleForTesting
@@ -668,6 +676,7 @@ public final class VideoStarts {
         }
 
         SabrStream.setBackoffListener(ServerBackoffs::onBackoff);
+        DefaultSabrChunkSource.setLiveHeadWaitListener(LiveHeadWaits::onWait);
         SabrStream.setProtectionStatusListener(ProtectionStatuses::onStatus);
         RendererReadiness.setListener(RendererWaits::onReadiness);
         // Where a Cronet opening's time went
@@ -1902,6 +1911,8 @@ public final class VideoStarts {
             result.addAll(sConnections.take(timer.prepareMs, endMs));
             // A wait asked for by the server and not waited: what's asked for in it may be answered late
             result.addAll(sBackoffs.take(timer.prepareMs, endMs));
+            // A live stream at its head: the next segment wasn't there yet, and its request waits
+            result.addAll(sLiveHeadWaits.take(timer.prepareMs, endMs));
             // Whether the server took the poToken: past its grace period, it sends no media with one it hasn't
             result.addAll(sProtection.take(timer.videoId, timer.prepareMs, endMs));
             // A load that failed: the player waits before it tries again, a gap with no row of its own
@@ -2094,6 +2105,7 @@ public final class VideoStarts {
         sLoadHolds = LoadHolds::take;
         sConnections = Connections::take;
         sBackoffs = ServerBackoffs::take;
+        sLiveHeadWaits = LiveHeadWaits::take;
         sProtection = ProtectionStatuses::take;
         sLoadErrors = LoadErrors::take;
         sRendererWaits = RendererWaits::take;

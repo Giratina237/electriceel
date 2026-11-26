@@ -128,6 +128,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
      * (see SabrExtractorInput#MIN_SWALLOW_BACKOFF_MS)
      */
     private static final long MAX_INIT_WAIT_MS = 15_000;
+    @Nullable private static volatile LiveHeadWaitListener liveHeadWaitListener;
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final int[] adaptationSetIndices;
     private final int trackType;
@@ -714,6 +715,29 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                 : Math.max(MIN_LIVE_WAIT_MS, manifest.liveSegmentTargetDurationSec * 1_000L / 4);
         nextLiveLoadTimeMs = SystemClock.elapsedRealtime() + waitMs;
         Log.d(TAG, "No new live segment: the next request waits " + waitMs + " ms");
+
+        LiveHeadWaitListener listener = liveHeadWaitListener;
+
+        if (listener != null) {
+            listener.onLiveHeadWait(trackType, waitMs);
+        }
+    }
+
+    /**
+     * Told when a live stream's request for the segment after its newest got none, the segment not there yet, and the next request
+     * waits (see maybeWaitForLiveSegment), e.g. for the app's diagnostics: a start at the head that waited for the stream had no row
+     * for it. On the loader's thread.
+     */
+    public interface LiveHeadWaitListener {
+        /**
+         * @param trackType the chunk source's, e.g. C#TRACK_TYPE_VIDEO
+         * @param waitMs how long the next request waits
+         */
+        void onLiveHeadWait(int trackType, long waitMs);
+    }
+
+    public static void setLiveHeadWaitListener(@Nullable LiveHeadWaitListener listener) {
+        liveHeadWaitListener = listener;
     }
 
     /**

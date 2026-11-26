@@ -383,6 +383,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     private void addSourceErrorDetails(PlayerFailure failure, @Nullable Throwable error) {
         try {
+            failure.clientAttempts(getSkippedClientAttempts());
+
             if (getPlayer() != null) {
                 long positionMs = getPlayer().getPositionMs();
                 long bufferedPositionMs = getPlayer().getBufferedPositionMs();
@@ -402,6 +404,30 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         } catch (RuntimeException e) {
             Log.e(TAG, "Can't read what the source failed on: %s", e.getMessage());
         }
+    }
+
+    /**
+     * Of the video's last fetch (the one the stream's formats came from, or a prefetch's, see FormatInfoWrapper#selectPlaybackFormatInfo),
+     * when a client before the one that gave them failed: why they're that client's. Signed out, autoplay went
+     * on WEB after ten videos on TV, and the 217 errors of the attestation wall that followed didn't say what TV had answered (EENAQFZF
+     * #1-#65). Null when the first client tried gave them: the player's client says as much.
+     */
+    @Nullable
+    private List<ClientAttempts.Attempt> getSkippedClientAttempts() {
+        Video video = getVideo();
+        List<ClientAttempts.Attempt> attempts = video != null ? ClientAttempts.get(video.videoId) : null;
+
+        if (attempts == null) {
+            return null;
+        }
+
+        for (ClientAttempts.Attempt attempt : attempts) {
+            if (!ClientAttempts.RESULT_OK.equals(attempt.result)) {
+                return attempts;
+            }
+        }
+
+        return null;
     }
 
     /**

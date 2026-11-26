@@ -100,6 +100,31 @@ public class DefaultSabrChunkSourceLiveTest {
         assertTrue("waited " + waitedMs + " ms", waitedMs >= 200);
     }
 
+    /**
+     * The wait is told, with its track: a start at the head that waited for the stream had no row for it (AFQQ49Z4 RJFwMQBXPUQ)
+     */
+    @Test
+    public void aLiveRequestAnsweredWithNoSegmentTellsItsWait() throws Exception {
+        long[] told = {-1, -1};
+        DefaultSabrChunkSource.setLiveHeadWaitListener((trackType, waitMs) -> {
+            told[0] = trackType;
+            told[1] = waitMs;
+        });
+
+        try {
+            DefaultSabrChunkSource source = source(liveManifest(4, audio()), 0, new FailingDataSource());
+            ChunkHolder out = new ChunkHolder();
+            source.getNextChunk(LIVE_POSITION_US, LIVE_POSITION_US, Collections.emptyList(), out);
+
+            source.onChunkLoadCompleted(out.chunk); // no segment came
+
+            assertEquals(C.TRACK_TYPE_AUDIO, told[0]);
+            assertEquals(1_000, told[1]); // a quarter of the 4 s segments
+        } finally {
+            DefaultSabrChunkSource.setLiveHeadWaitListener(null);
+        }
+    }
+
     @Test
     public void aSeekAfterAnAnswerWithNoSegmentAsksAtOnce() throws Exception {
         FailingDataSource upstream = new FailingDataSource();

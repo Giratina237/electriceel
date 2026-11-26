@@ -479,10 +479,12 @@ public final class PlayerFailure {
     }
 
     /**
-     * The same failure again: its repeats within a minute are counted, not written (see PlayerFailureLog)
+     * The same failure again: its repeats within a minute are counted, not written (see PlayerFailureLog). On another client it's
+     * another: the line of the repeats has the last one's client only, and a round of the clients at the attestation wall read as
+     * WEB repeated 8 times, the WEB_SAFARI and MWEB failures between them unseen (EENAQFZF #3).
      */
     String getSignature() {
-        return mKind + "|" + mVideoId + "|" + mErrorClass + "|" + mErrorMessage + "|" + mHttpCode;
+        return mKind + "|" + mVideoId + "|" + mClient + "|" + mErrorClass + "|" + mErrorMessage + "|" + mHttpCode;
     }
 
     JSONObject toJson(long ts, String appVersion, int appVersionCode, int account) {
