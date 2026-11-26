@@ -123,18 +123,24 @@ public final class SettingsSearch {
     }
 
     /**
-     * The words of the question, without the ones about no setting
+     * The words of the question, without the ones about no setting. All of them when there are only those (e.g. "like", a
+     * setting's name too).
      */
     static List<String> getQuestionWords(String question) {
         List<String> words = new ArrayList<>();
+        List<String> all = new ArrayList<>();
 
         for (String word : split(question)) {
             if (!STOP_WORDS.contains(word) && !words.contains(word)) {
                 words.add(word);
             }
+
+            if (!all.contains(word)) {
+                all.add(word);
+            }
         }
 
-        return words;
+        return words.isEmpty() ? all : words;
     }
 
     /**

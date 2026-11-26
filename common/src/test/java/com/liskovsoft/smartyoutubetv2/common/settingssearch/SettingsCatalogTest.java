@@ -55,6 +55,16 @@ public class SettingsCatalogTest {
         assertFalse(SettingsCapture.isActive());
     }
 
+    /**
+     * A question of words about no setting alone is searched all the same
+     */
+    @Test
+    public void search_onlyCommonWords() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+
+        assertFalse(SettingsSearch.find(catalog.getEntries(), "like", 10).isEmpty());
+    }
+
     @Test
     public void build_idsAreUnique() {
         SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
