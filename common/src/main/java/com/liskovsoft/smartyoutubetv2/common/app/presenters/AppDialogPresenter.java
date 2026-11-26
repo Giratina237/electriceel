@@ -290,8 +290,11 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
         mCategories.add(OptionCategory.chat(categoryTitle, item));
     }
 
-    public void appendCommentsCategory(CharSequence categoryTitle, OptionItem item) {
-        mCategories.add(OptionCategory.comments(categoryTitle, item));
+    /**
+     * @param subtitle on its own line under the title (e.g. the number of comments), null for none
+     */
+    public void appendCommentsCategory(CharSequence categoryTitle, CharSequence subtitle, OptionItem item) {
+        mCategories.add(OptionCategory.comments(categoryTitle, subtitle, item));
     }
 
     public void appendSingleSwitch(OptionItem optionItem) {

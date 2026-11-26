@@ -123,6 +123,8 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     private static final String SELECTED_VIDEO_ID = "SelectedVideoId";
     private static final int UPDATE_DELAY_MS = 100;
     private static final int SUGGESTIONS_START_INDEX = 1;
+    // After the comment count, as the thumbs after the like and dislike counts
+    private static final String SPEECH_BALLOON = "\uD83D\uDCAC";
     private VideoPlayerGlue mPlayerGlue;
     private SimpleExoPlayer mPlayer;
     private PlaybackPresenter mPlaybackPresenter;
@@ -1184,6 +1186,13 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
 
         if (getContext() != null && video.dislikeCount != null) {
             result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.dislikeCount, Helpers.NON_BREAKING_SPACE, Helpers.THUMB_DOWN); // color of thumb cannot be changed
+        }
+
+        // Always, unlike the likes and dislikes (Show likes/dislikes count). Before the subscribers: the modern player cuts
+        // the end of a line too long to fit. Kept in one piece where the count has a space (e.g. "1,1 тыс.").
+        if (getContext() != null && video.commentCount != null) {
+            result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.commentCount.replace(" ", Helpers.NON_BREAKING_SPACE),
+                    Helpers.NON_BREAKING_SPACE, SPEECH_BALLOON);
         }
 
         // A collaboration's would be the uploader's alone: each channel's is in the Collaborators panel (see CollaboratorsPresenter)

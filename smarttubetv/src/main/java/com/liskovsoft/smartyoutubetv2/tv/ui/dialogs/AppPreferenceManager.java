@@ -238,6 +238,8 @@ public class AppPreferenceManager {
         pref.setCommentsReceiver(optionItem.getCommentsReceiver());
 
         initDialogPreference(category, pref);
+        // The line under the title (see CommentsPreferenceDialogFragment)
+        pref.setDialogMessage(category.subtitle);
 
         return pref;
     }

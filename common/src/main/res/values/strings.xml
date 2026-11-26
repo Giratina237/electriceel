@@ -1098,6 +1098,11 @@
     <string name="enable_conscrypt_desc">Improves HTTPS, TLS, and VPN compatibility on some devices, but may occasionally cause playback issues or slower network performance</string>
     <string name="network_settings">Network settings</string>
     <string name="comments_disabled">Comments are disabled for this video</string>
+    <!-- The number as YouTube words it, e.g. "212 comments", "1.1K comments" -->
+    <plurals name="comment_count">
+        <item quantity="one">%s comment</item>
+        <item quantity="other">%s comments</item>
+    </plurals>
     <plurals name="hours">
         <item quantity="one">%s hour</item>
         <item quantity="other">%s hours</item>

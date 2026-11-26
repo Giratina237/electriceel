@@ -634,7 +634,7 @@ public class ModernPlaybackFragment extends PlaybackFragment {
             setTopMargin(subtitle, getResources().getDimensionPixelSize(R.dimen.modern_player_meta_top));
         }
 
-        // Title and metadata line (author, views, date and the SmartTube extras: likes, dislikes, subscribers) on one
+        // Title and metadata line (author, views, date and the SmartTube extras: likes, dislikes, comments, subscribers) on one
         // line each, as wide as the row leaves them (ModernTransportRowLayout), the end cut with an ellipsis
         singleLine(title);
         singleLine(subtitle);

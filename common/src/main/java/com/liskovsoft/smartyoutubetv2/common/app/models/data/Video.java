@@ -121,6 +121,10 @@ public final class Video {
     public boolean incognito;
     public String likeCount;
     public String dislikeCount;
+    /**
+     * As YouTube words it ("212", "1.1K"), null when it doesn't tell it (see MediaItemMetadata#getCommentCount)
+     */
+    public String commentCount;
     public String subscriberCount;
     public float volume = 1.0f;
     public boolean deArrowProcessed;
@@ -932,6 +936,7 @@ public final class Video {
         isSubscribed = metadata.isSubscribed();
         likeCount = metadata.getLikeCount();
         dislikeCount = metadata.getDislikeCount();
+        commentCount = metadata.getCommentCount();
         subscriberCount = metadata.getSubscriberCount();
         notificationStates = metadata.getNotificationStates();
         author = metadata.getAuthor();
