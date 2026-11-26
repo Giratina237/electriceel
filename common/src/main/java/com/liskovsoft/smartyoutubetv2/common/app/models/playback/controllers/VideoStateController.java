@@ -618,8 +618,10 @@ public class VideoStateController extends BasePlayerController {
             }
         }
 
-        // Set actual position for live videos with uncommon length
-        if (item.isLive && (state == null || state.durationMs - state.positionMs < Math.max(RESTORE_LIVE_BUFFER_MS, getLiveThreshold()))) {
+        // Set actual position for live videos with uncommon length. At 0 its position was reset with its speed kept (see resetPosition):
+        // it played from the start of its window.
+        if (item.isLive && (state == null || state.positionMs <= 0
+                || state.durationMs - state.positionMs < Math.max(RESTORE_LIVE_BUFFER_MS, getLiveThreshold()))) {
             // Add buffer. Should I take into account segment offset???
             state = new State(item, getPlayer().getDurationMs() - getLiveBuffer());
         }
