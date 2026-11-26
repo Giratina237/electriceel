@@ -287,12 +287,6 @@ public class DiagnosticsContractTest {
         VideoStarts.onPrepare();
         VideoStarts.onPlaying(false);
 
-        fixture.at(30_000);
-        VideoStarts.start("stuck", VideoStart.TRIGGER_NEXT);
-        VideoStarts.onFetch("stuck");
-        fixture.at(45_000);
-        fixture.fireGiveUp();
-
         fixture.at(50_000);
         VideoStarts.start("resumed", VideoStart.TRIGGER_OPEN);
         VideoStarts.onFetch("resumed");
@@ -314,6 +308,15 @@ public class DiagnosticsContractTest {
         VideoStarts.onFirstFrame();
         VideoStarts.onPlayerState(true, false);
         fixture.at(75_000);
+        fixture.fireGiveUp();
+
+        // Not playing a minute after its action: given up (15 s after it, it was only late)
+        fixture.at(80_000);
+        VideoStarts.start("stuck", VideoStart.TRIGGER_NEXT);
+        VideoStarts.onFetch("stuck");
+        fixture.at(95_000);
+        fixture.fireGiveUp();
+        fixture.at(140_000);
         fixture.fireGiveUp();
     }
 

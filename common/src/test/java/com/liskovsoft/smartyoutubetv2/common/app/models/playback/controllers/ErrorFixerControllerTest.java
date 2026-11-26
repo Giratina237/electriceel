@@ -7,6 +7,7 @@ import android.os.SystemClock;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.audio.AudioSink;
+import com.google.android.exoplayer2.source.sabr.SabrRefusedRequest;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.BrokenPartError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
@@ -30,8 +31,11 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.FrameDropCodecs;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SoundCodecs;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorManager;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil;
@@ -60,6 +64,7 @@ import org.robolectric.shadows.ShadowToast;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.ConnectException;
 import java.net.InetAddress;
@@ -194,7 +199,7 @@ public class ErrorFixerControllerTest {
 
         assertEquals(2, events.size());
         assertEquals(Arrays.asList("network_reload 1/3", "reload_video"), getActions(events.get(0)));
-        assertEquals(Arrays.asList("switch_next_client", "reload_video"), getActions(events.get(1)));
+        assertEquals(Arrays.asList("switch_next_client:WEB", "reload_video"), getActions(events.get(1)));
     }
 
     /**
@@ -751,7 +756,7 @@ public class ErrorFixerControllerTest {
         controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
                 new InvalidResponseCodeException(403, "Forbidden", Collections.emptyMap(), dataSpec()));
 
-        assertEquals(Arrays.asList("switch_next_client", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(Arrays.asList("switch_next_client:WEB", "reload_video"), getActions(mLog.readAll().get(0)));
     }
 
     /**
@@ -1303,7 +1308,7 @@ public class ErrorFixerControllerTest {
         controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
                 new InvalidResponseCodeException(503, "Service Unavailable", Collections.emptyMap(), dataSpec()));
 
-        assertEquals(Arrays.asList("switch_next_client", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(Arrays.asList("switch_next_client:WEB", "reload_video"), getActions(mLog.readAll().get(0)));
     }
 
     @Test
@@ -1963,7 +1968,7 @@ public class ErrorFixerControllerTest {
         controller.runFormatErrorAction(new BadWebViewException("Uncaught SyntaxError: Unexpected token"));
 
         List<JSONObject> events = mLog.readAll();
-        assertEquals(Arrays.asList("switch_next_client", "reload_video"), getActions(events.get(events.size() - 1)));
+        assertEquals(Arrays.asList("switch_next_client:WEB", "reload_video"), getActions(events.get(events.size() - 1)));
     }
 
     /**
@@ -2007,7 +2012,7 @@ public class ErrorFixerControllerTest {
 
         controller.runFormatErrorAction(new BadWebViewException("Error invoking downloadAndRunBotguard"));
 
-        assertEquals(Arrays.asList("switch_next_client", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(Arrays.asList("switch_next_client:WEB", "reload_video"), getActions(mLog.readAll().get(0)));
     }
 
     /**
@@ -2024,6 +2029,426 @@ public class ErrorFixerControllerTest {
         controller.runFormatErrorAction(new IllegalStateException(new SocketTimeoutException("failed to connect")));
 
         assertEquals(Arrays.asList(1_000, 2_000, 1_000), controller.mReloads);
+    }
+
+    /**
+     * 97Z1YWD3, signed out: the server held back each client's media at 0:59.9 with the attestation pending, and the app went from client
+     * to client, a reload each time, for minutes. Once a client comes round again, every client had its try: no reload, and the user is
+     * told to sign in.
+     */
+    @Test
+    public void theAttestationWallStopsOnceEveryClientHadItsTry() throws Exception {
+        TestController controller = new TestController(video("8aJEcMj1AOg"), "WEB", playerStub(atMs(59_917, 600_000)));
+        controller.mProtocol = PlayerFailure.PROTOCOL_SABR;
+
+        for (String client : Arrays.asList("WEB", "WEB_SAFARI", "MWEB", "WEB")) {
+            controller.mClient = client;
+            controller.onPlay();
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                    new UnexpectedLoaderException(new PoTokenError(PoTokenStatus.PENDING)));
+        }
+
+        // The same failure again: the first and the last of the repeats
+        List<JSONObject> events = mLog.readAll();
+        JSONObject first = events.get(0);
+        JSONObject last = events.get(events.size() - 1);
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(first));
+        assertEquals("PENDING", first.getJSONObject("details").getString("poTokenStatus"));
+        assertEquals(Arrays.asList("attestation_stop_sign_in"), getActions(last));
+        assertEquals(Arrays.asList("WEB", "WEB_SAFARI", "MWEB"), toList(last.getJSONObject("details").getJSONArray("wallClients")));
+        assertEquals(3, controller.mReloads.size());
+        assertEquals(RuntimeEnvironment.getApplication().getString(com.liskovsoft.smartyoutubetv2.common.R.string.msg_attestation_sign_in),
+                ShadowToast.getTextOfLatestToast());
+    }
+
+    /**
+     * Signed in, and no client asked for a sign-in: the wall is told, not a sign-in. A client that asked for one (a bot check) is told
+     * to sign in, signed in or not.
+     */
+    @Test
+    public void theAttestationWallSaysToSignInOnlyWhenItWasAskedFor() throws Exception {
+        ClientAttempts.clear("Gp_c7blMwZE");
+        TestController controller = new TestController(video("Gp_c7blMwZE"), "WEB", playerStub(atMs(59_944, 600_000)));
+        controller.mProtocol = PlayerFailure.PROTOCOL_SABR;
+        controller.mIsSignedIn = true;
+
+        for (String client : Arrays.asList("WEB", "WEB")) {
+            controller.mClient = client;
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                    new UnexpectedLoaderException(new PoTokenError(PoTokenStatus.PENDING)));
+        }
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("attestation_stop"), getActions(events.get(events.size() - 1)));
+
+        ClientAttempts.record("Gp_c7blMwZE", ClientAttempts.Attempt.unplayable("TV", "LOGIN_REQUIRED",
+                "Sign in to confirm you're not a bot"));
+
+        for (String client : Arrays.asList("WEB", "WEB")) {
+            controller.mClient = client;
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                    new UnexpectedLoaderException(new PoTokenError(PoTokenStatus.PENDING)));
+        }
+
+        events = mLog.readAll();
+        assertEquals(Arrays.asList("attestation_stop_sign_in"), getActions(events.get(events.size() - 1)));
+        ClientAttempts.clear("Gp_c7blMwZE");
+    }
+
+    /**
+     * A client that played well past where the last one stopped got past the wall: the next stop is a lap of its own
+     */
+    @Test
+    public void aClientThatPlayedPastTheWallStartsAnotherLap() throws Exception {
+        Map<String, Object> answers = atMs(59_917, 600_000);
+        TestController controller = new TestController(video("8aJEcMj1AOg"), "WEB", playerStub(answers));
+
+        for (String client : Arrays.asList("WEB", "WEB_SAFARI", "MWEB")) {
+            controller.mClient = client;
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                    new UnexpectedLoaderException(new PoTokenError(PoTokenStatus.PENDING)));
+        }
+
+        answers.put("getPositionMs", 300_000L);
+        controller.mClient = "WEB";
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                new UnexpectedLoaderException(new PoTokenError(PoTokenStatus.PENDING)));
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(events.get(events.size() - 1)));
+        assertEquals(4, controller.mReloads.size());
+    }
+
+    /**
+     * 97Z1YWD3 #13: reloaded at 0:59.9, the picture and the clock stood still with the attestation pending, and nothing was done for
+     * 58 s. The next client, as for a stall of it.
+     */
+    @Test
+    public void aStillClockWithTheAttestationPendingSwitchesTheClient() throws Exception {
+        TestController controller = new TestController(video("8aJEcMj1AOg"), "WEB", playerStub(atMs(59_921, 600_000)));
+        controller.mProtocol = PlayerFailure.PROTOCOL_SABR;
+        controller.onPlay();
+        ProtectionStatuses.onStatus("8aJEcMj1AOg", PoTokenStatus.PENDING);
+        // Its grace period over: pending since the start, at 0:59.9
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofMillis(59_921));
+        PlayerFailure failure = PlayerFailure.create(RuntimeEnvironment.getApplication(), PlaybackHealth.KIND_VIDEO_FROZEN)
+                .detail("clockStill", true);
+
+        controller.onHealthFailure(PlaybackHealth.KIND_VIDEO_FROZEN, failure);
+        failure.record();
+
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(1, controller.mReloads.size());
+    }
+
+    /**
+     * 65FDWR9C #1: a SABR read timed out ("Unable to connect") with the attestation pending since the long pause: the next client, as a
+     * stall of it gets, not the engine restarted with the same client (it played 0 ms)
+     */
+    @Test
+    public void aSabrTimeoutWithTheAttestationPendingSwitchesTheClient() throws Exception {
+        TestController controller = new TestController(video("oKgDcmHScsM"), "WEB");
+        controller.mProtocol = PlayerFailure.PROTOCOL_SABR;
+        controller.onPlay();
+        ProtectionStatuses.onStatus("oKgDcmHScsM", PoTokenStatus.PENDING);
+        // Its grace period over: pending 58.6 s before the error
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(Duration.ofMillis(58_600));
+
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN, unableToConnect());
+
+        assertEquals(Arrays.asList("switch_next_client_now", "reload_video"), getActions(mLog.readAll().get(0)));
+        assertEquals(0, controller.mRestarts.size());
+    }
+
+    /**
+     * R71TW3F4 #1-#13: WEB's server timed out every 40 s, after the video played each time, and the engine was restarted 13 times with
+     * nothing changed and a toast each. Reloaded without a word, three times for the video, then the next client for it.
+     */
+    @Test
+    public void aConnectionThatBreaksAfterItPlayedIsReloadedThenMovesTheVideo() throws Exception {
+        getGlobalPrefs().setIpv6TestEnabled(true);
+        setIpv6Working(false);
+        TestController controller = new TestController(video("zb6EkKExF_8"), "WEB");
+        controller.mNextClient = "TV";
+
+        for (int i = 0; i < 4; i++) {
+            controller.onPlay();
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN, unableToConnect());
+        }
+
+        // The same failure again: the first and the last of the repeats
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("network_reload 1/3", "reload_video"), getActions(events.get(0)));
+        assertEquals(Arrays.asList("client_for_video:TV", "reload_video"), getActions(events.get(events.size() - 1)));
+        assertEquals(0, ShadowToast.shownToastCount());
+        assertEquals(0, controller.mRestarts.size());
+        assertEquals(4, controller.mReloads.size());
+    }
+
+    /**
+     * With IPv6 working, the first one switches the engine as before (a restart), the ones after it are only reloaded
+     */
+    @Test
+    public void aConnectionThatBreaksAfterItPlayedSwitchesTheEngineOnce() throws Exception {
+        getTweaks().setPlayerDataSource(PlayerTweaksData.PLAYER_DATA_SOURCE_DEFAULT);
+        TestController controller = new TestController(video("zb6EkKExF_8"), "WEB");
+
+        controller.onPlay();
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN, unableToConnect());
+        controller.onPlay();
+        controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN, unableToConnect());
+
+        List<JSONObject> events = mLog.readAll();
+        assertEquals(Arrays.asList("network_reload 1/3", "switch_engine:" + Utils.NETWORK_ENGINE_OKHTTP, "restart_engine"),
+                getActions(events.get(0)));
+        assertEquals(Arrays.asList("network_reload 2/3", "reload_video"), getActions(events.get(1)));
+        assertEquals(1, controller.mRestarts.size());
+    }
+
+    /**
+     * A source's error tells what its loads did: the ones that failed since it last played, each try's time and error, and the number
+     * of the server its request went to (R71TW3F4 #1-#13 told none of it)
+     */
+    @Test
+    public void aSourceErrorTellsTheLoadsThatFailedSinceItPlayed() throws Exception {
+        // No engine to switch to: OkHttp's next is Cronet, which can't load under Robolectric
+        getGlobalPrefs().setIpv6TestEnabled(true);
+        setIpv6Working(false);
+
+        try {
+            FormatAttempts.onNewVideo(RuntimeEnvironment.getApplication(), "zb6EkKExF_8");
+            FormatAttempts.onRequest("rr1---sn-other.googlevideo.com");
+            FormatAttempts.onRequest(HOST);
+            TestController controller = new TestController(video("zb6EkKExF_8"), "WEB");
+            controller.onPlay();
+            long now = SystemClock.elapsedRealtime();
+            LoadErrors.onLoadError(now - 4_000, now, C.DATA_TYPE_MEDIA, C.TRACK_TYPE_VIDEO, new SocketTimeoutException("timeout"));
+
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN, unableToConnect());
+
+            JSONObject details = mLog.readAll().get(0).getJSONObject("details");
+            JSONObject loadError = details.getJSONArray("loadErrors").getJSONObject(0);
+            assertEquals("video chunk", loadError.getString("load"));
+            assertEquals("timed out", loadError.getString("error"));
+            assertEquals(4_000, loadError.getLong("ms"));
+            assertEquals(2, details.getInt("hostNumber"));
+            assertTrue(details.has("bufferedMs"));
+        } finally {
+            FormatAttempts.end(RuntimeEnvironment.getApplication());
+        }
+    }
+
+    /**
+     * WVE7ZKDD #2: SABR refused a rewind with a 403, protection OK, and switch_next_client made TV's poToken again (2.2 s of a 5.3 s
+     * reload), reading as a switch. Its player response is fetched again first, with the same poToken; refused again soon, the poToken
+     * is made again, and the action says so. The refused request is told, as a SabrError's is.
+     */
+    @Test
+    public void aSabrRefusalAfterItPlayedFetchesThePlayerResponseAgainFirst() throws Exception {
+        try {
+            TestController controller = new TestController(video("dQw4w9WgXcQ"), "TV");
+            controller.mProtocol = PlayerFailure.PROTOCOL_SABR;
+            controller.mSwitchedTo = null;
+            InvalidResponseCodeException refusal = new InvalidResponseCodeException(403, "Forbidden", Collections.emptyMap(), dataSpec());
+            Method onLoadError = SabrRefusedRequest.class.getDeclaredMethod("onLoadError", Throwable.class, String.class, long.class);
+            onLoadError.setAccessible(true);
+            onLoadError.invoke(null, refusal, "media, video 313, audio 251, selected 313, session 0 (first)", 87_000L);
+
+            controller.onPlay();
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN, refusal);
+            controller.onPlay();
+            controller.onEngineError(PlayerEventListener.ERROR_TYPE_SOURCE, PlayerEventListener.RENDERER_INDEX_UNKNOWN,
+                    new InvalidResponseCodeException(403, "Forbidden", Collections.emptyMap(), dataSpec()));
+
+            List<JSONObject> events = mLog.readAll();
+            assertEquals(Arrays.asList("refetch_player", "reload_video"), getActions(events.get(0)));
+            assertEquals(Arrays.asList("reset_potoken:TV", "reload_video"), getActions(events.get(events.size() - 1)));
+            assertEquals(1, controller.mSwitches);
+            JSONObject details = events.get(0).getJSONObject("details");
+            assertEquals("media, video 313, audio 251, selected 313, session 0 (first)", details.getString("sabrRequest"));
+            assertEquals(87_000, details.getLong("sabrSessionAgeMs"));
+        } finally {
+            SabrRefusedRequest.resetForTesting();
+        }
+    }
+
+    /**
+     * Y1D66CNW #1: a start's picture stood still 3.5 s through a tunneled decoder after a restore seek, the device's fourth such freeze,
+     * and the fallback heard of none of them. It's over: counted, without a restart (the next player is made without it).
+     */
+    @Test
+    public void aTunneledStartFreezeTurnsTunnelingOffWithoutARestart() throws Exception {
+        assertTunnelingOffWithoutARestart(PlaybackHealth.KIND_START_FROZEN, PlayerFailure.create(RuntimeEnvironment.getApplication(),
+                PlaybackHealth.KIND_START_FROZEN).detail("clockStill", false));
+    }
+
+    /**
+     * Paused by the user while the picture stood still (see PlaybackHealth): counted, and not restarted, which would play it
+     */
+    @Test
+    public void aTunneledFreezeEndedByAPauseTurnsTunnelingOffWithoutARestart() throws Exception {
+        assertTunnelingOffWithoutARestart(PlaybackHealth.KIND_VIDEO_FROZEN, PlayerFailure.create(RuntimeEnvironment.getApplication(),
+                PlaybackHealth.KIND_VIDEO_FROZEN).detail("endedByPause", true));
+    }
+
+    private void assertTunnelingOffWithoutARestart(String kind, PlayerFailure failure) throws Exception {
+        TunnelingFallback.reset(RuntimeEnvironment.getApplication());
+        VideoDecoderState.onSample(317, -1, true, null);
+
+        try {
+            TestController controller = new TestController(video("31GPth14P88"));
+            controller.onPlay();
+
+            controller.onHealthFailure(kind, failure);
+            failure.record();
+
+            assertEquals(Arrays.asList("tunneling_off"), getActions(mLog.readAll().get(0)));
+            assertEquals(0, controller.mRestarts.size());
+            assertTrue(TunnelingFallback.isOff(RuntimeEnvironment.getApplication()));
+        } finally {
+            VideoDecoderState.reset();
+            TunnelingFallback.reset(RuntimeEnvironment.getApplication());
+        }
+    }
+
+    /**
+     * 93HXRTB5 #1: 3 stalls of a 4K VP9 lowered the quality, and nothing told whether the connection was too slow for it. Told as a long
+     * stall's are.
+     */
+    @Test
+    public void healthStallsTellHowFastTheLoadsCame() throws Exception {
+        try {
+            playingAt(110_468_000, 8_321);
+            TestController controller = new TestController(video("0N4ujc0HJus"), QUALITIES, QUALITIES.get(0));
+            controller.onPlay();
+            PlayerFailure failure = PlayerFailure.create(RuntimeEnvironment.getApplication(), PlaybackHealth.KIND_STALLS);
+
+            controller.onHealthFailure(PlaybackHealth.KIND_STALLS, failure);
+            failure.record();
+
+            JSONObject event = mLog.readAll().get(0);
+            assertEquals(8_321, event.getJSONObject("details").getLong("recentThroughputKbps"));
+            assertEquals(Arrays.asList("lower_quality", "restart_engine"), getActions(event));
+        } finally {
+            FormatAttempts.end(RuntimeEnvironment.getApplication());
+        }
+    }
+
+    /**
+     * Z6R2NPPX #6: AV1 1080p was lowered to VP9 720p, the list's first, though AV1 720p was offered: the codec playing
+     */
+    @Test
+    public void theQualityLoweredKeepsTheCodecPlaying() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,25,av01", false),
+                ExoFormatItem.fromVideoSpec("1280,720,25,vp9", false),
+                ExoFormatItem.fromVideoSpec("1280,720,25,av01", false));
+
+        assertEquals(codecOf(formats.get(2)), codecOf(lowerOnRepeatedStall(formats)));
+    }
+
+    /**
+     * Not offered at the next size down: the one of the fewest bits a second there, not the list's first
+     */
+    @Test
+    public void theQualityLoweredToAnotherCodecIsTheSmallest() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                videoFormat("av01.0.08M.08", "video/av01", 2_352_000, 1920, 1080),
+                videoFormat("vp09.00.31.08", "video/x-vnd.on2.vp9", 1_213_000, 1280, 720),
+                videoFormat("avc1.4d401f", "video/avc", 900_000, 1280, 720));
+
+        assertEquals(codecOf(formats.get(2)), codecOf(lowerOnRepeatedStall(formats)));
+    }
+
+    /**
+     * The format of the lowered quality, the limit a repeated stall sets (see ErrorFixerController#lowerVideoQuality)
+     */
+    private FormatItem lowerOnRepeatedStall(List<FormatItem> formats) throws Exception {
+        TestController controller = new TestController(video("uiSWOWttNvo"), formats, formats.get(0));
+        controller.onPlay();
+        controller.onLongBuffering();
+        controller.onPlay();
+        controller.onLongBuffering();
+
+        FormatItem lowered = getPlayerData().getTempVideoFormat();
+        assertEquals(720, lowered.getHeight());
+
+        return lowered;
+    }
+
+    private static String codecOf(FormatItem format) {
+        return TrackSelectorUtil.codecNameShort(format.getTrack().format.codecs);
+    }
+
+    private static FormatItem videoFormat(String codecs, String mimeType, int bitrate, int width, int height) {
+        MediaTrack track = MediaTrack.forRendererIndex(TrackSelectorManager.RENDERER_INDEX_VIDEO);
+        track.format = Format.createVideoSampleFormat(null, mimeType, codecs, bitrate, Format.NO_VALUE, width, height, 25, null, null);
+
+        return ExoFormatItem.from(track);
+    }
+
+    /**
+     * CQHM6BGP #1: a 2-minute silent intro was reported silent from its start. On Opus, heard on the device before, it would have been
+     * swapped to AAC and the engine restarted for nothing: left as it is.
+     */
+    @Test
+    public void aSilentStartOfACodecHeardBeforeIsLeftAlone() throws Exception {
+        MediaTrack track = MediaTrack.forRendererIndex(TrackSelectorManager.RENDERER_INDEX_AUDIO);
+        track.format = Format.createAudioSampleFormat("251", "audio/opus", "opus", 146_000, Format.NO_VALUE, 2, 48_000, null, null, 0,
+                "en");
+        TestController controller = new TestController(video("j1LaXgDlqZs"), null,
+                playerStub(Collections.<String, Object>singletonMap("getAudioFormat", ExoFormatItem.from(track))));
+        SoundCodecs.onSound(RuntimeEnvironment.getApplication(), "audio/opus");
+        controller.onPlay();
+        PlayerFailure failure = PlayerFailure.create(RuntimeEnvironment.getApplication(), PlaybackHealth.KIND_AUDIO_SILENT)
+                .detail("silentFromStart", true);
+
+        controller.onHealthFailure(PlaybackHealth.KIND_AUDIO_SILENT, failure);
+        failure.record();
+
+        JSONObject event = mLog.readAll().get(0);
+        assertEquals(Collections.<String>emptyList(), getActions(event));
+        assertTrue(event.getJSONObject("details").has("codecHeardAgoMs"));
+        assertEquals(0, controller.mRestarts.size());
+    }
+
+    /**
+     * Another codec heard: this one's silence may be the device's, AAC is tried as before
+     */
+    @Test
+    public void aSilentStartOfACodecNotHeardPlaysAac() throws Exception {
+        MediaTrack track = MediaTrack.forRendererIndex(TrackSelectorManager.RENDERER_INDEX_AUDIO);
+        track.format = Format.createAudioSampleFormat("251", "audio/opus", "opus", 146_000, Format.NO_VALUE, 2, 48_000, null, null, 0,
+                "en");
+        TestController controller = new TestController(video("j1LaXgDlqZs"), null,
+                playerStub(Collections.<String, Object>singletonMap("getAudioFormat", ExoFormatItem.from(track))));
+        SoundCodecs.onSound(RuntimeEnvironment.getApplication(), "audio/mp4a-latm");
+        controller.onPlay();
+        PlayerFailure failure = PlayerFailure.create(RuntimeEnvironment.getApplication(), PlaybackHealth.KIND_AUDIO_SILENT)
+                .detail("silentFromStart", true);
+
+        controller.onHealthFailure(PlaybackHealth.KIND_AUDIO_SILENT, failure);
+        failure.record();
+
+        assertEquals(Arrays.asList("audio_fallback:mp4a", "restart_engine"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * "Unable to connect to …" from a read that timed out, as the player fails with it
+     */
+    private static HttpDataSourceException unableToConnect() {
+        return new HttpDataSourceException("Unable to connect to https://" + HOST + "/videoplayback",
+                new SocketTimeoutException("timeout"), dataSpec(), HttpDataSourceException.TYPE_OPEN);
+    }
+
+    private static List<String> toList(JSONArray array) throws Exception {
+        List<String> result = new ArrayList<>();
+
+        for (int i = 0; i < array.length(); i++) {
+            result.add(array.getString(i));
+        }
+
+        return result;
     }
 
     /**
@@ -2254,6 +2679,17 @@ public class ErrorFixerControllerTest {
          * The client the loader picks for the video when asked to (see VideoLoaderController#pickNextClientForVideo), null for none
          */
         private String mNextClient;
+        /**
+         * Of the video's formats, null when it has none
+         */
+        private String mClient;
+        /**
+         * The client a switch not forced goes to, null when it stays, its poToken made again (see
+         * ErrorFixerController#switchNextClientOrPoToken)
+         */
+        private String mSwitchedTo = "WEB";
+        private int mSwitches;
+        private boolean mIsSignedIn;
 
         private TestController(Video video) throws Exception {
             this(video, (String) null);
@@ -2273,6 +2709,7 @@ public class ErrorFixerControllerTest {
         private TestController(Video video, String formatClient, PlaybackView player) throws Exception {
             mVideo = video;
             mPlayer = player;
+            mClient = formatClient;
             setAltContext(RuntimeEnvironment.getApplication());
 
             // Without a player: reloads and restarts do nothing
@@ -2281,7 +2718,7 @@ public class ErrorFixerControllerTest {
             loader.set(this, new VideoLoaderController() {
                 @Override
                 public String getFormatClient() {
-                    return formatClient;
+                    return mClient;
                 }
 
                 @Override
@@ -2309,6 +2746,17 @@ public class ErrorFixerControllerTest {
                     return mNextClient;
                 }
             });
+        }
+
+        @Override
+        String switchNextClientOrPoToken() {
+            mSwitches++;
+            return mSwitchedTo;
+        }
+
+        @Override
+        boolean isSignedIn() {
+            return mIsSignedIn;
         }
 
         /**

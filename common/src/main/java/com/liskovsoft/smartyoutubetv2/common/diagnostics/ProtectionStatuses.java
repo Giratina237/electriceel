@@ -13,6 +13,7 @@ import org.json.JSONObject;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +87,34 @@ public final class ProtectionStatuses {
 
         return last != null && last.ms >= sinceMs
                 && (PoTokenStatus.PENDING.name().equals(last.status) || PoTokenStatus.PENDING_MISSING.name().equals(last.status));
+    }
+
+    /**
+     * How long the video's attestation has been pending (see isAttestationPending): since the first of its last told in a row that
+     * were. -1 when it isn't.
+     */
+    public static synchronized long getPendingMs(@Nullable String videoId, long sinceMs) {
+        if (!isAttestationPending(videoId, sinceMs)) {
+            return -1;
+        }
+
+        long pendingSinceMs = -1;
+
+        for (Iterator<Told> it = sStatuses.get(videoId).descendingIterator(); it.hasNext(); ) {
+            Told told = it.next();
+
+            if (told.ms < sinceMs || !isPending(told.status)) {
+                break;
+            }
+
+            pendingSinceMs = told.ms;
+        }
+
+        return sClock.now() - pendingSinceMs;
+    }
+
+    private static boolean isPending(String status) {
+        return PoTokenStatus.PENDING.name().equals(status) || PoTokenStatus.PENDING_MISSING.name().equals(status);
     }
 
     /**

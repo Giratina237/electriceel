@@ -9,6 +9,10 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException;
 import com.liskovsoft.googlecommon.common.helpers.ConnectionErrors;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -38,6 +42,10 @@ public final class LoadErrors {
      */
     @Nullable
     private static String sVideoId;
+    /**
+     * When the video last played (see #onPlay), in the clock's time, -1 for not yet
+     */
+    private static long sPlayedMs = -1;
 
     private static final class LoadError {
         final long startMs;
@@ -93,6 +101,46 @@ public final class LoadErrors {
         }
 
         sVideoId = videoId;
+    }
+
+    /**
+     * The player plays (see ErrorFixerController#onPlay): a failure of its source after it tells the loads that failed since (see
+     * #describeSincePlay)
+     */
+    public static synchronized void onPlay() {
+        sPlayedMs = sClock.now();
+    }
+
+    /**
+     * For a failure of the player's source: each try of a load that failed since the video last played, or since it was prepared when it
+     * hasn't, oldest first, as {load, error, ms (how long the try took), endAgoMs (how long before now it ended)}. ExoPlayer tries a load
+     * again after a while: each try is one. R71TW3F4 #1-#13: a read that timed out every 40 s, 13 times, and nothing told which load
+     * hung nor how its tries went. Null for none.
+     */
+    @Nullable
+    public static synchronized JSONArray describeSincePlay() {
+        long sinceMs = Math.max(sPlayedMs, sPreparedMs);
+        long now = sClock.now();
+        JSONArray result = new JSONArray();
+
+        try {
+            for (LoadError error : sErrors) {
+                if (error.endMs < sinceMs) {
+                    continue;
+                }
+
+                JSONObject item = new JSONObject();
+                item.put("load", error.load != null ? error.load : JSONObject.NULL);
+                item.put("error", error.error);
+                item.put("ms", Math.max(0, error.endMs - error.startMs));
+                item.put("endAgoMs", Math.max(0, now - error.endMs));
+                result.put(item);
+            }
+        } catch (JSONException e) {
+            throw new IllegalStateException(e);
+        }
+
+        return result.length() > 0 ? result : null;
     }
 
     /**
@@ -215,6 +263,7 @@ public final class LoadErrors {
     static synchronized void resetForTesting(@Nullable VideoStarts.Clock clock) {
         sErrors.clear();
         sPreparedMs = -1;
+        sPlayedMs = -1;
         sVideoId = null;
         sClock = clock != null ? clock : SystemClock::elapsedRealtime;
     }

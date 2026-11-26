@@ -10,6 +10,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.ext.cronet.CronetDataSource;
 import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
@@ -32,6 +33,7 @@ import java.net.SocketTimeoutException;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -41,12 +43,16 @@ import okhttp3.Call;
 import okhttp3.EventListener;
 import okhttp3.Protocol;
 
+import org.chromium.net.RequestFinishedInfo;
+import org.chromium.net.UrlResponseInfo;
+
 /**
  * The connections the player's OkHttp client opened, from the name's lookup to the connection being ready (with the lookup's time and
  * each address tried in their detail), and its requests that waited long for their answer, from being sent to its first byte. A
  * segment that took long with no response in its time was slow to come, one with a long response waited for the server. The other
- * engines' requests are timed whole, from being made to their answer's headers, connect included (see timeOpenings). Each names the
- * load it's of, e.g. the video's init chunk (see describeLoad). Any thread: OkHttp's and the loaders'.
+ * engines' requests are timed whole, from being made to their answer's headers, connect included (see timeOpenings), Cronet's with
+ * where that time went once they ended (see onRequestFinished). Each names the load it's of, e.g. the video's init chunk (see
+ * describeLoad). Any thread: OkHttp's, Cronet's and the loaders'.
  */
 public final class Connections {
     /**
@@ -84,27 +90,30 @@ public final class Connections {
      */
     static final String LOAD_MANIFEST = "manifest";
     /**
-     * Of a call made only to connect to a host ahead of the player's next request (see SabrHostPrewarmer)
+     * Of a connection whose call took one from the pool after its lookup, no address tried (see Listener#connectionAcquired)
      */
-    static final String LOAD_PREWARM = "prewarm";
-
+    static final String POOLED = "pooled";
     /**
-     * The tag of a call made only to connect ahead (see SabrHostPrewarmer): its connect is told apart from a load's
+     * Cronet starts a request as it's opened (see CronetDataSource#open): one of the same URL made further from an opening is another
+     * (see onRequestFinished)
      */
-    public enum Prewarm {
-        INSTANCE
-    }
+    static final long MAX_OPENING_MATCH_MS = 1_000;
+
     /**
      * For the client of the player only: the API's connections aren't the video's. Each call is made on the thread of the load it's
      * of (e.g. OkHttpDataSource#open), and its listener with it: that's when the load is known.
      */
-    public static final EventListener.Factory LISTENER =
-            call -> new Listener(call.request().tag(Prewarm.class) != null ? LOAD_PREWARM : describeLoad(Loader.getCurrentLoadable()));
+    public static final EventListener.Factory LISTENER = call -> new Listener(describeLoad(Loader.getCurrentLoadable()));
     private static final ArrayDeque<Connection> sConnections = new ArrayDeque<>();
     private static final ArrayDeque<TimedRequest> sResponses = new ArrayDeque<>();
     private static final ArrayDeque<TimedRequest> sOpenings = new ArrayDeque<>();
     @VisibleForTesting
     static VideoStarts.Clock sClock = SystemClock::elapsedRealtime;
+    /**
+     * Cronet's metrics are dates (see onRequestFinished)
+     */
+    @VisibleForTesting
+    static VideoStarts.Clock sWallClock = System::currentTimeMillis;
     /**
      * When the player was last prepared with a source, in the clock's time, -1 for not yet (see getLookup)
      */
@@ -154,7 +163,8 @@ public final class Connections {
         long dnsEndMs = -1;
         /**
          * The addresses tried, in the order they were: e.g. "IPv4 timed out after 5000 ms", "IPv6 70 ms". They can overlap: OkHttp 5
-         * starts the next 250 ms into one that hasn't connected yet (fast fallback).
+         * starts the next 250 ms into one whose TCP connect hasn't ended yet (fast fallback). Its TLS handshake isn't raced: one that
+         * hangs there holds the next one back till the read timeout (see Attempt#tlsStartMs).
          */
         final List<Attempt> attempts = new ArrayList<>(2);
         /**
@@ -171,6 +181,11 @@ public final class Connections {
          * Its call was cancelled (e.g. a seek's): where it ended (its lookup, an address) says nothing of them (see getLookup)
          */
         boolean isCancelled;
+        /**
+         * Its call took a connection from the pool after its lookup, one another call opened meanwhile: no address of its own connected
+         * (see Listener#connectionAcquired)
+         */
+        boolean isPooled;
 
         Connection(long startMs, @Nullable String load) {
             this.startMs = startMs;
@@ -179,8 +194,9 @@ public final class Connections {
 
         /**
          * E.g. "video init chunk, server 1, DNS 2 ms, IPv4 70 ms, h2", "audio chunk, DNS 5003 ms, IPv4 68 ms, http/1.1", "DNS 1 ms,
-         * IPv4 timed out after 5000 ms, IPv6 70 ms" (its load not known). With "still going" for one that hasn't ended, after what
-         * it's at: "DNS, still going", "DNS 2 ms, IPv4, still going". Null for nothing known.
+         * IPv4 (at 1 ms) timed out after 5000 ms, IPv6 (at 5001 ms) 70 ms" (its load not known), "video init chunk, DNS 840 ms, pooled,
+         * http/1.1". With "still going" for one that hasn't ended, after what it's at: "DNS, still going", "DNS 2 ms, IPv4, still
+         * going". Null for nothing known.
          *
          * @param hostNumber of its server among the video's (see FormatAttempts#getHostNumber), -1 for one not known
          */
@@ -206,8 +222,16 @@ public final class Connections {
                 parts.add(isGoing ? "DNS" : "DNS failed after " + (endMs - startMs) + " ms");
             }
 
+            // When each began tells a race from a sequence: W6k1qMUmzJs (MD8RQZM2) tried IPv4 only once IPv6 gave up 4 s in, and its
+            // rows read the same as a race would have
+            boolean isSeveral = attempts.size() > 1;
+
             for (Attempt attempt : attempts) {
-                parts.add(attempt.describe());
+                parts.add(attempt.describe(isSeveral ? startMs : -1));
+            }
+
+            if (isPooled) {
+                parts.add(POOLED);
             }
 
             if (protocol != null) {
@@ -243,11 +267,27 @@ public final class Connections {
          */
         @Nullable
         String failure;
+        /**
+         * Of an opening: what it asked for, to find it by when Cronet tells its metrics (see onRequestFinished). Null for a response.
+         */
+        @Nullable
+        final String url;
+        /**
+         * Of an opening on Cronet: where its time went once its request ended, e.g. "DNS 2 ms, connect 70 ms (TLS 45 ms), h2, response
+         * 230 ms" (see describeTimings). Null till then, and on the other engines.
+         */
+        @Nullable
+        String timings;
 
         TimedRequest(long startMs, long endMs, @Nullable String load) {
+            this(startMs, endMs, load, null);
+        }
+
+        TimedRequest(long startMs, long endMs, @Nullable String load, @Nullable String url) {
             this.startMs = startMs;
             this.endMs = endMs;
             this.load = load;
+            this.url = url;
         }
     }
 
@@ -264,6 +304,13 @@ public final class Connections {
          */
         @Nullable
         String failure;
+        /**
+         * Its TCP connect ended and its TLS handshake began then, -1 for not known (one not there, or another address going too: which of
+         * them got there isn't told). A failure from then on is the handshake's, which OkHttp's fast fallback doesn't race: it waits the
+         * read timeout (W6k1qMUmzJs, MD8RQZM2: "IPv6 timed out after 4026 ms", the SABR loads' 4 s, not the 5 s connect timeout, and
+         * only then IPv4).
+         */
+        long tlsStartMs = -1;
 
         Attempt(InetSocketAddress address, String family, long startMs) {
             this.address = address;
@@ -272,16 +319,27 @@ public final class Connections {
         }
 
         /**
-         * E.g. "IPv4 70 ms", "IPv6 timed out after 5000 ms", just "IPv4" for one going
+         * E.g. "IPv4 70 ms", "IPv6 timed out after 5000 ms", "IPv6 TLS timed out after 4026 ms", just "IPv4" for one going. With when
+         * it began, for one of several: "IPv6 (at 43 ms) TLS timed out after 4026 ms", "IPv4 (at 4069 ms) 1050 ms".
+         *
+         * @param connectionStartMs of its connection, -1 to leave when it began out
          */
-        String describe() {
+        String describe(long connectionStartMs) {
+            String name = connectionStartMs >= 0 ? family + " (at " + (startMs - connectionStartMs) + " ms)" : family;
+
             if (endMs < 0) {
-                return family;
+                return name;
             }
 
             long durationMs = endMs - startMs;
 
-            return failure != null ? family + " " + failure + " after " + durationMs + " ms" : family + " " + durationMs + " ms";
+            if (failure == null) {
+                return name + " " + durationMs + " ms";
+            }
+
+            String failed = tlsStartMs >= 0 && !failure.startsWith("TLS") ? "TLS " + failure : failure;
+
+            return name + " " + failed + " after " + durationMs + " ms";
         }
     }
 
@@ -368,6 +426,15 @@ public final class Connections {
         }
 
         @Override
+        public void secureConnectStart(@NonNull Call call) {
+            Connection connection = mConnection;
+
+            if (connection != null) {
+                startTls(connection);
+            }
+        }
+
+        @Override
         public void connectEnd(@NonNull Call call, @NonNull InetSocketAddress inetSocketAddress, @NonNull Proxy proxy, Protocol protocol) {
             Connection connection = mConnection;
 
@@ -377,6 +444,22 @@ public final class Connections {
             }
 
             onEnd();
+        }
+
+        /**
+         * Told after connectEnd of a connection the call opened, which ended it. One that hasn't ended is the pool's: another call opened
+         * it while this one looked the name up (93HXRTB5 G0s4r2KS3ok: the video init chunk's "connect 1474 ms" was a lookup of 840 ms,
+         * then the audio init chunk's connection, its request sent 1 ms later; it ran to the call's end), or while its own addresses
+         * were being tried.
+         */
+        @Override
+        public void connectionAcquired(@NonNull Call call, @NonNull okhttp3.Connection connection) {
+            Connection timed = mConnection;
+
+            if (timed != null) {
+                endPooled(timed, connection.protocol());
+                mConnection = null;
+            }
         }
 
         /**
@@ -560,7 +643,7 @@ public final class Connections {
     /**
      * For the player's engines with no OkHttp client (the default one, Cronet): their connections and responses aren't told apart, a
      * request is timed whole, its open, from being made to its answer's headers. One that fails to open (e.g. a connect timeout) or is
-     * cancelled ends then.
+     * cancelled ends then. Cronet tells where the time went once the request ended (see onRequestFinished).
      */
     public static DataSource timeOpenings(DataSource dataSource) {
         return new OpeningTimer(dataSource);
@@ -581,7 +664,8 @@ public final class Connections {
         @Override
         public long open(DataSpec dataSpec) throws IOException {
             // Made on the thread of the load it's of
-            TimedRequest opening = isNetwork(dataSpec) ? addOpening(sClock.now(), -1, describeLoad(Loader.getCurrentLoadable())) : null;
+            TimedRequest opening = isNetwork(dataSpec)
+                    ? addOpening(sClock.now(), -1, describeLoad(Loader.getCurrentLoadable()), dataSpec.uri.toString()) : null;
             IOException failure = null;
 
             try {
@@ -628,9 +712,12 @@ public final class Connections {
         }
     }
 
+    /**
+     * @param url what it asks for, null for not known
+     */
     @VisibleForTesting
-    static synchronized TimedRequest addOpening(long madeMs, long headersMs, @Nullable String load) {
-        TimedRequest opening = new TimedRequest(madeMs, headersMs, load);
+    static synchronized TimedRequest addOpening(long madeMs, long headersMs, @Nullable String load, @Nullable String url) {
+        TimedRequest opening = new TimedRequest(madeMs, headersMs, load, url);
         sOpenings.addLast(opening);
 
         if (sOpenings.size() > MAX_RESPONSES) {
@@ -638,6 +725,111 @@ public final class Connections {
         }
 
         return opening;
+    }
+
+    /**
+     * A request of Cronet's ended (see CronetManager#setRequestFinishedListener in SharedModules), on its listener's thread: its
+     * opening says where its time went, as OkHttp's connect rows do (WVE7ZKDD 11-24 01:57:39: both init chunks' openings took 5.08 s,
+     * and nothing told the lookup from the connect or the server; NVHZS7YS: 0.47-0.72 s each). Told once the request ended, its body
+     * read: an opening whose request still loads has none yet. The API's requests on the engine are none of the openings.
+     */
+    public static void onRequestFinished(RequestFinishedInfo info) {
+        RequestFinishedInfo.Metrics metrics = info.getMetrics();
+        String url = info.getUrl();
+
+        if (metrics == null || url == null) {
+            return;
+        }
+
+        UrlResponseInfo response = info.getResponseInfo();
+        String timings = describeTimings(metrics, response != null ? response.getNegotiatedProtocol() : null);
+        Date madeAt = metrics.getRequestStart();
+
+        if (timings != null) {
+            // Its metrics are dates: on the clock, as the openings are
+            setTimings(url, madeAt != null ? sClock.now() - (sWallClock.now() - madeAt.getTime()) : -1, timings);
+        }
+    }
+
+    /**
+     * E.g. "DNS 2 ms, connect 70 ms (TLS 45 ms), h2, response 230 ms", "reused, h3, response 412 ms", "DNS 3 ms, connect" (one that
+     * didn't connect). Cronet's connect has the TLS handshake in it. The response is from the request being sent to its answer's
+     * headers: the server's wait and a round trip. Null for nothing known.
+     *
+     * @param protocol the one it agreed on with the server, e.g. h2, h3, http/1.1; null or empty for none
+     */
+    @VisibleForTesting
+    @Nullable
+    static String describeTimings(RequestFinishedInfo.Metrics metrics, @Nullable String protocol) {
+        List<String> parts = new ArrayList<>(4);
+
+        if (metrics.getSocketReused()) {
+            parts.add("reused");
+        } else {
+            long dnsMs = between(metrics.getDnsStart(), metrics.getDnsEnd());
+
+            if (dnsMs >= 0) {
+                parts.add("DNS " + dnsMs + " ms");
+            }
+
+            if (metrics.getConnectStart() != null) {
+                long connectMs = between(metrics.getConnectStart(), metrics.getConnectEnd());
+                long tlsMs = between(metrics.getSslStart(), metrics.getSslEnd());
+
+                parts.add(connectMs < 0 ? "connect" : tlsMs >= 0 ? "connect " + connectMs + " ms (TLS " + tlsMs + " ms)"
+                        : "connect " + connectMs + " ms");
+            }
+        }
+
+        if (!TextUtils.isEmpty(protocol) && !"unknown".equals(protocol)) {
+            parts.add(protocol);
+        }
+
+        long responseMs = between(metrics.getSendingStart(), metrics.getResponseStart());
+
+        if (responseMs >= 0) {
+            parts.add("response " + responseMs + " ms");
+        }
+
+        return parts.isEmpty() ? null : TextUtils.join(", ", parts);
+    }
+
+    /**
+     * -1 for one of them not known
+     */
+    private static long between(@Nullable Date from, @Nullable Date to) {
+        return from != null && to != null ? Math.max(0, to.getTime() - from.getTime()) : -1;
+    }
+
+    /**
+     * To the opening of the URL made nearest the time, that has none yet
+     *
+     * @param madeMs when the request was made, in the clock's time, -1 for not known: the oldest one then
+     */
+    @VisibleForTesting
+    static synchronized void setTimings(String url, long madeMs, String timings) {
+        TimedRequest match = null;
+
+        for (TimedRequest opening : sOpenings) {
+            if (opening.timings != null || !url.equals(opening.url)) {
+                continue;
+            }
+
+            if (madeMs < 0) {
+                match = opening;
+                break;
+            }
+
+            long offMs = Math.abs(opening.startMs - madeMs);
+
+            if (offMs <= MAX_OPENING_MATCH_MS && (match == null || offMs < Math.abs(match.startMs - madeMs))) {
+                match = opening;
+            }
+        }
+
+        if (match != null) {
+            match.timings = timings;
+        }
     }
 
     /**
@@ -674,6 +866,45 @@ public final class Connections {
 
     private static synchronized void startAttempt(Connection connection, InetSocketAddress address) {
         connection.attempts.add(new Attempt(address, familyOf(address), sClock.now()));
+    }
+
+    /**
+     * To the address going, when it's the only one: with several, which one's TCP connect won isn't told (OkHttp cancels the others
+     * then, and may tell their end after)
+     */
+    private static synchronized void startTls(Connection connection) {
+        Attempt going = null;
+
+        for (Attempt attempt : connection.attempts) {
+            if (attempt.endMs < 0) {
+                if (going != null) {
+                    return;
+                }
+
+                going = attempt;
+            }
+        }
+
+        if (going != null) {
+            going.tlsStartMs = sClock.now();
+        }
+    }
+
+    /**
+     * Its call took a connection from the pool: it ends now, the addresses still going given up on (OkHttp cancels them)
+     */
+    private static synchronized void endPooled(Connection connection, @Nullable Protocol protocol) {
+        long nowMs = sClock.now();
+        connection.isPooled = true;
+        connection.protocol = protocol;
+        connection.endMs = nowMs;
+
+        for (Attempt attempt : connection.attempts) {
+            if (attempt.endMs < 0) {
+                attempt.endMs = nowMs;
+                attempt.failure = FAILURE_CANCELLED;
+            }
+        }
     }
 
     /**
@@ -726,8 +957,9 @@ public final class Connections {
                 return "timed out";
             }
 
-            // The load was cancelled (e.g. by a seek): its thread was interrupted
-            if (cause instanceof InterruptedIOException) {
+            // The load was cancelled (e.g. by a seek): its thread was interrupted. Cronet's is a class of its own, not java.io's (EY23XNK9
+            // 19:07:40, 19:07:54 and WVE7ZKDD 00:30:36: the openings a restore seek cancelled said "failed").
+            if (cause instanceof InterruptedIOException || cause instanceof CronetDataSource.InterruptedIOException) {
                 return FAILURE_CANCELLED;
             }
 
@@ -783,7 +1015,8 @@ public final class Connections {
     }
 
     /**
-     * The ones that waited long (see MIN_RESPONSE_MS), and the ones that failed: one cancelled isn't (e.g. a seek's)
+     * The ones that waited long (see MIN_RESPONSE_MS), and the ones that failed: one cancelled isn't (e.g. a seek's), and says so when
+     * it waited long
      */
     private static void addRequests(List<VideoStart.Stage> result, ArrayDeque<TimedRequest> requests, String name, long fromMs,
                                     long toMs) {
@@ -798,27 +1031,38 @@ public final class Connections {
             boolean isFailed = !isGoing && request.failure != null && !FAILURE_CANCELLED.equals(request.failure);
 
             if (endMs - request.startMs >= MIN_RESPONSE_MS || isFailed && endMs >= request.startMs) {
-                result.add(new VideoStart.Stage(name, describeRequest(request.load, isGoing, isFailed ? request.failure : null), 1,
-                        request.startMs, endMs));
+                result.add(new VideoStart.Stage(name, describeRequest(request.load, request.timings, isGoing,
+                        isGoing ? null : request.failure), 1, request.startMs, endMs));
             }
         }
     }
 
     /**
-     * E.g. "audio init chunk", "audio init chunk, still going", "video chunk, timed out", "still going" (its load not known). Null for
-     * nothing known.
+     * E.g. "audio init chunk", "audio init chunk, still going", "video chunk, timed out", "video chunk, cancelled", "still going" (its
+     * load not known), "audio init chunk, DNS 2 ms, connect 70 ms (TLS 45 ms), h2, response 230 ms" (Cronet's). Null for nothing known.
      *
+     * @param timings where its time went (see describeTimings), null for not known
      * @param failure why its answer didn't come, e.g. "timed out", null for one that came or waits
      */
     @Nullable
-    private static String describeRequest(@Nullable String load, boolean isGoing, @Nullable String failure) {
-        String state = isGoing ? VideoStarts.DETAIL_GOING : failure;
+    private static String describeRequest(@Nullable String load, @Nullable String timings, boolean isGoing, @Nullable String failure) {
+        List<String> parts = new ArrayList<>(3);
 
-        if (state == null) {
-            return load;
+        if (load != null) {
+            parts.add(load);
         }
 
-        return load != null ? load + ", " + state : state;
+        if (timings != null) {
+            parts.add(timings);
+        }
+
+        String state = isGoing ? VideoStarts.DETAIL_GOING : failure;
+
+        if (state != null) {
+            parts.add(state);
+        }
+
+        return parts.isEmpty() ? null : TextUtils.join(", ", parts);
     }
 
     /**
@@ -876,5 +1120,6 @@ public final class Connections {
         sConnections.clear();
         sResponses.clear();
         sOpenings.clear();
+        sWallClock = System::currentTimeMillis;
     }
 }

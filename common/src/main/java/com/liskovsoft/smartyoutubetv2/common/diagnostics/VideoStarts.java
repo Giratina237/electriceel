@@ -14,6 +14,7 @@ import androidx.annotation.VisibleForTesting;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.RendererReadiness;
 import com.google.android.exoplayer2.source.sabr.parser.SabrStream;
+import com.liskovsoft.sharedutils.cronet.CronetManager;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.sharedutils.rx.RxHelper;
@@ -46,9 +47,22 @@ public final class VideoStarts {
      */
     static final String LOG_TAG = "VideoStart";
     /**
-     * Not playing by then, the start is given up and recorded as it is (see VideoStart#OUTCOME_GAVE_UP)
+     * Not playing by then, the start is late: ready and paused, it's recorded as paused (see #giveUp); otherwise it's timed on, till
+     * it plays, is left, or MAX_RECORDED_MS
      */
     static final long MAX_START_MS = 15_000;
+    /**
+     * Not playing by then, the start is given up and recorded as it is (see VideoStart#OUTCOME_GAVE_UP). Given up at 15 s, a start's
+     * record stopped there though the video went on to play: 97Z1YWD3's start 92 was ready ~26 s after the click, its last ~11 s not
+     * recorded, and R71TW3F4's oKgDcmHScsM (gave_up) played 0.7 s after. A player's first preprocess takes 22-27 s on a slow box
+     * (H5B64KBE, Y1D66CNW); past a minute the user has most likely gone.
+     */
+    static final long MAX_RECORDED_MS = 60_000;
+    /**
+     * Ready and paused past its 15 s: paused from then if it still is this long after (see #onPlayerState). The app pauses too: auto
+     * frame rate holds the playback for the display's mode switch, and its pause setting goes up to 15 s (see AutoFrameRateController).
+     */
+    static final long LATE_PAUSED_MS = 16_000;
     /**
      * A start that never played is recorded when it ran this long: one left sooner was skipped by the user (e.g. pressing next
      * twice), not stuck. One found unplayable is recorded however soon.
@@ -129,6 +143,15 @@ public final class VideoStarts {
      */
     static final String STAGE_LOAD_ERROR = "load error";
     /**
+     * A load of the player cancelled while it started (e.g. by a seek), from when it was asked for, its detail the load and the bytes
+     * it got, e.g. "video chunk, 36 KB" (see #onLoadCanceled)
+     */
+    static final String STAGE_LOAD_CANCELLED = "load cancelled";
+    /**
+     * Of a start: a seek cancels a load of each track at most (see MAX_SEEKS)
+     */
+    static final int MAX_CANCELLED_LOADS = 20;
+    /**
      * A moment of the formats stage: the formats the player got were made before this start's fetch began (e.g. cached, or the ones a
      * reload took), its detail how long before, e.g. "made 11h36m ago" (see #onFormats)
      */
@@ -176,6 +199,20 @@ public final class VideoStarts {
      * frame: from the first of them (see DebugInfoMediaCodecVideoRenderer#getSkippedToPosition)
      */
     static final String STAGE_TO_POSITION = "to the position";
+    /**
+     * What a resume made of the keyframe before its position (see #onKeyframeResume), after the frames on its "to the position" row.
+     * Told only to the log, a resume that decoded 72 4K frames in 1084 ms, not gone back to its keyframe, didn't say why (WVE7ZKDD
+     * 11-24 22:43:55).
+     */
+    public static final String KEYFRAME_GONE_BACK = "gone back to the keyframe";
+    public static final String KEYFRAME_DECODER_THERE = "decoder there already";
+    public static final String KEYFRAME_AUDIO_LOADING = "audio still loading";
+    public static final String KEYFRAME_OTHER_POSITION = "decoded to another position";
+    static final String KEYFRAME_NOT_WORTH_IT = "not worth going back";
+    /**
+     * Before a decision made again once the audio came in (see KEYFRAME_AUDIO_LOADING)
+     */
+    static final String KEYFRAME_AFTER_AUDIO = "after the audio";
     static final String STAGE_MODE_SWITCH = "display mode switch";
     static final String STAGE_FIRST_FRAME = "first frame";
     /**
@@ -243,7 +280,8 @@ public final class VideoStarts {
     @VisibleForTesting
     static Scheduler sScheduler = new HandlerScheduler();
     /**
-     * A start not playing 15 s after the user's action is given up, even when nothing happens any more (e.g. a request hangs)
+     * A start not playing 15 s after the user's action is late, then given up a minute after it, even when nothing happens any more
+     * (e.g. a request hangs)
      */
     private static final Runnable sGiveUp = VideoStarts::giveUp;
     /**
@@ -514,6 +552,19 @@ public final class VideoStarts {
         final long[] moreChunkEndMs = new long[MORE_CHUNK_STAGES.length];
         boolean hasVideoDecoder;
         int seeks;
+        /**
+         * Of the loads cancelled (see #onLoadCanceled)
+         */
+        int cancelledLoads;
+        /**
+         * What the resume made of its keyframe (see #onKeyframeResume), null for nothing told
+         */
+        @Nullable
+        String keyframeResume;
+        /**
+         * Not playing at MAX_START_MS: timed on (see #giveUp)
+         */
+        boolean isLate;
         boolean isCached;
         String client;
         String protocol;
@@ -619,6 +670,8 @@ public final class VideoStarts {
         SabrStream.setBackoffListener(ServerBackoffs::onBackoff);
         SabrStream.setProtectionStatusListener(ProtectionStatuses::onStatus);
         RendererReadiness.setListener(RendererWaits::onReadiness);
+        // Where a Cronet opening's time went
+        CronetManager.setRequestFinishedListener(Connections::onRequestFinished);
         Plays.init(context);
     }
 
@@ -1009,6 +1062,13 @@ public final class VideoStarts {
         timer.prepareMs = now;
         timer.firstFrameMs = -1;
         timer.playingMs = -1;
+
+        // A late one's pause is over with its player: given up at its minute again (see #onPlayerState)
+        if (timer.isLate && timer.pausedMs >= 0) {
+            sScheduler.cancel(sGiveUp);
+            sScheduler.schedule(sGiveUp, Math.max(0, MAX_RECORDED_MS - (now - timer.t0)));
+        }
+
         timer.pausedMs = -1;
         timer.positionMs = -1;
         timer.video = null;
@@ -1020,6 +1080,7 @@ public final class VideoStarts {
         Arrays.fill(timer.moreChunkLoads, 0);
         Arrays.fill(timer.moreChunkBytes, 0);
         timer.hasVideoDecoder = false;
+        timer.keyframeResume = null;
     }
 
     /**
@@ -1074,6 +1135,32 @@ public final class VideoStarts {
 
         timer.isChunkLoaded[chunk] = true;
         addToBuffering(timer, CHUNK_STAGES[chunk], formatBytes(bytes), startMs, endMs);
+    }
+
+    /**
+     * A segment's load was cancelled (e.g. by a seek), in the clock's time: a row of its own, from when it was asked for, with the
+     * bytes it got. It left nothing before (2M1DY5CD -BwLZBMKW4g: no load from 0.96 s to a jump to the live position at 1.76 s, then
+     * the first chunks took 2.3-2.6 s on new connections, as loads cut off mid-response do).
+     *
+     * @param isInit its initialization (the format's header), not its media
+     */
+    public static void onLoadCanceled(boolean isInit, boolean isVideo, boolean isAudio, long startMs, long endMs, long bytes) {
+        Timer timer = getTimer();
+        int chunk = chunkOf(isInit, isVideo, isAudio);
+
+        if (timer == null || chunk < 0 || timer.prepareMs < 0 || startMs < timer.prepareMs) {
+            return;
+        }
+
+        // Its kind's first not loaded yet: the next one's load is the one still loading (see getBufferingExtras)
+        if (!timer.isChunkLoaded[chunk]) {
+            timer.chunkLoadMs[chunk] = -1;
+        }
+
+        if (timer.cancelledLoads++ < MAX_CANCELLED_LOADS) {
+            String load = (isVideo ? "video " : "audio ") + (isInit ? Connections.LOAD_INIT_CHUNK : Connections.LOAD_CHUNK);
+            addToBuffering(timer, STAGE_LOAD_CANCELLED, load + ", " + formatBytes(bytes), startMs, endMs);
+        }
     }
 
     /**
@@ -1231,9 +1318,29 @@ public final class VideoStarts {
      * frame waited for is the last one's
      */
     public static void onSeek(long positionMs) {
+        onSeek(positionMs, -1, -1);
+    }
+
+    /**
+     * Of a live stream, where it was and where the live end is: its jump to the live position is made when it's within 1 s of it (see
+     * VideoStateController#isLiveEnd). 2M1DY5CD -BwLZBMKW4g jumped there at 1.76 s, 15 s behind it since 0.74 s, by what wasn't known.
+     *
+     * @param fromMs where it was, -1 for not told
+     * @param liveEndMs where the live stream's window ends, -1 for not told (e.g. not live)
+     */
+    public static void onSeek(long positionMs, long fromMs, long liveEndMs) {
         Timer timer = getTimer();
 
-        if (timer == null || timer.prepareMs < 0 || timer.firstFrameMs >= 0 || timer.seeks >= MAX_SEEKS) {
+        // Till it's recorded, its first frame or not (a tunneled one plays before it): the play's own seeks are kept from then (see
+        // Plays#onSeek)
+        if (timer == null || timer.prepareMs < 0) {
+            return;
+        }
+
+        // Sent elsewhere, its decoder's way to the position is another's
+        timer.keyframeResume = null;
+
+        if (timer.seeks >= MAX_SEEKS) {
             return;
         }
 
@@ -1241,8 +1348,60 @@ public final class VideoStarts {
         timer.seeks++;
         // What sent it there (0J159Z0Z: the tunneled resumes that froze had one seek, the ones that played two, made by what wasn't known)
         String caller = describeSeekCaller(Thread.currentThread().getStackTrace());
-        String detail = "to " + VideoStart.formatPosition(positionMs);
+        String detail = describeSeek(positionMs, fromMs, liveEndMs);
         addToBuffering(timer, STAGE_SEEK, caller != null ? detail + ", " + caller : detail, now, now);
+    }
+
+    /**
+     * E.g. "to 0:30", "to 9:11, from 9:10, 850 ms before the live end", "to 9:11, live end 9:12"
+     */
+    @VisibleForTesting
+    static String describeSeek(long positionMs, long fromMs, long liveEndMs) {
+        StringBuilder result = new StringBuilder("to ").append(VideoStart.formatPosition(positionMs));
+
+        if (fromMs >= 0) {
+            result.append(", from ").append(VideoStart.formatPosition(fromMs));
+        }
+
+        if (liveEndMs >= 0 && fromMs >= 0) {
+            long toEndMs = liveEndMs - fromMs;
+            result.append(", ").append(Math.abs(toEndMs)).append(toEndMs >= 0 ? " ms before the live end" : " ms past the live end");
+        } else if (liveEndMs >= 0) {
+            result.append(", live end ").append(VideoStart.formatPosition(liveEndMs));
+        }
+
+        return result.toString();
+    }
+
+    /**
+     * What the resume made of the keyframe before its position (e.g. KEYFRAME_GONE_BACK, see ExoPlayerController#maybeResumeFromKeyframe):
+     * said after the frames on its "to the position" row. The last told counts.
+     */
+    public static void onKeyframeResume(String decision) {
+        Timer timer = getTimer();
+
+        if (timer != null && timer.prepareMs >= 0 && timer.firstFrameMs < 0) {
+            timer.keyframeResume = decision;
+        }
+    }
+
+    /**
+     * E.g. "not worth going back, 380 ms to go": the decoder gets to the position sooner than going back costs, as it was estimated
+     * (see KeyframeResume)
+     *
+     * @param isAfterAudio decided again once the audio came in (see KEYFRAME_AUDIO_LOADING)
+     */
+    public static String describeKeyframeNotWorthIt(long remainingMs, boolean isAfterAudio) {
+        return describeKeyframeDecision(KEYFRAME_NOT_WORTH_IT + ", " + remainingMs + " ms to go", isAfterAudio);
+    }
+
+    /**
+     * E.g. "decoder there already", "after the audio, gone back to the keyframe"
+     *
+     * @param isAfterAudio decided again once the audio came in (see KEYFRAME_AUDIO_LOADING)
+     */
+    public static String describeKeyframeDecision(String decision, boolean isAfterAudio) {
+        return isAfterAudio ? KEYFRAME_AFTER_AUDIO + ", " + decision : decision;
     }
 
     /**
@@ -1251,7 +1410,6 @@ public final class VideoStarts {
      * test's)
      */
     @Nullable
-    @VisibleForTesting
     static String describeSeekCaller(StackTraceElement[] stack) {
         boolean isResume = false;
 
@@ -1303,9 +1461,11 @@ public final class VideoStarts {
             timer.video = frame.video;
             timer.videoBitrateKbps = frame.videoBitrateKbps;
 
-            // Of this source: the renderer counts since its position was set
+            // Of this source: the renderer counts since its position was set. Gone back to the keyframe, it has none: its seek says so.
             if (frame.skippedFrames > 0 && frame.skipStartMs >= timer.prepareMs) {
-                addToBuffering(timer, STAGE_TO_POSITION, frame.skippedFrames + " frames", frame.skipStartMs, timer.firstFrameMs);
+                String frames = frame.skippedFrames + " frames";
+                addToBuffering(timer, STAGE_TO_POSITION, timer.keyframeResume != null ? frames + ", " + timer.keyframeResume : frames,
+                        frame.skipStartMs, timer.firstFrameMs);
             }
         }
 
@@ -1326,9 +1486,22 @@ public final class VideoStarts {
         }
 
         if (!isReady || playWhenReady) {
+            // A late one's pause is over: given up at its minute again, not at the pause's end (see below)
+            if (timer.isLate && timer.pausedMs >= 0) {
+                sScheduler.cancel(sGiveUp);
+                sScheduler.schedule(sGiveUp, Math.max(0, MAX_RECORDED_MS - (sClock.now() - timer.t0)));
+            }
+
             timer.pausedMs = -1;
         } else if (timer.pausedMs < 0) {
             timer.pausedMs = sClock.now();
+
+            // Past its 15 s (see #giveUp): still paused a while after, paused from now, as it would have been then. Else a play long
+            // after would count the pause as start time, and a leave would read as never ready.
+            if (timer.isLate) {
+                sScheduler.cancel(sGiveUp);
+                sScheduler.schedule(sGiveUp, LATE_PAUSED_MS);
+            }
         }
     }
 
@@ -1426,7 +1599,12 @@ public final class VideoStarts {
             return;
         }
 
-        record(build(timer, now, outcome));
+        // Late, ready and paused when it was left: paused, timed till it was ready, as it would have been then (see #onPlayerState).
+        // Not finished as a play: the player is closing.
+        boolean isLatePaused = timer.isLate && timer.pausedMs >= 0
+                && Helpers.equalsAny(outcome, VideoStart.OUTCOME_LEFT, VideoStart.OUTCOME_REPLACED);
+        record(isLatePaused ? build(timer, Math.max(timer.pausedMs, timer.firstFrameMs), VideoStart.OUTCOME_PAUSED)
+                : build(timer, now, outcome));
 
         if (VideoStart.OUTCOME_GAVE_UP.equals(outcome)) {
             // Its reloads are timed till one plays (see #onReload)
@@ -1455,9 +1633,10 @@ public final class VideoStarts {
     }
 
     /**
-     * Not playing 15 s after the user's action: given up, unless it's been ready and paused since (by the user, or started so), then
-     * recorded as paused, timed till it was ready. A paused start was recorded as given up, as if it were stuck: one that showed its
-     * first frame with 54 s buffered, then played 97 s once the user played it.
+     * Not playing 15 s after the user's action: recorded as paused if it's been ready and paused since (by the user, or started so),
+     * timed till it was ready. A paused start was recorded as given up, as if it were stuck: one that showed its first frame with 54 s
+     * buffered, then played 97 s once the user played it. Otherwise it's late: timed on till it plays or is left, given up at
+     * MAX_RECORDED_MS.
      */
     private static void giveUp() {
         Timer timer = sTimer;
@@ -1466,12 +1645,21 @@ public final class VideoStarts {
             return;
         }
 
-        if (timer.pausedMs < 0) {
-            abandon(VideoStart.OUTCOME_GAVE_UP);
+        if (timer.pausedMs >= 0) {
+            finish(timer, Math.max(timer.pausedMs, timer.firstFrameMs), VideoStart.OUTCOME_PAUSED);
             return;
         }
 
-        finish(timer, Math.max(timer.pausedMs, timer.firstFrameMs), VideoStart.OUTCOME_PAUSED);
+        long leftMs = MAX_RECORDED_MS - (sClock.now() - timer.t0);
+
+        if (leftMs > 0) {
+            timer.isLate = true;
+            sScheduler.cancel(sGiveUp);
+            sScheduler.schedule(sGiveUp, leftMs);
+            return;
+        }
+
+        abandon(VideoStart.OUTCOME_GAVE_UP);
     }
 
     /**
@@ -1568,6 +1756,12 @@ public final class VideoStarts {
 
         for (Group group : groups) {
             boolean isOpen = group.endMs < 0;
+
+            // Begun after the record's end, e.g. the engine released by leaving a late start recorded paused at its pause (see #abandon):
+            // not of it
+            if (group.startMs > endMs) {
+                continue;
+            }
 
             // Leaving the player released its engine: no restart
             if (isOpen && STAGE_ENGINE_RESTART.equals(group.name) && VideoStart.OUTCOME_LEFT.equals(outcome)) {
@@ -1792,15 +1986,15 @@ public final class VideoStarts {
     }
 
     /**
-     * The start going on. One that's run too long is given up.
+     * The start going on. One that's run too long is late or given up (see #giveUp), its give-up not run yet (e.g. the main thread busy).
      */
     @Nullable
     private static Timer getTimer() {
         Timer timer = sTimer;
 
-        if (timer != null && sClock.now() - timer.t0 > MAX_START_MS) {
+        if (timer != null && sClock.now() - timer.t0 > (timer.isLate ? MAX_RECORDED_MS : MAX_START_MS)) {
             giveUp();
-            return null;
+            return sTimer == timer ? timer : null;
         }
 
         return timer;

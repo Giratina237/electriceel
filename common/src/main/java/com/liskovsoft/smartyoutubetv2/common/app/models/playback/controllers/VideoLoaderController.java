@@ -1030,6 +1030,31 @@ public class VideoLoaderController extends BasePlayerController {
     }
 
     /**
+     * The video stopped at the attestation wall on the client its formats came from (see ErrorFixerController#countWallSwitch): what it
+     * played there was the server's grace period, not the client playing it. Not remembered for it, nor confirmed when it plays there
+     * again. A remembered pick the error fixer moves on from is forgotten when the next formats come (see forgetFailedClientPick), but
+     * stopped at the wall, none come: it would be asked first for a week, signed in too (97Z1YWD3).
+     */
+    void forgetWallClientPick() {
+        Video video = getVideo();
+        String client = getFormatClient();
+
+        if (video == null || video.videoId == null || client == null) {
+            return;
+        }
+
+        if (client.equals(mPendingPick) && video.videoId.equals(mPendingPickVideoId)) {
+            mPendingPick = null;
+            mPendingPickVideoId = null;
+        }
+
+        if (client.equals(VideoClientPicks.get(getContext(), video.videoId))) {
+            Log.d(TAG, "%s stopped at the attestation wall on %s: not asked first again", video.videoId, client);
+            VideoClientPicks.forget(getContext(), video.videoId);
+        }
+    }
+
+    /**
      * The client remembered for the video (see VideoClientPicks) failed it, and isn't asked first again: asked, it didn't give the
      * formats (it refused it, or gave none), or the video played on it and its formats are another client's now (its segments failed,
      * and the error fixer moved on). Not when the user picked the client for it, nor for formats of another client it wasn't asked for

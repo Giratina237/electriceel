@@ -50,7 +50,6 @@ import com.liskovsoft.smartyoutubetv2.common.utils.NetworkEngineFallback;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.googlecommon.common.helpers.DefaultHeaders;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CancelableCalls;
-import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SabrHostPrewarmer;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SabrLiveHeadFetcher;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SabrSessionRefresher;
 
@@ -109,8 +108,6 @@ public class ExoMediaSourceFactory {
     public ExoMediaSourceFactory(Context context) {
         mContext = context;
         ValidatedNetworkState.install(context);
-        // The host a SABR stream is sent to is connected to while the response that said so is read
-        SabrHostPrewarmer.init(context);
         // A canceled load's OkHttp call is aborted, e.g. on a seek (see CancelableCalls)
         CancelableCalls.install();
     }

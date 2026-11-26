@@ -604,6 +604,9 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             ((SabrProtocolError) cause).setRequest(manifest.getLastRequest(trackType), manifest.getSessionAgeMs());
         }
 
+        // Refused with HTTP 401 or 403: the same, kept for the app by the error (see SabrRefusedRequest)
+        SabrRefusedRequest.onLoadError(e, manifest.getLastRequest(trackType), manifest.getSessionAgeMs());
+
         // A reload request is not a transport failure. Handing it back as "handled" would
         // retry the very same request at full speed. Let it fall through to the
         // LoadErrorHandlingPolicy, which fails the load: the app reloads the video with the token.
@@ -730,7 +733,24 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             prefetcher.clear(); // another time
             liveSegmentsPerResponse = 1;
             livePrefetchSequenceNumber = -1;
-            return dataSource;
+
+            // A retry at the head waits (see newMediaChunk): nothing after it exists yet. Nor of 1 s segments: a response holds the
+            // ones after the one asked for too (see prefetchAhead), so the seek's own brings the next ones, and asking for them as well
+            // would load them twice while the start waits
+            if (nextLiveLoadTimeMs != C.TIME_UNSET || manifest.liveSegmentTargetDurationSec < 2) {
+                return dataSource;
+            }
+
+            // Which segment the seek brings first isn't known till it comes. Its number isn't worked out from the target's time: the
+            // head's time isn't known here, and from the target duration alone the number drifts (2 s segments of a 29.97 fps stream
+            // are 2.002 s), while one off asks for a segment the player doesn't read. The ones after it are asked for as soon as its
+            // header is read, while its media loads, not once the chunk is loaded: a live start fetched the 2 s segments it needed one
+            // after another, at about a second or more each (CQHM6BGP hMzTblhfTvc: ready at 4068 ms, after a second audio segment
+            // that took 1771 ms).
+            SabrManifest seekManifest = manifest;
+            int bitrate = trackSelection.getSelectedFormat().bitrate;
+            return new SabrLivePrefetcher.FirstSegmentDataSource(dataSource,
+                    () -> prefetchAfterFirstSegment(prefetcher, seekManifest, trackType, iTag, bitrate));
         }
 
         MediaHeader last = sabrStream.getInitializedFormat(iTag);
@@ -741,13 +761,49 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
 
         updateLiveSegmentsPerResponse(last.getSequenceNumber());
         DataSource chunkDataSource = prefetcher.dataSourceFor(iTag, last.getSequenceNumber() + 1L, dataSource);
-        long head = sabrStream.getLiveHeadSequenceNumber();
         long targetDurationMs = manifest.liveSegmentTargetDurationSec * 1_000L;
         int segmentsPerResponse = liveSegmentsPerResponse;
         int maxPrefetchBytes = SabrLivePrefetcher.getMaxResponseBytes(
                 trackSelection.getSelectedFormat().bitrate, targetDurationMs, segmentsPerResponse);
+        // The one after last is the player's own request
+        prefetchAhead(prefetcher, manifest, trackType, iTag, last, 1, segmentsPerResponse, maxPrefetchBytes);
 
-        for (int k = 1; k <= SabrLivePrefetcher.PREFETCH_COUNT; k++) {
+        return chunkDataSource;
+    }
+
+    /**
+     * On a seek's chunk's loading thread, before each read (see SabrLivePrefetcher.FirstSegmentDataSource): once the seek's first
+     * segment came, the ones after it are asked for, the player's next request first
+     *
+     * @return whether it came
+     */
+    private boolean prefetchAfterFirstSegment(SabrLivePrefetcher prefetcher, SabrManifest manifest, int trackType, int iTag,
+                                              int bitrate) {
+        SabrStream stream = Assertions.checkNotNull(sabrStream);
+        // Its header, read before its media: the segment ended only at its MEDIA_END, about when the player asks for the next itself
+        MediaHeader first = stream.getNewestLiveHeader(iTag);
+
+        if (first == null || !first.hasSequenceNumber()) {
+            return false;
+        }
+
+        int maxPrefetchBytes = SabrLivePrefetcher.getMaxResponseBytes(bitrate, manifest.liveSegmentTargetDurationSec * 1_000L, 1);
+        prefetchAhead(prefetcher, manifest, trackType, iTag, first, 0, 1, maxPrefetchBytes);
+
+        return true;
+    }
+
+    /**
+     * Asks for PREFETCH_COUNT segments after the newest one received, none past the head
+     *
+     * @param firstStep of the first one asked for, in responses past the one after last: 0 for that one
+     */
+    private void prefetchAhead(SabrLivePrefetcher prefetcher, SabrManifest manifest, int trackType, int iTag, MediaHeader last,
+                               int firstStep, int segmentsPerResponse, int maxPrefetchBytes) {
+        long head = Assertions.checkNotNull(sabrStream).getLiveHeadSequenceNumber();
+        long targetDurationMs = manifest.liveSegmentTargetDurationSec * 1_000L;
+
+        for (int k = firstStep; k < firstStep + SabrLivePrefetcher.PREFETCH_COUNT; k++) {
             // A response holds the segments after the one asked for too (3 behind the head of a 1 s stream): the ones asked for ahead
             // are as far apart. One by one, each segment came in 3 responses, and 2 of them weren't read: 3x the bytes for as long as
             // the player stayed behind the head (2026-11-15).
@@ -770,8 +826,6 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                     0, 0, C.LENGTH_UNSET, null, 0, sabrHeaders);
             prefetcher.prefetch(iTag, sequenceNumber, dataSpec, maxPrefetchBytes);
         }
-
-        return chunkDataSource;
     }
 
     /**

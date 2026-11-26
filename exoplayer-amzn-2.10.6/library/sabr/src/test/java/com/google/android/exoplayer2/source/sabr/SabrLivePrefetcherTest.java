@@ -14,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.TrackGroup;
+import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.source.chunk.ChunkHolder;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
 import com.google.android.exoplayer2.source.sabr.manifest.AdaptationSet;
@@ -40,6 +41,7 @@ import com.google.android.exoplayer2.util.MimeTypes;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -216,6 +218,47 @@ public class SabrLivePrefetcherTest {
     }
 
     /**
+     * Which segment a live seek brings first isn't known before it comes: the three after it, the player's next one first, are asked
+     * for as soon as its header is read, while its media still loads, not once the chunk is loaded (CQHM6BGP hMzTblhfTvc: a start
+     * fetched the 2 s segments it needed one after another, at about a second each)
+     */
+    @Test
+    public void theSegmentsAfterASeeksFirstAreAskedForAsItComes() throws Exception {
+        RecordingFactory factory = new RecordingFactory(RESPONSE);
+        SabrManifest manifest = liveManifest(2);
+        DefaultSabrChunkSource source = source(manifest);
+        source.enableLivePrefetch(factory, null);
+        MediaChunk seek = firstChunk(source);
+        DataSource loading = loadingDataSource(seek);
+        loading.open(seek.dataSpec);
+        loading.read(new byte[16], 0, 16);
+        assertTrue(factory.sources.isEmpty()); // nothing came yet
+
+        receive(manifest.getSabrStream(C.TRACK_TYPE_AUDIO), SEQUENCE + 10); // its first segment's header: SEQUENCE
+        loading.read(new byte[16], 0, 16);
+        loading.read(new byte[16], 0, 16);
+
+        assertEquals(3, factory.sources.size()); // once
+        for (int i = 0; i < 3; i++) { // SEQUENCE + 1, + 2 and + 3, each as if after the one before it
+            VideoPlaybackAbrRequest request = VideoPlaybackAbrRequest.parseFrom(opened(factory.sources.get(i)).httpBody);
+            assertEquals(SEQUENCE + i, request.getBufferedRanges(0).getStartSegmentIndex());
+        }
+
+        // The player's next request gets the one asked for ahead, and one more is asked for
+        source.getNextChunk(0, 0, Collections.singletonList(seek), new ChunkHolder());
+        assertEquals(4, factory.sources.size());
+    }
+
+    /**
+     * What the chunk loads from
+     */
+    private static DataSource loadingDataSource(Chunk chunk) throws Exception {
+        Field field = Chunk.class.getDeclaredField("dataSource");
+        field.setAccessible(true);
+        return (DataSource) field.get(chunk);
+    }
+
+    /**
      * Its request, once the prefetch's thread opened it
      */
     private static DataSpec opened(RecordingDataSource source) throws InterruptedException {
@@ -367,7 +410,9 @@ public class SabrLivePrefetcherTest {
         @Nullable
         @Override
         public Uri getUri() {
-            return null;
+            // As a real one's once open: a chunk's StatsDataSource asks for it
+            DataSpec dataSpec = this.dataSpec;
+            return dataSpec != null ? dataSpec.uri : null;
         }
 
         @Override

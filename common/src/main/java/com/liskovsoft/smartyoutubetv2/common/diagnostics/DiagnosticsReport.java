@@ -319,13 +319,25 @@ public final class DiagnosticsReport {
         // On, but turned off for the run after it froze the picture or stalled, or for good after it did in two runs (see
         // TunnelingFallback)
         video.put("tunneledPlaybackOff", TunnelingFallback.isOff(context));
+        // When the user last set it again while it was suspended: one more frozen run suspends it again (see TunnelingFallback#reset).
+        // H5B64KBE to Y1D66CNW, the reset could only be told from tunneledPlaybackOff and the decoder's name.
+        long tunnelingResetAt = TunnelingFallback.getSuspendedResetAt(context);
+        video.put("tunneledPlaybackResetAt", tunnelingResetAt > 0 ? formatUtc(tunnelingResetAt) : JSONObject.NULL);
         video.put("avcOverVp9", tweaksData.isAvcOverVp9Preferred());
         video.put("amlogicFix", tweaksData.isAmlogicFixEnabled());
         video.put("sonyFrameDropFix", tweaksData.isSonyFrameDropFixEnabled());
         video.put("highBitrateFormats", tweaksData.isHighBitrateFormatsEnabled());
         video.put("altPresets", tweaksData.isAltPresetsEnabled());
         video.put("bufferType", getBufferTypeName(playerData.getVideoBufferType()));
+        // On, a live stream plays from the end of its window, not 15 s behind it (see LiveEdge): the live starts of 2M1DY5CD and
+        // MD8RQZM2, sent to the end again and again, were taken for ones placed 15 s behind it
+        video.put("bufferOnStreamsDisabled", tweaksData.isBufferOnStreamsDisabled());
         video.put("networkErrorFixingDisabled", tweaksData.isNetworkErrorFixingDisabled());
+        // The format asked for, as a failure's formats say it (see FormatAttempts#toJson), and whether it's the device's default rather
+        // than the user's pick: 1080p on a 720p screen over a slow link (NVHZS7YS) and AV1 on a software decoder (XF9KYTK1) said neither
+        FormatItem videoFormat = playerData.getFormat(FormatItem.TYPE_VIDEO);
+        video.put("requestedFormat", describeRequested(PlayerFailure.describeVideo(videoFormat)));
+        video.put("requestedFormatDefault", videoFormat != null && videoFormat.equals(playerData.getDefaultVideoFormat()));
         settings.put("video", video);
 
         JSONObject audio = new JSONObject();
@@ -338,6 +350,10 @@ public final class DiagnosticsReport {
         audio.put("autoVolume", tweaksData.isPlayerAutoVolumeEnabled());
         audio.put("audioFocus", tweaksData.isAudioFocusEnabled());
         audio.put("language", nullable(emptyToNull(playerData.getAudioLanguage())));
+        // As the video's: off with the sound off
+        FormatItem audioFormat = playerData.getFormat(FormatItem.TYPE_AUDIO);
+        audio.put("requestedFormat", playerData.isSoundOff() ? "off" : describeRequested(PlayerFailure.describeAudio(audioFormat)));
+        audio.put("requestedFormatDefault", audioFormat != null && audioFormat.equals(playerData.getDefaultAudioFormat()));
         settings.put("audio", audio);
 
         JSONObject autoFrameRate = new JSONObject();
@@ -369,6 +385,13 @@ public final class DiagnosticsReport {
         settings.put("country", nullable(emptyToNull(localeManager.getCountry())));
 
         return settings;
+    }
+
+    /**
+     * A format asked for, auto when none is set (see FormatAttempts#toJson)
+     */
+    private static String describeRequested(@Nullable String description) {
+        return description != null ? description : "auto";
     }
 
     /**

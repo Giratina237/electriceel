@@ -97,6 +97,7 @@ public final class PlayerCommands {
      */
     public static void onSeek(String source, long positionMs) {
         add("seek", source, null, positionMs);
+        Plays.onSeek(source, positionMs);
     }
 
     /**

@@ -80,7 +80,8 @@ public final class VideoStart {
      */
     public static final String OUTCOME_WAITING = "waiting";
     /**
-     * Not playing 15 s after the user's action (see VideoStarts#MAX_START_MS)
+     * Not playing a minute after the user's action (see VideoStarts#MAX_RECORDED_MS). One that played or was left sooner, past 15 s,
+     * is recorded as that (it was given up at 15 s).
      */
     public static final String OUTCOME_GAVE_UP = "gave_up";
     /**
@@ -585,6 +586,8 @@ public final class VideoStart {
             case "player preprocess":
             case "n-function load":
             case "decipher":
+            case "player load":
+            case "solve":
                 return Category.PLAYER_JS;
             case VideoStarts.STAGE_BUFFERING:
             case VideoStarts.STAGE_FIRST_VIDEO_CHUNK:
@@ -607,6 +610,7 @@ public final class VideoStart {
             case VideoStarts.STAGE_REUSED:
             case VideoStarts.STAGE_RECOVERY:
             case "cached":
+            case "player stand-in":
                 return Category.MARK;
             default:
                 // The fetch's: each client's attempt, its request, sign-in, the subtitles, the HLS fix…

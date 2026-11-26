@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.ext.cronet.CronetDataSource;
 import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
@@ -32,8 +33,11 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -44,6 +48,11 @@ import okhttp3.EventListener;
 import okhttp3.OkHttpClient;
 import okhttp3.Protocol;
 import okhttp3.Request;
+
+import org.chromium.net.CronetException;
+import org.chromium.net.RequestFinishedInfo;
+import org.chromium.net.UrlRequest;
+import org.chromium.net.UrlResponseInfo;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -58,6 +67,14 @@ public class ConnectionsTest {
     private static final Format VIDEO = Format.createContainerFormat("248", "video/webm", "video/x-vnd.on2.vp9", "vp9", 17_668_000,
             0, null);
     private static final Format AUDIO = Format.createContainerFormat("251", "audio/webm", "audio/opus", "opus", 128_000, 0, "en");
+    /**
+     * Of a SABR request: each has its own (rn)
+     */
+    private static final String URL = "https://" + HOST + "/videoplayback?sabr=1&rn=3";
+    /**
+     * The wall clock at the test clock's 0
+     */
+    private static final long WALL_T0 = 1_792_000_000_000L;
     private final AtomicLong mNow = new AtomicLong();
     @Rule
     public TemporaryFolder mFolder = new TemporaryFolder();
@@ -286,6 +303,128 @@ public class ConnectionsTest {
     }
 
     /**
+     * EY23XNK9 19:07:40, WVE7ZKDD 00:30:36: the openings a restore seek cancelled said "failed". Cronet's interrupted open is its own
+     * InterruptedIOException, not java.io's: cancelled, left out when short, as the other engines' are
+     */
+    @Test
+    public void aCronetOpeningCancelledIsntAFailure() {
+        DataSource source = Connections.timeOpenings(new FakeDataSource(40, cronetInterrupted()));
+        mNow.set(1_000);
+
+        try {
+            source.open(new DataSpec(Uri.parse("https://example.com/videoplayback")));
+        } catch (IOException e) {
+            // As the player gets it
+        }
+
+        assertTrue(Connections.take(500, 3_000).isEmpty());
+    }
+
+    /**
+     * Cancelled after it waited long: shown, as cancelled
+     */
+    @Test
+    public void aLongCronetOpeningCancelledSaysSo() {
+        DataSource source = Connections.timeOpenings(new FakeDataSource(900, cronetInterrupted()));
+        mNow.set(1_000);
+
+        try {
+            source.open(new DataSpec(Uri.parse("https://example.com/videoplayback")));
+        } catch (IOException e) {
+            // As the player gets it
+        }
+
+        List<VideoStart.Stage> stages = Connections.take(500, 3_000);
+
+        assertEquals(1, stages.size());
+        assertEquals(Connections.FAILURE_CANCELLED, stages.get(0).detail);
+        assertEquals(1_900, stages.get(0).endMs);
+    }
+
+    /**
+     * As CronetDataSource#open throws it when its thread is interrupted (e.g. a seek cancelled the load)
+     */
+    private static IOException cronetInterrupted() {
+        return new CronetDataSource.OpenException(new CronetDataSource.InterruptedIOException(new InterruptedException()),
+                new DataSpec(Uri.parse("https://example.com/videoplayback")), UrlRequest.Status.INVALID);
+    }
+
+    /**
+     * WVE7ZKDD 11-24 01:57:39: both init chunks' openings took 5.08 s, and nothing told the lookup from the connect or the server.
+     * Cronet's metrics of the request, once it ended, say where the time went.
+     */
+    @Test
+    public void aCronetOpeningSaysWhereItsTimeWent() throws IOException {
+        Connections.sWallClock = () -> WALL_T0 + mNow.get();
+        DataSource source = Connections.timeOpenings(new FakeDataSource(5_080, null));
+        mNow.set(1_000);
+        source.open(new DataSpec(Uri.parse(URL)));
+        mNow.set(6_500);
+        FakeMetrics metrics = new FakeMetrics(WALL_T0 + 1_001);
+        metrics.dnsStart = 1L;
+        metrics.dnsEnd = 5_004L;
+        metrics.connectStart = 5_004L;
+        metrics.connectEnd = 5_074L;
+        metrics.sslStart = 5_030L;
+        metrics.sslEnd = 5_074L;
+        metrics.sendingStart = 5_075L;
+        metrics.responseStart = 5_079L;
+        Connections.onRequestFinished(new FakeInfo(URL, metrics, "h2"));
+
+        List<VideoStart.Stage> stages = Connections.take(500, 7_000);
+
+        assertEquals(1, stages.size());
+        assertEquals(VideoStarts.STAGE_OPENING, stages.get(0).name);
+        assertEquals("DNS 5003 ms, connect 70 ms (TLS 44 ms), h2, response 4 ms", stages.get(0).detail);
+        assertEquals(6_080, stages.get(0).endMs);
+    }
+
+    /**
+     * NVHZS7YS: 0.47-0.72 s openings on a connection that may have been one already open. A reused one says so, with no lookup or
+     * connect. Not ended yet, a request has no metrics: its opening says what it did.
+     */
+    @Test
+    public void aCronetOpeningOnAReusedConnectionSaysSo() throws IOException {
+        Connections.sWallClock = () -> WALL_T0 + mNow.get();
+        DataSource source = Connections.timeOpenings(new FakeDataSource(470, null));
+        mNow.set(1_000);
+        source.open(new DataSpec(Uri.parse(URL)));
+
+        assertNull(Connections.take(500, 3_000).get(0).detail);
+
+        FakeMetrics metrics = new FakeMetrics(WALL_T0 + 1_000);
+        metrics.isReused = true;
+        metrics.sendingStart = 2L;
+        metrics.responseStart = 468L;
+        Connections.onRequestFinished(new FakeInfo(URL, metrics, "h3"));
+
+        assertEquals("reused, h3, response 466 ms", Connections.take(500, 3_000).get(0).detail);
+    }
+
+    /**
+     * The same URL asked again (e.g. a retry): the metrics are the request's made nearest their start. Another URL's (e.g. the API's
+     * on the same engine) are no opening's.
+     */
+    @Test
+    public void cronetMetricsGoToTheirOwnOpening() {
+        Connections.sWallClock = () -> WALL_T0 + mNow.get();
+        Connections.addOpening(1_000, 1_400, "video chunk", URL);
+        Connections.addOpening(9_000, 9_300, "video chunk", URL);
+        mNow.set(10_000);
+        FakeMetrics other = new FakeMetrics(WALL_T0 + 1_000);
+        other.isReused = true;
+        Connections.onRequestFinished(new FakeInfo("https://www.youtube.com/youtubei/v1/player", other, "h2"));
+        FakeMetrics retry = new FakeMetrics(WALL_T0 + 9_002);
+        retry.isReused = true;
+        Connections.onRequestFinished(new FakeInfo(URL, retry, "h2"));
+
+        List<VideoStart.Stage> stages = Connections.take(500, 10_000);
+
+        assertEquals("video chunk", stages.get(0).detail);
+        assertEquals("video chunk, reused, h2", stages.get(1).detail);
+    }
+
+    /**
      * A file or an asset isn't a request
      */
     @Test
@@ -394,9 +533,135 @@ public class ConnectionsTest {
         List<VideoStart.Stage> stages = Connections.take(500, 7_000);
 
         assertEquals(1, stages.size());
-        assertEquals("DNS 3 ms, IPv4 timed out after 5000 ms, IPv6 70 ms, http/1.1", stages.get(0).detail);
+        assertEquals("DNS 3 ms, IPv4 (at 3 ms) timed out after 5000 ms, IPv6 (at 5003 ms) 70 ms, http/1.1", stages.get(0).detail);
         assertEquals(1_000, stages.get(0).startMs);
         assertEquals(6_073, stages.get(0).endMs);
+    }
+
+    /**
+     * W6k1qMUmzJs (MD8RQZM2): IPv4 tried only once IPv6 gave up 4 s in, its rows read as a race would have. Each address of several
+     * says when it began; one whose TCP connect ended and whose TLS handshake hung says so: OkHttp's fast fallback races the TCP
+     * connects only, and the handshake waits the read timeout (the SABR loads' 4 s, not the 5 s connect timeout).
+     */
+    @Test
+    public void aSequenceOfAddressesSaysWhenEachBeganAndWhereItHung() {
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.dnsStart(mCall, HOST);
+        mNow.set(1_043);
+        listener.dnsEnd(mCall, HOST, Arrays.asList(IPV6, IPV4));
+        listener.connectStart(mCall, new InetSocketAddress(IPV6, 443), Proxy.NO_PROXY);
+        mNow.set(1_069);
+        listener.secureConnectStart(mCall);
+        mNow.set(5_069);
+        listener.connectFailed(mCall, new InetSocketAddress(IPV6, 443), Proxy.NO_PROXY, null, new SocketTimeoutException("Read timed out"));
+        listener.connectStart(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY);
+        mNow.set(5_090);
+        listener.secureConnectStart(mCall);
+        mNow.set(6_119);
+        listener.connectEnd(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY, Protocol.HTTP_1_1);
+
+        assertEquals("DNS 43 ms, IPv6 (at 43 ms) TLS timed out after 4026 ms, IPv4 (at 4069 ms) 1050 ms, http/1.1",
+                Connections.take(500, 7_000).get(0).detail);
+    }
+
+    /**
+     * A race (fast fallback): the next address 250 ms into the first, which is given up on once it connected. Two going at a TLS
+     * handshake's start: which one's TCP connect won isn't told.
+     */
+    @Test
+    public void aRaceOfAddressesSaysWhenEachBegan() {
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.dnsStart(mCall, HOST);
+        mNow.set(1_043);
+        listener.dnsEnd(mCall, HOST, Arrays.asList(IPV6, IPV4));
+        listener.connectStart(mCall, new InetSocketAddress(IPV6, 443), Proxy.NO_PROXY);
+        mNow.set(1_293);
+        listener.connectStart(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY);
+        mNow.set(1_320);
+        listener.secureConnectStart(mCall);
+        mNow.set(1_343);
+        listener.connectEnd(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY, Protocol.HTTP_2);
+
+        assertEquals("DNS 43 ms, IPv6 (at 43 ms) cancelled after 300 ms, IPv4 (at 293 ms) 50 ms, h2",
+                Connections.take(500, 3_000).get(0).detail);
+    }
+
+    /**
+     * 93HXRTB5 G0s4r2KS3ok: the video init chunk's "connect 1474 ms" was a lookup of 840 ms, then the connection the audio init chunk
+     * opened meanwhile, taken from the pool: no address of its own, its request sent 1 ms later. It ran to the call's end.
+     */
+    @Test
+    public void aConnectionTakenFromThePoolAfterTheLookupEndsThere() {
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.dnsStart(mCall, HOST);
+        mNow.set(1_840);
+        listener.dnsEnd(mCall, HOST, Collections.singletonList(IPV4));
+        mNow.set(1_841);
+        listener.connectionAcquired(mCall, pooled(Protocol.HTTP_1_1));
+        listener.requestHeadersStart(mCall);
+        mNow.set(2_349);
+        listener.responseBodyStart(mCall);
+        mNow.set(2_474);
+        listener.callEnd(mCall);
+
+        VideoStart.Stage connect = Connections.take(500, 3_000).get(0);
+
+        assertEquals(VideoStarts.STAGE_CONNECT, connect.name);
+        assertEquals("DNS 840 ms, pooled, http/1.1", connect.detail);
+        assertEquals(1_000, connect.startMs);
+        assertEquals(1_841, connect.endMs);
+    }
+
+    /**
+     * The connection the call opened is acquired after its connect ended: nothing more to it
+     */
+    @Test
+    public void aConnectionOfItsOwnIsntPooled() {
+        EventListener listener = Connections.LISTENER.create(mCall);
+        mNow.set(1_000);
+        listener.dnsStart(mCall, HOST);
+        mNow.set(1_002);
+        listener.dnsEnd(mCall, HOST, Collections.singletonList(IPV4));
+        listener.connectStart(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY);
+        mNow.set(1_070);
+        listener.connectEnd(mCall, new InetSocketAddress(IPV4, 443), Proxy.NO_PROXY, Protocol.HTTP_1_1);
+        mNow.set(1_071);
+        listener.connectionAcquired(mCall, pooled(Protocol.HTTP_1_1));
+
+        VideoStart.Stage connect = Connections.take(500, 3_000).get(0);
+
+        assertEquals("DNS 2 ms, IPv4 68 ms, http/1.1", connect.detail);
+        assertEquals(1_070, connect.endMs);
+    }
+
+    /**
+     * A connection of the pool, as OkHttp gives it: only its protocol is read
+     */
+    private static okhttp3.Connection pooled(Protocol protocol) {
+        return new okhttp3.Connection() {
+            @Override
+            public okhttp3.Route route() {
+                return null;
+            }
+
+            @Override
+            public java.net.Socket socket() {
+                return null;
+            }
+
+            @Override
+            public okhttp3.Handshake handshake() {
+                return null;
+            }
+
+            @Override
+            public Protocol protocol() {
+                return protocol;
+            }
+        };
     }
 
     @Test
@@ -828,6 +1093,216 @@ public class ConnectionsTest {
             return InetAddress.getByAddress(bytes);
         } catch (UnknownHostException e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * Cronet's metrics of a request: its start on the wall clock, the others in ms since it (null for none)
+     */
+    private static final class FakeMetrics extends RequestFinishedInfo.Metrics {
+        private final long mRequestStartMs;
+        Long dnsStart;
+        Long dnsEnd;
+        Long connectStart;
+        Long connectEnd;
+        Long sslStart;
+        Long sslEnd;
+        Long sendingStart;
+        Long responseStart;
+        boolean isReused;
+
+        FakeMetrics(long requestStartMs) {
+            mRequestStartMs = requestStartMs;
+        }
+
+        @Nullable
+        private Date at(@Nullable Long sinceStartMs) {
+            return sinceStartMs != null ? new Date(mRequestStartMs + sinceStartMs) : null;
+        }
+
+        @Override
+        public Date getRequestStart() {
+            return new Date(mRequestStartMs);
+        }
+
+        @Override
+        public Date getDnsStart() {
+            return at(dnsStart);
+        }
+
+        @Override
+        public Date getDnsEnd() {
+            return at(dnsEnd);
+        }
+
+        @Override
+        public Date getConnectStart() {
+            return at(connectStart);
+        }
+
+        @Override
+        public Date getConnectEnd() {
+            return at(connectEnd);
+        }
+
+        @Override
+        public Date getSslStart() {
+            return at(sslStart);
+        }
+
+        @Override
+        public Date getSslEnd() {
+            return at(sslEnd);
+        }
+
+        @Override
+        public Date getSendingStart() {
+            return at(sendingStart);
+        }
+
+        @Override
+        public Date getSendingEnd() {
+            return at(sendingStart);
+        }
+
+        @Override
+        public Date getPushStart() {
+            return null;
+        }
+
+        @Override
+        public Date getPushEnd() {
+            return null;
+        }
+
+        @Override
+        public Date getResponseStart() {
+            return at(responseStart);
+        }
+
+        @Override
+        public Date getRequestEnd() {
+            return null;
+        }
+
+        @Override
+        public boolean getSocketReused() {
+            return isReused;
+        }
+
+        @Override
+        public Long getTtfbMs() {
+            return null;
+        }
+
+        @Override
+        public Long getTotalTimeMs() {
+            return null;
+        }
+
+        @Override
+        public Long getSentByteCount() {
+            return null;
+        }
+
+        @Override
+        public Long getReceivedByteCount() {
+            return null;
+        }
+    }
+
+    /**
+     * A request of Cronet's that ended, as its engine tells it (see CronetManager#setRequestFinishedListener)
+     */
+    private static final class FakeInfo extends RequestFinishedInfo {
+        private final String mUrl;
+        private final Metrics mMetrics;
+        private final String mProtocol;
+
+        FakeInfo(String url, Metrics metrics, String protocol) {
+            mUrl = url;
+            mMetrics = metrics;
+            mProtocol = protocol;
+        }
+
+        @Override
+        public String getUrl() {
+            return mUrl;
+        }
+
+        @Override
+        public Collection<Object> getAnnotations() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public Metrics getMetrics() {
+            return mMetrics;
+        }
+
+        @Override
+        public int getFinishedReason() {
+            return 0;
+        }
+
+        @Override
+        public UrlResponseInfo getResponseInfo() {
+            return new UrlResponseInfo() {
+                @Override
+                public String getUrl() {
+                    return mUrl;
+                }
+
+                @Override
+                public List<String> getUrlChain() {
+                    return Collections.singletonList(mUrl);
+                }
+
+                @Override
+                public int getHttpStatusCode() {
+                    return 200;
+                }
+
+                @Override
+                public String getHttpStatusText() {
+                    return "OK";
+                }
+
+                @Override
+                public List<Map.Entry<String, String>> getAllHeadersAsList() {
+                    return Collections.emptyList();
+                }
+
+                @Override
+                public Map<String, List<String>> getAllHeaders() {
+                    return Collections.emptyMap();
+                }
+
+                @Override
+                public boolean wasCached() {
+                    return false;
+                }
+
+                @Override
+                public String getNegotiatedProtocol() {
+                    return mProtocol;
+                }
+
+                @Override
+                public String getProxyServer() {
+                    return null;
+                }
+
+                @Override
+                public long getReceivedByteCount() {
+                    return 0;
+                }
+            };
+        }
+
+        @Override
+        public CronetException getException() {
+            return null;
         }
     }
 

@@ -1,12 +1,14 @@
 package com.liskovsoft.smartyoutubetv2.common.diagnostics;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 
 import com.liskovsoft.googlecommon.common.locale.LocaleManager;
 import com.liskovsoft.mediaserviceinterfaces.oauth.Account;
 import com.liskovsoft.sharedutils.locale.LocaleUpdater;
 import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AppPrefs;
@@ -245,6 +247,28 @@ public class DiagnosticsReportTest {
         assertTrue(settings.getJSONObject("autoFrameRate").has("enabled"));
     }
 
+    /**
+     * H5B64KBE to Y1D66CNW: the user set tunneled playback again while it was suspended, which only tunneledPlaybackOff and the decoder's
+     * name told. When it was, null for never.
+     */
+    @Test
+    public void aSuspendedTunnelingSetAgainSaysWhen() throws Exception {
+        SharedPreferences prefs = getContext().getSharedPreferences("tunneling_fallback", Context.MODE_PRIVATE);
+        prefs.edit().clear().commit();
+
+        assertTrue(getVideoSettings().isNull("tunneledPlaybackResetAt"));
+
+        prefs.edit().putBoolean("suspended", true).commit();
+        TunnelingFallback.reset(getContext());
+
+        assertTrue(getVideoSettings().getString("tunneledPlaybackResetAt").matches("\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ"));
+        prefs.edit().clear().commit();
+    }
+
+    private static JSONObject getVideoSettings() throws Exception {
+        return build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings").getJSONObject("video");
+    }
+
     @Test
     public void theLanguageAndCountryAreTheOnesInUse() throws Exception {
         setLocale("ru", "US");
@@ -312,6 +336,60 @@ public class DiagnosticsReportTest {
             assertFalse(build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings").getBoolean("mediaSession"));
         } finally {
             tweaksData.setPlaybackNotificationsDisabled(savedDisabled);
+        }
+    }
+
+    /**
+     * NVHZS7YS played 1080p on a 720p screen over a slow link, XF9KYTK1 AV1 on a software decoder: nothing said whether that was the
+     * format asked for, nor whether the user had picked it
+     */
+    @Test
+    public void theFormatsAskedForAreSaidAndWhetherTheDefault() throws Exception {
+        PlayerData playerData = PlayerData.instance(getContext());
+        FormatItem savedVideo = playerData.getFormat(FormatItem.TYPE_VIDEO);
+        FormatItem savedAudio = playerData.getFormat(FormatItem.TYPE_AUDIO);
+
+        try {
+            playerData.setFormat(ExoFormatItem.fromVideoSpec("1920,1080,60,av01", false));
+            playerData.setFormat(FormatItem.AUDIO_51_EC3);
+            JSONObject settings = build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings");
+
+            assertEquals("1920x1080 av01 60fps", settings.getJSONObject("video").getString("requestedFormat"));
+            assertFalse(settings.getJSONObject("video").getBoolean("requestedFormatDefault"));
+            assertEquals("ec-3", settings.getJSONObject("audio").getString("requestedFormat"));
+            assertFalse(settings.getJSONObject("audio").getBoolean("requestedFormatDefault"));
+
+            playerData.setFormat(playerData.getDefaultVideoFormat());
+            playerData.setFormat(playerData.getDefaultAudioFormat());
+            settings = build(null, 0, Collections.emptyList()).getJSONObject("app").getJSONObject("settings");
+
+            assertEquals(PlayerFailure.describeVideo(playerData.getDefaultVideoFormat()),
+                    settings.getJSONObject("video").getString("requestedFormat"));
+            assertTrue(settings.getJSONObject("video").getBoolean("requestedFormatDefault"));
+            assertTrue(settings.getJSONObject("audio").getBoolean("requestedFormatDefault"));
+        } finally {
+            playerData.setFormat(savedVideo);
+            playerData.setFormat(savedAudio);
+        }
+    }
+
+    /**
+     * 2M1DY5CD and MD8RQZM2: a live start sent to the end of its window again and again was taken for one placed 15 s behind it, the
+     * buffer on streams' off not known
+     */
+    @Test
+    public void theBufferOnStreamsIsSaidOnOrOff() throws Exception {
+        PlayerTweaksData tweaksData = PlayerTweaksData.instance(getContext());
+        boolean savedDisabled = tweaksData.isBufferOnStreamsDisabled();
+
+        try {
+            tweaksData.setBufferOnStreamsDisabled(true);
+            assertTrue(getVideoSettings().getBoolean("bufferOnStreamsDisabled"));
+
+            tweaksData.setBufferOnStreamsDisabled(false);
+            assertFalse(getVideoSettings().getBoolean("bufferOnStreamsDisabled"));
+        } finally {
+            tweaksData.setBufferOnStreamsDisabled(savedDisabled);
         }
     }
 

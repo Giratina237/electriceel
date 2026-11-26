@@ -10,6 +10,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -22,14 +23,15 @@ import static org.junit.Assert.assertTrue;
 public class TunnelingFallbackTest {
     @Before
     public void setUp() {
-        TunnelingFallback.reset(getContext());
+        TunnelingFallback.clearForTesting(getContext());
         TunnelingFallback.newRunForTesting();
     }
 
     @After
     public void tearDown() {
-        TunnelingFallback.reset(getContext());
+        TunnelingFallback.clearForTesting(getContext());
         TunnelingFallback.newRunForTesting();
+        TunnelingFallback.sClock = System::currentTimeMillis;
     }
 
     @Test
@@ -68,19 +70,43 @@ public class TunnelingFallbackTest {
     }
 
     /**
-     * The user set the setting again: tried anew, the runs counted from none
+     * The user set the setting before it was suspended: tried anew, the runs counted from none
      */
     @Test
     public void aResetTriesItAgain() {
-        TunnelingFallback.turnOff(getContext());
-        TunnelingFallback.newRunForTesting();
         TunnelingFallback.turnOff(getContext());
 
         TunnelingFallback.reset(getContext());
 
         assertFalse(TunnelingFallback.isOff(getContext()));
+        TunnelingFallback.newRunForTesting();
         TunnelingFallback.turnOff(getContext());
         assertFalse(TunnelingFallback.isSuspended(getContext()));
+        assertEquals(-1, TunnelingFallback.getSuspendedResetAt(getContext()));
+    }
+
+    /**
+     * H5B64KBE #1 suspended it, the user turned the setting off and on, and the very next tunneled start froze (Y1D66CNW #1): tried
+     * again, but that one frozen run suspends it again, in the run the user set it in too. When the user set it is kept, the first of
+     * the two.
+     */
+    @Test
+    public void aResetOfASuspendedOneSuspendsItAgainAtTheNextFreeze() {
+        TunnelingFallback.turnOff(getContext());
+        TunnelingFallback.newRunForTesting();
+        TunnelingFallback.turnOff(getContext());
+        TunnelingFallback.newRunForTesting();
+
+        TunnelingFallback.sClock = () -> 1_795_545_600_000L;
+        TunnelingFallback.reset(getContext());
+        TunnelingFallback.sClock = () -> 1_795_545_605_000L;
+        TunnelingFallback.reset(getContext());
+
+        assertFalse(TunnelingFallback.isOff(getContext()));
+        assertEquals(1_795_545_600_000L, TunnelingFallback.getSuspendedResetAt(getContext()));
+
+        assertTrue(TunnelingFallback.turnOff(getContext()));
+        assertTrue(TunnelingFallback.isSuspended(getContext()));
     }
 
     private static Context getContext() {

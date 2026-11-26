@@ -309,6 +309,8 @@
     <string name="msg_mode_switch_error">Can\'t switch display mode to \"%s\"</string>
     <string name="msg_player_error">Player error occurred %s. Restarting playback…</string>
     <string name="msg_device_refuses_audio">The device refuses to play sound. Restart the device to fix it.</string>
+    <string name="msg_attestation_sign_in">YouTube stopped this video on every client to check that you\'re not a bot. Sign in to play it.</string>
+    <string name="msg_attestation_wall">YouTube stopped this video on every client to check that you\'re not a bot. Try it again later.</string>
     <string name="video_preset_disabled">Without preset</string>
     <string name="video_preset_enabled">Format of the next video will be set according to preset</string>
     <string name="player_sleep_timer">Sleep timer</string>

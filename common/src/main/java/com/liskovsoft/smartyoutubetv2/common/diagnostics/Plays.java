@@ -48,6 +48,10 @@ public final class Plays {
      * The last ones are kept one by one: how many there were is in the counts
      */
     static final int MAX_PAUSES = 20;
+    /**
+     * The last ones are kept one by one: how many there were is in the count
+     */
+    static final int MAX_SEEKS = 10;
     @VisibleForTesting
     static VideoStarts.Clock sClock = SystemClock::elapsedRealtime;
     @VisibleForTesting
@@ -101,6 +105,30 @@ public final class Plays {
         }
     }
 
+    private static final class Seek {
+        /**
+         * Wall clock
+         */
+        final long ts;
+        /**
+         * Where to
+         */
+        final long positionMs;
+        final String source;
+        /**
+         * The app's code that sent it (see VideoStarts#describeSeekCaller), null when not known
+         */
+        @Nullable
+        final String caller;
+
+        Seek(long ts, long positionMs, String source, @Nullable String caller) {
+            this.ts = ts;
+            this.positionMs = positionMs;
+            this.source = source;
+            this.caller = caller;
+        }
+    }
+
     private static final class Play {
         final String videoId;
         final long startTs;
@@ -119,6 +147,8 @@ public final class Plays {
          */
         @Nullable
         Pause openPause;
+        int seekCount;
+        final ArrayDeque<Seek> seeks = new ArrayDeque<>();
         /**
          * How it ended, or was last seen (see END_BACKGROUND), null while it goes on
          */
@@ -230,6 +260,29 @@ public final class Plays {
 
         if (!PlayerCommands.SOURCE_APP.equals(source)) {
             write(play);
+        }
+    }
+
+    /**
+     * The player was told to go to a position (see PlayerCommands#onSeek): kept with the play, written with it. A resume from 0:07 was
+     * left at 0:00.711 after 858 ms played, the position the player itself gave, and nothing said what had sent it back (XF9KYTK1
+     * 0zujjiTyeiA): a start's seeks are recorded only till its first frame.
+     *
+     * @param positionMs where to
+     */
+    static void onSeek(String source, long positionMs) {
+        Play play = sPlay;
+
+        if (play == null) {
+            return;
+        }
+
+        play.seekCount++;
+        play.seeks.addLast(new Seek(sWallClock.now(), positionMs, source,
+                VideoStarts.describeSeekCaller(Thread.currentThread().getStackTrace())));
+
+        if (play.seeks.size() > MAX_SEEKS) {
+            play.seeks.removeFirst();
         }
     }
 
@@ -348,7 +401,8 @@ public final class Plays {
 
     /**
      * {"playedMs", "end", "endPositionMs", "pauseCounts": {source: count}, "pauses": [{"ts", "positionMs", "source", "sender",
-     * "resumedAfterMs", "resumedBy"}]}: as it is now, its time played up to now
+     * "resumedAfterMs", "resumedBy"}], "seekCount", "seeks": [{"ts", "positionMs", "source", "caller"}]}: as it is now, its time played
+     * up to now
      */
     private static JSONObject toJson(Play play) {
         JSONObject result = new JSONObject();
@@ -397,6 +451,26 @@ public final class Plays {
                 }
 
                 result.put("pauses", pauses);
+            }
+
+            if (play.seekCount > 0) {
+                result.put("seekCount", play.seekCount);
+                JSONArray seeks = new JSONArray();
+
+                for (Seek seek : play.seeks) {
+                    JSONObject item = new JSONObject();
+                    item.put("ts", seek.ts);
+                    item.put("positionMs", seek.positionMs);
+                    item.put("source", seek.source);
+
+                    if (seek.caller != null) {
+                        item.put("caller", seek.caller);
+                    }
+
+                    seeks.put(item);
+                }
+
+                result.put("seeks", seeks);
             }
         } catch (JSONException e) {
             throw new IllegalStateException(e);

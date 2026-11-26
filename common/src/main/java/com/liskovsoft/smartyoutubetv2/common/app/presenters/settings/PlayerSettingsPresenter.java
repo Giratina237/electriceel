@@ -848,7 +848,8 @@ public class PlayerSettingsPresenter extends BasePresenter<Void> {
                 option -> mPlayerTweaksData.setAvcOverVp9Preferred(option.isSelected()),
                 mPlayerTweaksData.isAvcOverVp9Preferred()));
 
-        // On, but suspended on the device after it froze the picture in two runs (see TunnelingFallback): said, and set again, tried anew
+        // On, but suspended on the device after it froze the picture in two runs (see TunnelingFallback): said, and set again, tried again
+        // till it freezes once more (see TunnelingFallback#reset, which keeps when)
         boolean isTunnelingSuspended = mPlayerTweaksData.isTunneledPlaybackEnabled() && TunnelingFallback.isSuspended(getContext());
         options.add(UiOptionItem.from(getContext().getString(R.string.tunneled_video_playback),
                 getContext().getString(isTunnelingSuspended ? R.string.tunneled_video_playback_suspended_desc

@@ -212,6 +212,37 @@ public class PlaysTest {
     }
 
     /**
+     * XF9KYTK1 0zujjiTyeiA: a resume from 0:07 was left at 0:00.711, and nothing said what had sent it back. A play's seeks are kept with
+     * it, the last ones one by one; one without any has none.
+     */
+    @Test
+    public void aPlaysSeeksAreKeptWithIt() throws Exception {
+        Plays.onStarted("video", START_TS, true);
+        mNow.addAndGet(150);
+        Plays.onSeek(PlayerCommands.SOURCE_APP, 100);
+
+        for (int i = 0; i < Plays.MAX_SEEKS; i++) {
+            Plays.onSeek(PlayerCommands.SOURCE_MEDIA_SESSION, 1_000 + i);
+        }
+
+        Plays.onFinish(711);
+        Plays.onStarted("other", START_TS + 1, true);
+        Plays.onFinish(5_000);
+
+        JSONObject play = mPlays.get(0);
+        assertEquals(Plays.MAX_SEEKS + 1, play.getInt("seekCount"));
+        JSONArray seeks = play.getJSONArray("seeks");
+        assertEquals(Plays.MAX_SEEKS, seeks.length());
+        JSONObject first = seeks.getJSONObject(0);
+        assertEquals(WALL_OFFSET_MS + 50_000 + 150, first.getLong("ts"));
+        assertEquals(1_000, first.getLong("positionMs"));
+        assertEquals(PlayerCommands.SOURCE_MEDIA_SESSION, first.getString("source"));
+        assertFalse("a test's, not the app's code", first.has("caller"));
+        assertFalse(mPlays.get(1).has("seekCount"));
+        assertFalse(mPlays.get(1).has("seeks"));
+    }
+
+    /**
      * No start played (e.g. a card's preview, which isn't timed): nothing to add to
      */
     @Test

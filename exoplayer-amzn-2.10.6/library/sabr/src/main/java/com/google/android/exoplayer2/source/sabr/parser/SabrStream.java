@@ -418,6 +418,14 @@ public class SabrStream {
         return processor.getInitializedFormats().get(iTag);
     }
 
+    /**
+     * See SabrProcessor#getNewestLiveHeader
+     */
+    @Nullable
+    public MediaHeader getNewestLiveHeader(int iTag) {
+        return processor.getNewestLiveHeader(iTag);
+    }
+
     public StreamerContext createStreamerContext() {
         return processor.createStreamerContext();
     }

@@ -15,6 +15,8 @@ import com.google.android.exoplayer2.drm.DrmSessionManager;
 import com.google.android.exoplayer2.drm.FrameworkMediaCrypto;
 import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
 import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
+import com.google.android.exoplayer2.source.SampleStream;
+import com.google.android.exoplayer2.source.chunk.ChunkSampleStream;
 import com.google.android.exoplayer2.video.MediaCodecVideoRenderer;
 import com.google.android.exoplayer2.video.VideoRendererEventListener;
 import com.liskovsoft.sharedutils.mylogger.Log;
@@ -97,6 +99,22 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
     private volatile long mLastQueuedUs = C.TIME_UNSET;
     private volatile long mLastShownUs = C.TIME_UNSET;
     private volatile long mLastShownAtMs = -1;
+    /**
+     * {@link C#TIME_UNSET} for none: the position it was last sent to (a seek, or where it was enabled), in the renderer's time, and,
+     * tunneled, that less the first sample given to the decoder since: how far before it the keyframe the decoder goes from is. Set on
+     * the playback thread, the second read by the main one too (see {@link #getTunneledFrames()}).
+     */
+    private long mResetPositionUs = C.TIME_UNSET;
+    private volatile long mKeyframeBehindUs = C.TIME_UNSET;
+    /**
+     * Of the stream it reads: what's added to its samples' time to get the renderer's (see BaseRenderer#readSource). Playback thread.
+     */
+    private long mStreamOffsetUs;
+    /**
+     * As it was last rendered: how far past the position the video track's samples are loaded (see {@link #getBufferedAheadUs()}). Set
+     * on the playback thread, read by the main one.
+     */
+    private volatile long mBufferedAheadUs = C.TIME_UNSET;
 
     // Exo 2.9
     //public DebugInfoMediaCodecVideoRenderer(Context context, MediaCodecSelector mediaCodecSelector, long allowedJoiningTimeMs,
@@ -188,12 +206,45 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         mLastQueuedUs = C.TIME_UNSET;
         mLastShownUs = C.TIME_UNSET;
         mLastShownAtMs = -1;
+        mBufferedAheadUs = C.TIME_UNSET;
+    }
+
+    @Override
+    protected void onStreamChanged(Format[] formats, long offsetUs) throws ExoPlaybackException {
+        super.onStreamChanged(formats, offsetUs);
+        mStreamOffsetUs = offsetUs;
     }
 
     @Override
     public void render(long positionUs, long elapsedRealtimeUs) throws ExoPlaybackException {
         mPositionUs = positionUs;
+        long bufferedUs = getStreamBufferedUs();
+        mBufferedAheadUs = bufferedUs == C.TIME_UNSET || bufferedUs == C.TIME_END_OF_SOURCE ? bufferedUs : bufferedUs - positionUs;
         super.render(positionUs, elapsedRealtimeUs);
+    }
+
+    /**
+     * Where the video track's samples are loaded to, in the renderer's time: {@link C#TIME_END_OF_SOURCE} to its end, {@link C#TIME_UNSET}
+     * when its stream doesn't tell (a DASH or SABR one does, see ChunkSampleStream). Here, on the playback thread: its stream isn't
+     * made to be read on another.
+     */
+    private long getStreamBufferedUs() {
+        SampleStream stream = getStream();
+
+        if (!(stream instanceof ChunkSampleStream)) {
+            return C.TIME_UNSET;
+        }
+
+        long bufferedUs;
+
+        try {
+            bufferedUs = ((ChunkSampleStream<?>) stream).getBufferedPositionUs();
+        } catch (RuntimeException e) {
+            // Only told: the playback goes on whatever it is
+            return C.TIME_UNSET;
+        }
+
+        return bufferedUs == C.TIME_END_OF_SOURCE || bufferedUs == C.TIME_UNSET ? bufferedUs : bufferedUs + mStreamOffsetUs;
     }
 
     /**
@@ -218,6 +269,13 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         if (mIsTunneling) {
             long queuedUs = mLastQueuedUs;
             mLastQueuedUs = queuedUs == C.TIME_UNSET ? buffer.timeUs : Math.max(queuedUs, buffer.timeUs);
+
+            // The first since the position was set: the keyframe before it (see BaseRenderer#onPositionReset). The decoder goes from
+            // there to the position, and processOutputBuffer, which tells the frames it took, doesn't run in tunneling: 4 of 7 tunneled
+            // starts sent to a position froze, and how far each had to decode couldn't be told (H5B64KBE, Y1D66CNW).
+            if (mKeyframeBehindUs == C.TIME_UNSET && mResetPositionUs != C.TIME_UNSET) {
+                mKeyframeBehindUs = mResetPositionUs - buffer.timeUs;
+            }
         }
     }
 
@@ -277,6 +335,8 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         resetSkippedToPosition();
         // The codec was flushed: what it was given is gone
         mLastQueuedUs = C.TIME_UNSET;
+        mResetPositionUs = positionUs;
+        mKeyframeBehindUs = C.TIME_UNSET;
     }
 
     @Override
@@ -285,6 +345,9 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         setPendingFrameSteps(0);
         mPositionUs = C.TIME_UNSET;
         mLastQueuedUs = C.TIME_UNSET;
+        mResetPositionUs = C.TIME_UNSET;
+        mKeyframeBehindUs = C.TIME_UNSET;
+        mBufferedAheadUs = C.TIME_UNSET;
     }
 
     @Override
@@ -361,12 +424,24 @@ public class DebugInfoMediaCodecVideoRenderer extends MediaCodecVideoRenderer {
         long shownUs = mLastShownUs;
         long shownAtMs = mLastShownAtMs;
         long queuedUs = mLastQueuedUs;
+        long keyframeBehindUs = mKeyframeBehindUs;
         boolean hasPosition = positionUs != C.TIME_UNSET;
 
         return new TunneledFrames(
                 hasPosition && shownUs != C.TIME_UNSET ? (positionUs - shownUs) / 1_000 : null,
                 shownAtMs >= 0 ? SystemClock.elapsedRealtime() - shownAtMs : null,
-                hasPosition && queuedUs != C.TIME_UNSET ? (queuedUs - positionUs) / 1_000 : null);
+                hasPosition && queuedUs != C.TIME_UNSET ? (queuedUs - positionUs) / 1_000 : null,
+                keyframeBehindUs != C.TIME_UNSET ? keyframeBehindUs / 1_000 : null);
+    }
+
+    /**
+     * As it was last rendered, how far past the position the video track's samples are loaded, the video's alone (the player's buffered
+     * position is the least of its tracks): {@link C#TIME_END_OF_SOURCE} to its end, {@link C#TIME_UNSET} when unknown (e.g. HLS, the
+     * URL list's). Negative behind it. Of a decoder given nothing for a while, none means it had nothing to take, more that it took
+     * nothing (T26RECBZ #1: no input for 2.1 s, 32 s buffered after).
+     */
+    public long getBufferedAheadUs() {
+        return mBufferedAheadUs;
     }
 
     /**

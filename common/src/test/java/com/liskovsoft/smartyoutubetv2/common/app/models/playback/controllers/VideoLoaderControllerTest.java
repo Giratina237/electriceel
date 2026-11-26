@@ -11,6 +11,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.service.VideoSt
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
+import com.liskovsoft.smartyoutubetv2.common.misc.VideoClientPicks;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.youtubeapi.common.helpers.AppClient;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
@@ -138,6 +139,34 @@ public class VideoLoaderControllerTest {
         controller.addPickedClient(PlayerFailure.create(RuntimeEnvironment.getApplication(), PlayerFailure.KIND_EMPTY_FORMATS)).record();
 
         assertEquals("WEB", mLog.readAll().get(0).getJSONObject("details").getString("pickedClient"));
+    }
+
+    /**
+     * Moved to MWEB, it played there only to stop at the attestation wall: not asked first when it's opened again, and the pick waiting
+     * to be confirmed isn't once it plays there. Another video's, or another client's, stays.
+     */
+    @Test
+    public void aClientPickThatStoppedAtTheAttestationWallIsForgotten() throws Exception {
+        PlayingController controller = new PickingController(video("Gp_c7blMwZE"));
+        setField(controller, "mFormatVideoId", "Gp_c7blMwZE");
+        setField(controller, "mFormatClient", "MWEB");
+        setField(controller, "mPendingPick", "MWEB");
+        setField(controller, "mPendingPickVideoId", "Gp_c7blMwZE");
+        VideoClientPicks.remember(RuntimeEnvironment.getApplication(), "Gp_c7blMwZE", "MWEB");
+        VideoClientPicks.remember(RuntimeEnvironment.getApplication(), "8aJEcMj1AOg", "MWEB");
+
+        controller.forgetWallClientPick();
+        controller.onPlay();
+
+        assertNull(VideoClientPicks.get(RuntimeEnvironment.getApplication(), "Gp_c7blMwZE"));
+        assertEquals("MWEB", VideoClientPicks.get(RuntimeEnvironment.getApplication(), "8aJEcMj1AOg"));
+
+        // Moved on to WEB since: its own pick stays
+        setField(controller, "mFormatClient", "WEB");
+        VideoClientPicks.remember(RuntimeEnvironment.getApplication(), "Gp_c7blMwZE", "IOS");
+        controller.forgetWallClientPick();
+
+        assertEquals("IOS", VideoClientPicks.get(RuntimeEnvironment.getApplication(), "Gp_c7blMwZE"));
     }
 
     /**

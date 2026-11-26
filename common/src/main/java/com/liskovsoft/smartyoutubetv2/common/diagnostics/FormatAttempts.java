@@ -467,7 +467,8 @@ public final class FormatAttempts {
 
     /**
      * What a long stall (see ErrorFixerController#onLongBuffering) came from: which track ran out, and whether the connection is too slow
-     * for the format or its request hangs. Of the format tried.
+     * for the format or its request hangs. Of the format tried. A health "stalls" failure and a source's engine error have them too (see
+     * ErrorFixerController#onHealthFailure, #addSourceErrorDetails).
      */
     public static void addStallDetails(PlayerFailure failure, long positionMs) {
         Attempt last = getLast();

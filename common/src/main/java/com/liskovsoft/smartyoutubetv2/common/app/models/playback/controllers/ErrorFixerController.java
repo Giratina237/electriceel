@@ -15,12 +15,14 @@ import com.google.android.exoplayer2.audio.AudioSink;
 import com.google.android.exoplayer2.audio.AudioTrackCounts;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderErrorException;
 import com.google.android.exoplayer2.mediacodec.MediaCodecRenderer.DecoderInitializationException;
+import com.google.android.exoplayer2.source.sabr.SabrRefusedRequest;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.BrokenResponseError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.PoTokenError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrBackoffError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrProtocolError;
 import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
 import com.google.android.exoplayer2.source.sabr.parser.parts.PoTokenStatusSabrPart.PoTokenStatus;
+import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.HttpDataSource.HttpDataSourceException;
 import com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException;
 import com.google.android.exoplayer2.util.MimeTypes;
@@ -44,11 +46,13 @@ import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailureLog;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.Plays;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.ProtectionStatuses;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.SilenceDetector;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoDecoderState;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.DecoderErrorFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.errors.SabrDefaultLoadErrorHandlingPolicy;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.FrameDropCodecs;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.SoundCodecs;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.TunnelingFallback;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
@@ -62,9 +66,14 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.common.utils.NetworkEngineFallback;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
+import com.liskovsoft.youtubeapi.service.YouTubeSignInService;
+import com.liskovsoft.youtubeapi.service.internal.MediaServiceData;
 import com.liskovsoft.youtubeapi.videoinfo.V2.ClientAttempts;
 
+import org.json.JSONArray;
+
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -164,6 +173,20 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * still gone (see onLiveSegmentsGone)
      */
     private static final long LIVE_REFETCH_MS = 60_000;
+    /**
+     * Played this far past where the attestation wall stopped it, a client got past it: its lap starts over (see countWallSwitch)
+     */
+    private static final long WALL_PASSED_MS = 10_000;
+    /**
+     * No switch counted for this long, its lap was left (e.g. the video closed and opened again later): another starts (see
+     * countWallSwitch). 97Z1YWD3's switches came 5-15 s apart.
+     */
+    private static final long WALL_LAP_GAP_MS = 120_000;
+    /**
+     * The attestation pending this long, the server's grace period is over: it sends no more media (65FDWR9C #1: 58.6 s; 97Z1YWD3
+     * stopped at 0:59.9). Sooner, a request that got no answer is the network's.
+     */
+    private static final long ATTESTATION_GRACE_MS = 50_000;
     private final BufferingDetector mBufferingDetector = new BufferingDetector(this);
     private VideoLoaderController mVideoLoaderController;
     /**
@@ -274,10 +297,44 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     private long mSourceChangedMs;
     /**
+     * The video stopped at the attestation wall (see countWallSwitch), where it stopped, and the clients its formats came from at the
+     * switches made for it since: null for none
+     */
+    private String mWallVideoId;
+    private long mWallPositionMs;
+    private final List<String> mWallClients = new ArrayList<>();
+    private int mWallSwitches;
+    private long mWallSwitchMs;
+    /**
+     * A tunneled freeze the user paused, of this video: turned off, its player restarted once it plays again (see onPlay)
+     */
+    private String mTunnelingRestartVideoId;
+    /**
+     * A client of the wall's lap asked for a sign-in, not for the viewer's age: a bot check (see isSignInAsked)
+     */
+    private boolean mIsWallSignInAsked;
+    /**
+     * The video whose SABR request was refused after it played, and when its player response was fetched again for it (see
+     * applySabrRefusedRefetch)
+     */
+    private String mSabrRefetchVideoId;
+    private long mSabrRefetchMs;
+    /**
+     * The decoded buffers with sound in them when it last played (see SilenceDetector#getSoundBuffers): more by the check, its codec was
+     * heard (see SoundCodecs)
+     */
+    private long mSoundBuffersAtPlay;
+    /**
      * Still playing and its clock moved on: the audio's clock is the player's, so its sound is output (see FormatAttempts)
      */
     private final Runnable mCheckAudioPlayed = () -> {
         if (getPlayer() != null && getPlayer().isPlaying() && getPlayer().getPositionMs() - mPlayStartPositionMs >= AUDIO_PLAYED_MS) {
+            // Heard: the codec plays with sound on the device, a stream of it silent from its start is the video's (see
+            // applySilentAudioFallback)
+            if (SilenceDetector.getSoundBuffers() > mSoundBuffersAtPlay) {
+                SoundCodecs.onSound(getContext(), getMimeType(getPlayer().getAudioFormat()));
+            }
+
             FormatAttempts.onAudioPlayed();
             // A track refused after this is another time's
             mAudioInitErrorCount = 0;
@@ -298,6 +355,11 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         Log.e(TAG, "Player error occurred: %s. Trying to fix…", type);
 
         PlayerFailure failure = newFailure(PlayerFailure.KIND_ENGINE_ERROR).engineError(type, rendererIndex, error);
+
+        if (type == PlayerEventListener.ERROR_TYPE_SOURCE) {
+            addSourceErrorDetails(failure, error);
+        }
+
         mBufferingDetector.reset();
         Utils.removeCallbacks(mCheckAudioPlayed);
         FormatAttempts.onPlaying(false);
@@ -309,6 +371,56 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         } finally {
             failure.record();
         }
+    }
+
+    /**
+     * What the source failed on, as a stall tells it (see onLongBuffering): where its tracks' last loads end and how fast they came, what's
+     * buffered, the loads that failed since it last played with each try's time and error (see LoadErrors#describeSincePlay), and the
+     * number of the server the failed request went to (see FormatAttempts#getHostNumber). R71TW3F4 #1-#13: a read that timed out every
+     * 40 s, 13 times, and nothing told which load hung, how its tries went, nor on which server. A SABR request refused with HTTP 401 or
+     * 403 says what it asked for and how old its session was, as a SabrProtocolError does (see applySabrProtocolErrorAction): WVE7ZKDD #2,
+     * a 403 on a rewind, couldn't tell whether the seek or a server change drew it. Diagnostics only: the fix goes on without them.
+     */
+    private void addSourceErrorDetails(PlayerFailure failure, @Nullable Throwable error) {
+        try {
+            if (getPlayer() != null) {
+                long positionMs = getPlayer().getPositionMs();
+                long bufferedPositionMs = getPlayer().getBufferedPositionMs();
+                FormatAttempts.addStallDetails(failure, positionMs);
+                failure.detail("bufferedMs", bufferedPositionMs >= 0 ? bufferedPositionMs - positionMs : null);
+            }
+
+            failure.detail("loadErrors", LoadErrors.describeSincePlay());
+            int hostNumber = FormatAttempts.getHostNumber(getFailedHost(error));
+            failure.detail("hostNumber", hostNumber > 0 ? hostNumber : null);
+            SabrRefusedRequest refused = SabrRefusedRequest.of(error);
+
+            if (refused != null) {
+                failure.detail("sabrRequest", refused.request);
+                failure.detail("sabrSessionAgeMs", refused.sessionAgeMs >= 0 ? refused.sessionAgeMs : null);
+            }
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Can't read what the source failed on: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * The server's name of the request the error is of (see HttpDataSourceException#dataSpec), null when not known
+     */
+    @Nullable
+    private static String getFailedHost(@Nullable Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof HttpDataSourceException) {
+                DataSpec dataSpec = ((HttpDataSourceException) cause).dataSpec;
+                return dataSpec != null && dataSpec.uri != null ? dataSpec.uri.getHost() : null;
+            }
+
+            if (cause.getCause() == cause) {
+                break;
+            }
+        }
+
+        return null;
     }
 
     @Override
@@ -354,6 +466,12 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      */
     @Override
     public void onHealthFailure(String kind, PlayerFailure failure) {
+        // What its loads did, whatever's done: lowered for stalls, it didn't tell whether a server was slow or the format too big for the
+        // connection (93HXRTB5 #1: 3 stalls of a 4K VP9 at 8.3 Mbps, lowered to 1440p, which played 48 min). As a long stall's.
+        if (PlaybackHealth.KIND_STALLS.equals(kind) && getPlayer() != null) {
+            FormatAttempts.addStallDetails(failure, getPlayer().getPositionMs());
+        }
+
         // Not over a fix already asked for (e.g. a long stall's reload)
         if (!isOfflineVideo() || mVideoLoaderController.isFixPending()) {
             return;
@@ -363,10 +481,35 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         // and a restart that kept it froze again 13 s later (18CK8PQ0 #2, #3). All 7 freezes of that device were of its tunneled VP9
         // decoder: after a resume's seek, a switch from AVC, or mid-play. A clock that stands still isn't the decoder's.
         boolean isClockStill = Boolean.TRUE.equals(failure.getDetail("clockStill"));
+        // The user paused the frozen picture (see PlaybackHealth): the freeze is over, and a restart or a reload would play it again
+        boolean isEndedByPause = Boolean.TRUE.equals(failure.getDetail("endedByPause"));
 
-        if (PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && !isClockStill && VideoDecoderState.isTunneling()
-                && TunnelingFallback.turnOff(getContext())) {
-            applyTunnelingOff(failure);
+        // Whether this player tunnels, not whether the fallback was on: a start's freeze, or one the user paused, turned it off without
+        // a restart, and this player tunnels still
+        if (PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && !isClockStill && VideoDecoderState.isTunneling()) {
+            applyTunnelingOff(failure, !isEndedByPause, TunnelingFallback.turnOff(getContext()));
+            // Paused, restarted once it plays again: the picture may stand still then too, and it's reported once for the format
+            Video video = getVideo();
+            mTunnelingRestartVideoId = isEndedByPause && video != null ? video.videoId : null;
+            return;
+        }
+
+        // A start's picture stood still through a tunneled decoder, and it's over: no restart, the next player is made without it (see
+        // ExoPlayerController#setTrackSelector), and it counts toward its suspension. Y1D66CNW #1: 3.5 s still after a restore seek, the
+        // device's fourth such freeze, all of them a start's, and the fallback heard of none.
+        if (PlaybackHealth.KIND_START_FROZEN.equals(kind) && !isClockStill && VideoDecoderState.isTunneling()) {
+            // Off already, by a start's freeze before (the player is kept from video to video): this one tunnels still, restarted
+            boolean isTurnedOff = TunnelingFallback.turnOff(getContext());
+            applyTunnelingOff(failure, !isTurnedOff, isTurnedOff);
+
+            return;
+        }
+
+        // The picture and the clock stand still, with the poToken's attestation pending: the server holds back the media, as a stall of
+        // it does (see runLongBufferingAction), and the player stays ready. 97Z1YWD3 #13: reloaded at 0:59.9, 3 frames in 8.5 s, and
+        // 58 s more of it till the user left. Not one the user paused: the reload would play it.
+        if (PlaybackHealth.KIND_VIDEO_FROZEN.equals(kind) && isClockStill && !isEndedByPause && isAtAttestationWall()) {
+            applyAttestationWallSwitch(failure);
             return;
         }
 
@@ -393,9 +536,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         // A codec the decoder declares for this frame rate, dropping frames on video after video: another one of the same size, for
         // this video only (27XPFNZC: AV1 1080p50 dropped 168 frames in 33 s on one video, 48 in 2.4 s on the next; VP9 1080p50 had
         // dropped none in 21 min on that device). A first video's drops may be its own (436Q6MET: a 4K60 start dropped 151 frames in
-        // its first 10 s, then none in 32 min).
-        String otherCodec = PlaybackHealth.KIND_FRAME_DROPS.equals(kind) && !isBeyondDecoder && isDroppingOnVideoAfterVideo(video)
-                ? applyOtherVideoCodec(video) : null;
+        // its first 10 s, then none in 32 min). The drops of a decoder catching up to where a seek or a resume sent it are left out by
+        // PlaybackHealth, only the ones that went on past its catch-up are reported (see PlaybackHealth#isDropsAfterCatchUp): MD8RQZM2
+        // #1's start resumed at 0:02 dropped 75 of 83 frames 1.1-1.6 s in, on a device whose AV1 2160p60 had played 69 times with no
+        // failure, and two such would have sent its 4K60 to VP9. A start from where the player was has nothing to catch up on: its drops
+        // are the codec's (EY23XNK9: VP9 60fps starts dropped 48-57 frames in their first 10 s, AV1 0-1).
+        // Not a card's preview: its drops on a small surface over the UI say nothing of the codec in the player
+        String otherCodec = PlaybackHealth.KIND_FRAME_DROPS.equals(kind) && !isBeyondDecoder && !isEmbedPlayer()
+                && isDroppingOnVideoAfterVideo(video) ? applyOtherVideoCodec(video) : null;
 
         if (otherCodec != null) {
             failure.action("other_codec:" + otherCodec).action("restart_engine");
@@ -494,13 +642,25 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * The sound played silent from the start, for 15 s: AAC in the language of the track for this video, as for an audio decoder's
      * error, unless it's AAC already. The format is marked failed already (see ExoPlayerController#recordHealthFailure), and the
      * restart plays the video from here. Not for a track too small to carry a sound (RF6HBNNH #5 and #7: Opus at 3 and 4 kbps, which
-     * is a video with no sound): its silence is the video's, and another format of it is as silent.
+     * is a video with no sound): its silence is the video's, and another format of it is as silent. Nor for a codec the device played with
+     * sound lately (see SoundCodecs): its decoding and output work, the silence is the video's, e.g. a silent intro (CQHM6BGP #1: 2
+     * minutes of it, reported at 15 s; it played AAC already, but on Opus, which had played 74 times there, it would have swapped to AAC
+     * and restarted the engine for nothing). Not checking the sound again later instead: that intro was still silent at 30 s, and a
+     * stream that's silent on the device would wait longer for its fix. The trade-off: a codec heard before whose stream of this video
+     * alone is silent (none seen so far) stays silent.
      */
     private void applySilentAudioFallback(PlayerFailure failure) {
         FormatItem audio = getPlayer().getAudioFormat();
         Format format = audio != null && audio.getTrack() != null ? audio.getTrack().format : null;
 
         if (format != null && format.bitrate > 0 && format.bitrate < MIN_SOUND_BITRATE) {
+            return;
+        }
+
+        long heardAgoMs = SoundCodecs.getHeardAgoMs(getContext(), format != null ? format.sampleMimeType : null);
+
+        if (heardAgoMs >= 0) {
+            failure.detail("codecHeardAgoMs", heardAgoMs);
             return;
         }
 
@@ -557,9 +717,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             // Past its grace period, the server withholds the media while the poToken's attestation is pending: stalled at 0:59,
             // the same client's reload froze there (51AQC7FS). The SABR stream tells it as a PoTokenError (see
             // applySabrPoTokenAction): this is a stall it didn't tell.
-            failure.action("switch_next_client_now").action("reload_video");
-            YouTubeServiceManager.instance().switchNextClientNow();
-            mVideoLoaderController.reloadVideo(failure.getKind());
+            applyAttestationWallSwitch(failure);
         } else if (isOfflineVideo() && isSubtitlesEnabled()) {
             // Long loading subtitles cause hangs
             failure.action("disable_subtitles").action("reload_video");
@@ -571,8 +729,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             // and a reload played 2 s more each time, six times), likely a tunneled decoder given all of it. It's given no more than
             // 2 s ahead now (see DebugInfoMediaCodecVideoRenderer#shouldFeedInput); should it happen anyway, the engine plays without
             // tunneling from now on.
-            if (VideoDecoderState.isTunneling() && TunnelingFallback.turnOff(getContext())) {
-                applyTunnelingOff(failure);
+            if (VideoDecoderState.isTunneling()) {
+                applyTunnelingOff(failure, true, TunnelingFallback.turnOff(getContext()));
             } else {
                 failure.action("reload_video");
                 mVideoLoaderController.reloadVideo(failure.getKind());
@@ -707,6 +865,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     @Override
     public void onPlay() {
         mBufferingDetector.onStopBuffering();
+        // A source failure after this tells the loads that failed since (see addSourceErrorDetails)
+        LoadErrors.onPlay();
         mSabrErrorFixAttempts = 0;
         mStallRetries.reset();
         // A video played after it: the DNS fix stays
@@ -718,6 +878,16 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         Video video = getVideo();
         String videoId = video != null ? video.videoId : null;
         String client = mVideoLoaderController.getFormatClient();
+
+        // A tunneled freeze the user paused (see onHealthFailure): played again, the player is made without tunneling
+        if (mTunnelingRestartVideoId != null) {
+            boolean isSameVideo = mTunnelingRestartVideoId.equals(videoId);
+            mTunnelingRestartVideoId = null;
+
+            if (isSameVideo && VideoDecoderState.isTunneling()) {
+                mVideoLoaderController.restartEngine(PlaybackHealth.KIND_VIDEO_FROZEN);
+            }
+        }
 
         // Played again after a pause or a seek: from when it first played since the refusal
         if (!Helpers.equals(videoId, mSabrPlayedVideoId) || !Helpers.equals(client, mSabrPlayedClient)) {
@@ -734,6 +904,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
         if (getPlayer() != null) {
             mPlayStartPositionMs = getPlayer().getPositionMs();
+            mSoundBuffersAtPlay = SilenceDetector.getSoundBuffers();
             Utils.removeCallbacks(mCheckAudioPlayed);
             Utils.postDelayed(mCheckAudioPlayed, AUDIO_PLAYED_CHECK_MS);
         }
@@ -927,6 +1098,10 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return;
         }
 
+        if (applySabrTimeoutAction(error, failure)) {
+            return;
+        }
+
         applyEngineErrorAction(type, rendererIndex, error, failure);
     }
 
@@ -1010,7 +1185,8 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * SABR server requires attestation, or it's still pending: it won't send media past its grace period (about a minute) with this
      * poToken, at the same position after every reload. A TV token it rejects goes (e.g. the WebView's BotGuard makes bad ones): the
      * client streams without one, like before it had any. Otherwise another client: a pending TV token was a fresh one (51AQC7FS,
-     * 0KPV79TF: the app had run under a minute), and without one the server required one (5V8J002W #11).
+     * 0KPV79TF: the app had run under a minute), and without one the server required one (5V8J002W #11). Counted toward the wall's lap
+     * (see countWallSwitch).
      */
     private boolean applySabrPoTokenAction(Throwable error, PlayerFailure failure) {
         Throwable cause = error.getCause();
@@ -1020,15 +1196,16 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
 
         PoTokenStatus status = ((PoTokenError) cause).status;
+        // What the server made of it, as the error says: the protection statuses told may be of another stream (97Z1YWD3: PENDING on
+        // the web clients, PENDING_MISSING on IOS, which sends none)
+        failure.detail("poTokenStatus", status != null ? status.name() : null);
 
         if (status == PoTokenStatus.INVALID && YouTubeServiceManager.instance().rejectPoToken(mVideoLoaderController.getFormatClient())) {
             failure.action("reject_potoken").action("reload_video");
+            mVideoLoaderController.reloadVideo(failure.getKind());
         } else {
-            failure.action("switch_next_client_now").action("reload_video");
-            YouTubeServiceManager.instance().switchNextClientNow();
+            applyAttestationWallSwitch(failure);
         }
-
-        mVideoLoaderController.reloadVideo(failure.getKind());
 
         return true;
     }
@@ -1037,18 +1214,170 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
      * SABR's media server refused the request (HTTP 401 or 403, see SabrDefaultLoadErrorHandlingPolicy#isRefused) while the poToken's
      * attestation was pending: past its grace period, the server refuses it at the same position after every retry and app restart
      * (CX17FXZW #1-#4: 401s 7 times a minute, protection PENDING since 23 s before). The server holding back its media this way is a
-     * PoTokenError of its own (see applySabrPoTokenAction): another client. Refused otherwise, see applyEngineErrorAction.
+     * PoTokenError of its own (see applySabrPoTokenAction): another client, counted toward the wall's lap (see countWallSwitch). Refused
+     * otherwise, see applySabrRefusedRefetch.
      */
     private boolean applySabrRefusedAction(Throwable error, PlayerFailure failure) {
         if (getVideo() == null || !SabrDefaultLoadErrorHandlingPolicy.isRefused(error) || !isAttestationPending()) {
             return false;
         }
 
+        applyAttestationWallSwitch(failure);
+
+        return true;
+    }
+
+    /**
+     * A SABR request got no answer (e.g. its read timed out, see isConnectionError) while the poToken's attestation was pending: the
+     * server holding back the media, as a stall of it is (see runLongBufferingAction), not the network. 65FDWR9C #1: protection went
+     * from OK to PENDING 58.6 s before, in a 21 h pause, and the engine restart on the same client played 0 ms before the user left.
+     * After a fix asked for already (see runEngineErrorAction): the player it replaces may time out on its way out.
+     */
+    private boolean applySabrTimeoutAction(Throwable error, PlayerFailure failure) {
+        // Within the grace period the server still sends: a timeout then is the network's, reloaded as one (see applyEngineErrorAction)
+        if (!isConnectionError(error) || !isAtAttestationWall()) {
+            return false;
+        }
+
+        applyAttestationWallSwitch(failure);
+
+        return true;
+    }
+
+    /**
+     * SABR's server holds back the media while the poToken's attestation is pending, past its grace period (see isAttestationPending):
+     * the next client, and the video again, counted toward the wall's lap (see countWallSwitch). Every client had its try: it stops
+     * there, and says why.
+     */
+    private void applyAttestationWallSwitch(PlayerFailure failure) {
+        // The player a switch asked for a moment ago replaces failed on its way out: its formats are the client counted already, and
+        // counting it again would end the lap after one client
+        if (mVideoLoaderController.isFixPending()) {
+            failure.action("fix_pending");
+            return;
+        }
+
+        if (!countWallSwitch(failure)) {
+            stopAtAttestationWall(failure);
+            return;
+        }
+
         failure.action("switch_next_client_now").action("reload_video");
         YouTubeServiceManager.instance().switchNextClientNow();
         mVideoLoaderController.reloadVideo(failure.getKind());
+    }
 
-        return true;
+    /**
+     * The client is switched for the attestation wall: past its grace period (about the video's first minute), SABR's server holds back
+     * the media of a poToken whose attestation is pending, and IOS's fresh sessions are refused. Counted for the video while it never
+     * plays past where it stopped. Signed out, every client of the order failed it: the TV ones asked for a sign-in, the web ones'
+     * attestation stayed pending, IOS's sessions were refused; the app went from client to client at 0:59.9, a reload each time, for 2
+     * and 3.5 minutes till the user left (97Z1YWD3 #1-#23, 45 errors). Both MediaServiceCore's switch and the client picked for the video
+     * (see VideoLoaderController#pickNextClientForVideo) go round the order: once a client its formats came from comes round again,
+     * every client of it had its try.
+     *
+     * @return false when every client had its try: the caller stops (see stopAtAttestationWall), it neither switches nor reloads
+     */
+    private boolean countWallSwitch(PlayerFailure failure) {
+        Video video = getVideo();
+
+        if (video == null || video.videoId == null) {
+            return true;
+        }
+
+        long positionMs = getPlayer() != null ? getPlayer().getPositionMs() : -1;
+        long nowMs = SystemClock.elapsedRealtime();
+
+        // Another video, this one played past the wall since, or its lap left long ago: a lap of its own
+        if (!video.videoId.equals(mWallVideoId) || positionMs > mWallPositionMs + WALL_PASSED_MS || nowMs - mWallSwitchMs > WALL_LAP_GAP_MS) {
+            resetWall();
+            mWallVideoId = video.videoId;
+        }
+
+        mWallSwitchMs = nowMs;
+
+        mWallPositionMs = Math.max(mWallPositionMs, positionMs);
+        mIsWallSignInAsked |= isSignInAsked(ClientAttempts.get(video.videoId));
+        // What it played on the client was the server's grace, not the client playing it
+        mVideoLoaderController.forgetWallClientPick();
+
+        String client = mVideoLoaderController.getFormatClient();
+        boolean isLapDone = client != null && mWallClients.contains(client)
+                || mWallSwitches >= MediaServiceData.instance().getClientOrder().size();
+
+        if (!isLapDone) {
+            mWallSwitches++;
+
+            if (client != null) {
+                mWallClients.add(client);
+            }
+        }
+
+        // The clients of its lap so far, this one's included
+        failure.detail("wallClients", new JSONArray(mWallClients));
+
+        return !isLapDone;
+    }
+
+    /**
+     * Every client had its try at the attestation wall (see countWallSwitch): nothing more is reloaded, and the user is told why, paused
+     * where it stopped. Signed out, or asked by a client for a sign-in (a bot check), to sign in: signed in on the same box, TV played
+     * every start (97Z1YWD3). Played or opened again, it has another lap.
+     */
+    private void stopAtAttestationWall(PlayerFailure failure) {
+        boolean isSignInToTell = mIsWallSignInAsked || !isSignedIn();
+        failure.action(isSignInToTell ? "attestation_stop_sign_in" : "attestation_stop");
+        resetWall();
+        Context context = getContext();
+
+        if (context == null) {
+            return;
+        }
+
+        String message = context.getString(isSignInToTell ? R.string.msg_attestation_sign_in : R.string.msg_attestation_wall);
+        MessageHelpers.showLongMessage(context, message);
+
+        if (getPlayer() != null) {
+            getPlayer().setPlayWhenReady(false);
+            // In place of the error's title: what the user can do about it
+            getPlayer().setTitle(message);
+            getPlayer().showProgressBar(false);
+            // The title is seen only with the controls
+            getPlayer().showOverlay(true);
+        }
+    }
+
+    private void resetWall() {
+        mWallVideoId = null;
+        mWallPositionMs = -1;
+        mWallClients.clear();
+        mWallSwitches = 0;
+        mIsWallSignInAsked = false;
+    }
+
+    /**
+     * A client asked for a sign-in, not for the viewer's age: a bot check (97Z1YWD3, signed out: TV, TV_SAMSUNG and TV_DOWNGRADED, "sign
+     * in to confirm you're not a bot")
+     */
+    private static boolean isSignInAsked(@Nullable List<ClientAttempts.Attempt> attempts) {
+        if (attempts == null) {
+            return false;
+        }
+
+        for (ClientAttempts.Attempt attempt : attempts) {
+            if (!attempt.ageGated && STATUS_LOGIN_REQUIRED.equals(attempt.status)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * An account is signed in. Not the account manager's: a test's.
+     */
+    boolean isSignedIn() {
+        return YouTubeSignInService.instance().isSigned();
     }
 
     /**
@@ -1097,6 +1426,13 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         }
 
         if ((isRepeated || isFreshSessionRefused) && !hasPlayedOnClient) {
+            // A fresh session refused with the attestation pending is the wall's (see countWallSwitch): 97Z1YWD3's IOS, which sends no
+            // poToken (PENDING_MISSING), was refused sabr.no_video_selected 30-200 ms into each, ten times
+            if (isFreshSessionRefused && isAtAttestationWall() && !mVideoLoaderController.isFixPending() && !countWallSwitch(failure)) {
+                stopAtAttestationWall(failure);
+                return true;
+            }
+
             MessageHelpers.showLongMessage(getContext(), cause.getMessage());
             // The client refuses this video: the next one for it only, remembered for when it's opened again. The other videos play
             // on the order's first (89HAAW4J: TV played the others, and the switch kept TV_SAMSUNG for all of them).
@@ -1122,14 +1458,25 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
-     * Tunneling was turned off (see TunnelingFallback#turnOff): the engine restarts without it. Turned off in another run before, it's
-     * suspended on the device from now on, and the message says so.
+     * Tunneling was turned off (see TunnelingFallback#turnOff): the engine restarts without it, or with a freeze that's over (a start's,
+     * see onHealthFailure), the next player is made without it. Turned off in another run before, it's suspended on the device from now
+     * on, and the message says so.
+     *
+     * @param isRestarted the engine restarts now
+     * @param isTurnedOff it was on till now (see TunnelingFallback#turnOff): the user is told, once
      */
-    private void applyTunnelingOff(PlayerFailure failure) {
+    private void applyTunnelingOff(PlayerFailure failure, boolean isRestarted, boolean isTurnedOff) {
         boolean isSuspended = TunnelingFallback.isSuspended(getContext());
-        failure.action(isSuspended ? "tunneling_suspended" : "tunneling_off").action("restart_engine");
-        MessageHelpers.showLongMessage(getContext(), isSuspended ? R.string.msg_tunneling_suspended : R.string.msg_tunneling_off);
-        mVideoLoaderController.restartEngine(failure.getKind());
+        failure.action(isSuspended ? "tunneling_suspended" : "tunneling_off");
+
+        if (isTurnedOff) {
+            MessageHelpers.showLongMessage(getContext(), isSuspended ? R.string.msg_tunneling_suspended : R.string.msg_tunneling_off);
+        }
+
+        if (isRestarted) {
+            failure.action("restart_engine");
+            mVideoLoaderController.restartEngine(failure.getKind());
+        }
     }
 
     /**
@@ -1200,10 +1547,14 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
 
     /**
      * A SABR response read out of step happened with Cronet or the default engine 20 times in 628 plays, and with OkHttp none in 679
-     * (2026-11-19's submissions: FVNAAYZD, RF6HBNNH, F8DMFX2M, 84ENEA2S, 2Q5RK79E, DMQEWB9B). Whether it's the engine's isn't known:
-     * the video's reload reads with OkHttp, and a response broken again says it isn't (its failure has the engine in use). For this video
-     * only, the engine saved in the settings is the user's (see NetworkEngineFallback). The reload builds the player's connections anew
-     * (see ExoMediaSourceFactory#releaseIfEngineChanged).
+     * (2026-11-19's submissions: FVNAAYZD, RF6HBNNH, F8DMFX2M, 84ENEA2S, 2Q5RK79E, DMQEWB9B), so the video's reload read with OkHttp.
+     * OkHttp did it too: Z6R2NPPX #2-#4 (32.70.5, 32.71.3, okhttp_no_ipv6), 0.2-0.3 s after a seek each, as 15 of those 16 whose
+     * commands were known. Their cause was a load a seek cancelled reading on into the next response, whatever the engine, fixed in
+     * 32.80.1 (see SabrExtractorInput). From 32.80.1 on, the 18 submissions of 2026-11-25 had none in about 200 SABR starts on Cronet
+     * and 230 on OkHttp. Kept for the one in 16 that came with no seek, till more of them say whether any is left on another engine:
+     * it does nothing till one is, for one video, and a response broken again on OkHttp says it isn't the engine's (its failure has the
+     * engine in use). For this video only, the engine saved in the settings is the user's (see NetworkEngineFallback). The reload builds
+     * the player's connections anew (see ExoMediaSourceFactory#releaseIfEngineChanged).
      */
     private void applyOkHttpFallback(Video video, PlayerFailure failure) {
         if (getPlayerTweaksData().isNetworkErrorFixingDisabled()) {
@@ -1297,6 +1648,65 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         return false;
     }
 
+    /**
+     * SABR's server refused a request (HTTP 401 or 403) of a video that played, its poToken's attestation not pending (see
+     * applySabrRefusedAction): its player response is fetched again first, with the same poToken, as a SabrError's is (see
+     * applySabrProtocolErrorAction). WVE7ZKDD #2: refused on a rewind 87 s into a session whose protection was OK; switch_next_client
+     * made TV's poToken again, 2.2 s of a 5.3 s reload, and the reload played 15 min on TV. Refused again within REPEATED_SABR_ERROR_MS,
+     * the poToken is made again or the client switched (see switchNextClient).
+     */
+    private boolean applySabrRefusedRefetch(Throwable error, PlayerFailure failure) {
+        Video video = getVideo();
+
+        if (video == null || !PlayerFailure.PROTOCOL_SABR.equals(mVideoLoaderController.getFormatProtocol())
+                || !SabrDefaultLoadErrorHandlingPolicy.isRefused(error)) {
+            return false;
+        }
+
+        long nowMs = SystemClock.elapsedRealtime();
+
+        if (Helpers.equals(video.videoId, mSabrRefetchVideoId) && nowMs - mSabrRefetchMs <= REPEATED_SABR_ERROR_MS) {
+            return false;
+        }
+
+        mSabrRefetchVideoId = video.videoId;
+        mSabrRefetchMs = nowMs;
+        failure.action("refetch_player");
+        YouTubeServiceManager.instance().reloadPlayerResponse(video.videoId, null);
+
+        return true;
+    }
+
+    /**
+     * The next client for every video, or the same client with its poToken made again when it can be (see
+     * YouTubeServiceManager#switchNextClientOrPoToken): the action says which. It read switch_next_client when the reload stayed on TV
+     * with a new poToken (WVE7ZKDD #2), as 65FDWR9C #2-#7's first one stayed on WEB.
+     *
+     * @return the action, e.g. "switch_next_client:WEB", "reset_potoken:TV"
+     */
+    private String switchNextClient() {
+        String client = mVideoLoaderController.getFormatClient();
+        String next = switchNextClientOrPoToken();
+
+        return next != null ? "switch_next_client:" + next : "reset_potoken" + (client != null ? ":" + client : "");
+    }
+
+    /**
+     * See YouTubeServiceManager#switchNextClientOrPoToken. Not the service's: a test's.
+     */
+    @Nullable
+    String switchNextClientOrPoToken() {
+        return YouTubeServiceManager.instance().switchNextClientOrPoToken();
+    }
+
+    /**
+     * An "Unable to connect" error may switch the engine: the user lets the app fix network errors, and IPv6 connects (while it doesn't,
+     * the player stays on OkHttp till the app restarts, see ExoMediaSourceFactory)
+     */
+    private boolean isEngineSwitchable() {
+        return !getPlayerTweaksData().isNetworkErrorFixingDisabled() && !OkHttpManager.isIpv6Disabled();
+    }
+
     private void applyEngineErrorAction(int type, int rendererIndex, Throwable error, PlayerFailure failure) {
         boolean restartEngine = true;
         long restartDelayMs = RETRY_MS;
@@ -1306,11 +1716,40 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         String errorMessage = errorTitle + "\n" + errorContent;
         Log.e(TAG, errorMessage);
 
-        if (Helpers.startsWithAny(errorContent, "Unable to connect to")) {
+        if (Helpers.startsWithAny(errorContent, "Unable to connect to") && mBufferingDetector.isPlayable() && isConnectionError(error)) {
+            // It played, and its connection broke (e.g. a read timed out): not the device's date nor no internet. Counted for the video
+            // and reloaded without a word, as a broken connection of the source is (see applyNetworkErrorReload), then the next client
+            // for this video only. R71TW3F4 #1-#13: WEB's server timed out every 40 s, and 13 engine restarts with nothing changed played
+            // 40 s each, with ~7 s of black screen and an error toast every time; TV played that video 17 min on the same device.
+            restartEngine = false;
+            showMessage = false;
+
+            if (applyNetworkErrorReload(error, failure)) {
+                // The first time, another engine as before: it needs the engine restarted
+                if (mNetworkErrorReloads == 1 && isEngineSwitchable()) {
+                    failure.action("switch_engine:" + Utils.getNetworkEngineId(switchNextEngine()));
+                    restartEngine = true;
+                }
+            } else {
+                String picked = mVideoLoaderController.pickNextClientForVideo();
+
+                if (picked != null) {
+                    failure.action("client_for_video:" + picked);
+                } else {
+                    // No other client (e.g. the order has one): as before
+                    if (isEngineSwitchable()) {
+                        failure.action("switch_engine:" + Utils.getNetworkEngineId(switchNextEngine()));
+                    }
+
+                    restartEngine = true;
+                    showMessage = true;
+                }
+            }
+        } else if (Helpers.startsWithAny(errorContent, "Unable to connect to")) {
             // No internet connection or WRONG DATE on the device
             // Recently this message starting to show for other unknown reasons
             // Not while IPv6 doesn't connect: the player stays on OkHttp till the app restarts (see ExoMediaSourceFactory)
-            if (!getPlayerTweaksData().isNetworkErrorFixingDisabled() && !OkHttpManager.isIpv6Disabled()) {
+            if (isEngineSwitchable()) {
                 failure.action("switch_engine:" + Utils.getNetworkEngineId(switchNextEngine()));
             }
         } else if (error instanceof OutOfMemoryError || (error != null && error.getCause() instanceof OutOfMemoryError)) {
@@ -1367,10 +1806,12 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
                 failure.action("switch_next_client_now");
                 YouTubeServiceManager.instance().switchNextClientNow();
                 showMessage = true;
+            } else if (applySabrRefusedRefetch(error, failure)) {
+                // Response code: 401, 403 of SABR
+                Log.d(TAG, "SABR refused a request of a video that played: its player response fetched again");
             } else if (!applyNetworkErrorReload(error, failure)) {
                 // A broken connection (e.g. a read timeout) or response (see isBrokenResponse) is only reloaded, with the same client
-                failure.action("switch_next_client");
-                YouTubeServiceManager.instance().switchNextClient(); // Response code: 403
+                failure.action(switchNextClient()); // Response code: 403
             }
         } else if (type == PlayerEventListener.ERROR_TYPE_RENDERER && rendererIndex == PlayerEventListener.RENDERER_INDEX_SUBTITLE) {
             // "Response code: 429" (subtitle error)
@@ -1775,8 +2216,7 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             reloadLater(failure, mFetchRetries.next(videoId));
         } else if (Helpers.containsAny(message, "Unexpected token", "Syntax error", "invalid argument") || // temporal fix
                 Helpers.equalsAny(className, "PoTokenException", "BadWebViewException")) {
-            failure.action("switch_next_client").action("reload_video");
-            YouTubeServiceManager.instance().switchNextClient();
+            failure.action(switchNextClient()).action("reload_video");
             mVideoLoaderController.reloadVideo(failure.getKind());
         } else if (Helpers.containsAny(message, "is not defined")) {
             failure.action("invalidate_cache").action("reload_video");
@@ -1984,6 +2424,23 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
     }
 
     /**
+     * The server holds back the media for the attestation (see isAttestationPending): pending past its grace period, or the video's
+     * wall lap goes on (see countWallSwitch), a reload's pending being new. Within the grace period it still sends: what fails then
+     * isn't the wall, and a switch would be for every video after it, IOS's being always pending (PENDING_MISSING).
+     */
+    private boolean isAtAttestationWall() {
+        Video video = getVideo();
+
+        if (video == null || video.videoId == null || !isAttestationPending()) {
+            return false;
+        }
+
+        boolean isInLap = video.videoId.equals(mWallVideoId) && SystemClock.elapsedRealtime() - mWallSwitchMs <= WALL_LAP_GAP_MS;
+
+        return isInLap || ProtectionStatuses.getPendingMs(video.videoId, mSourceChangedMs) >= ATTESTATION_GRACE_MS;
+    }
+
+    /**
      * The video streams over SABR, and the server's last word on its poToken, since the source opened, is that the attestation is
      * pending (see ProtectionStatuses). Over another protocol, or told before, that word was of a stream before (e.g. the client
      * switched to VISIONOS's DASH, or to another SABR client whose requests got no answer yet).
@@ -2151,13 +2608,38 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
             return false;
         }
 
-        // The next size down: another codec of the same size wouldn't help. The first of it, as the list prefers.
-        FormatItem lower = null;
+        // The next size down: another codec of the same size wouldn't help. Of it, the codec playing, else the one of the fewest bits a
+        // second, not the list's first: the smaller is the point on a connection too slow for the format (Z6R2NPPX #6: AV1 1080p was
+        // lowered to VP9 720p at 1213k, AV1 720p offered, usually the smaller). The list's first when none says its bitrate.
+        int lowerSize = -1;
 
         for (FormatItem format : videoFormats) {
             int formatSize = Math.max(format.getWidth(), format.getHeight());
 
-            if (formatSize > 0 && formatSize < size && (lower == null || formatSize > Math.max(lower.getWidth(), lower.getHeight()))) {
+            if (formatSize > 0 && formatSize < size && formatSize > lowerSize) {
+                lowerSize = formatSize;
+            }
+        }
+
+        // None below the one playing: a format whose size isn't known (-1) isn't it
+        if (lowerSize <= 0) {
+            return false;
+        }
+
+        String playingCodec = getCodecName(videoFormat);
+        FormatItem lower = null;
+
+        for (FormatItem format : videoFormats) {
+            if (Math.max(format.getWidth(), format.getHeight()) != lowerSize) {
+                continue;
+            }
+
+            if (playingCodec != null && playingCodec.equals(getCodecName(format))) {
+                lower = format;
+                break;
+            }
+
+            if (lower == null || isLowerBitrate(format, lower)) {
                 lower = format;
             }
         }
@@ -2183,6 +2665,35 @@ public class ErrorFixerController extends BasePlayerController implements OnLong
         mVideoFallback = limit;
 
         return true;
+    }
+
+    /**
+     * Of fewer bits a second than the other: its bitrate is known, and the other's isn't or is higher
+     */
+    private static boolean isLowerBitrate(FormatItem format, FormatItem other) {
+        int bitrate = getBitrate(format);
+        int otherBitrate = getBitrate(other);
+
+        return bitrate > 0 && (otherBitrate <= 0 || bitrate < otherBitrate);
+    }
+
+    /**
+     * Of the format's track, -1 when not known
+     */
+    private static int getBitrate(FormatItem format) {
+        Format trackFormat = format.getTrack() != null ? format.getTrack().format : null;
+
+        return trackFormat != null && trackFormat.bitrate > 0 ? trackFormat.bitrate : -1;
+    }
+
+    /**
+     * Of the format's track, e.g. "audio/opus", null when not known
+     */
+    @Nullable
+    private static String getMimeType(@Nullable FormatItem format) {
+        Format trackFormat = format != null && format.getTrack() != null ? format.getTrack().format : null;
+
+        return trackFormat != null ? trackFormat.sampleMimeType : null;
     }
 
     @Nullable

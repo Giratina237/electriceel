@@ -47,7 +47,7 @@ public final class KeyframeResume {
      * How long the decoder still takes to get to the position, as far as can be told: at its own pace once it has shown one, at the
      * usual one before
      */
-    static long getRemainingMs(long gapMs, float frameRate, int height, int decodedFrames, long decodingMs) {
+    public static long getRemainingMs(long gapMs, float frameRate, int height, int decodedFrames, long decodingMs) {
         float remainingFrames = Math.max(0, gapMs * (frameRate > 0 ? frameRate : DEFAULT_FRAME_RATE) / 1_000 - decodedFrames);
         boolean isPaced = decodedFrames >= MIN_PACED_FRAMES && decodingMs >= MIN_PACED_MS;
         float frameMs = isPaced ? (float) decodingMs / decodedFrames : height > LARGE_FRAME_HEIGHT ? LARGE_FRAME_MS : FRAME_MS;

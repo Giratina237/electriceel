@@ -905,7 +905,7 @@ public class VideoStartsTest {
     }
 
     /**
-     * Not playing in time, even when nothing happens any more (a request hangs): given up and recorded
+     * Not playing in time, even when nothing happens any more (a request hangs): late at 15 s, given up and recorded a minute in
      */
     @Test
     public void aStartNotPlayingInTimeIsGivenUp() {
@@ -916,14 +916,93 @@ public class VideoStartsTest {
         mFixture.at(VideoStarts.MAX_START_MS);
         mFixture.fireGiveUp();
 
+        assertTrue(mFixture.recorded.isEmpty());
+        assertEquals(VideoStarts.MAX_RECORDED_MS - VideoStarts.MAX_START_MS, mFixture.giveUpDelayMs);
+
+        mFixture.at(VideoStarts.MAX_RECORDED_MS);
+        mFixture.fireGiveUp();
+
         assertEquals(VideoStart.OUTCOME_GAVE_UP, last().outcome);
-        assertEquals(VideoStarts.MAX_START_MS, last().totalMs);
+        assertEquals(VideoStarts.MAX_RECORDED_MS, last().totalMs);
         // It plays later: that's not this start any more
         VideoStarts.onFormats(VIDEO_ID, "TV");
         VideoStarts.onPrepare();
         VideoStarts.onFirstFrame();
         VideoStarts.onPlaying(true);
         assertEquals(1, mFixture.recorded.size());
+    }
+
+    /**
+     * 97Z1YWD3 start 92: ready ~26 s after the click, recorded as given up at 15 s with its last ~11 s left out. R71TW3F4
+     * oKgDcmHScsM: gave_up, and played 0.7 s later. Late, a start is timed on till it plays: played, with what it waited for past 15 s.
+     */
+    @Test
+    public void aLateStartThatPlaysIsRecordedAsPlayed() {
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.fetchStagesSoFar = stages(
+                openStage("fetch", 0, 0),
+                openStage("lock wait", 1, 0));
+        mFixture.at(VideoStarts.MAX_START_MS);
+        mFixture.fireGiveUp();
+        assertTrue(mFixture.recorded.isEmpty());
+
+        // Still going when it's looked at, past the 15 s
+        mFixture.at(20_000);
+        assertStage(find(VideoStarts.snapshot(), "lock wait"), "lock wait", VideoStarts.DETAIL_GOING, 1, 0, 20_000);
+
+        mFixture.fetchStages = stages(
+                stage("fetch", null, 0, 0, 25_400),
+                stage("lock wait", "warm-up", 1, 0, 25_000));
+        mFixture.at(25_500);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+        VideoStarts.onPrepare();
+        mFixture.at(26_000);
+        VideoStarts.onFirstFrame();
+        VideoStarts.onPlaying(true);
+
+        VideoStart start = last();
+
+        assertEquals(1, mFixture.recorded.size());
+        assertEquals(VideoStart.OUTCOME_PLAYED, start.outcome);
+        assertEquals(26_000, start.totalMs);
+        assertStage(find(start, "lock wait"), "lock wait", "warm-up", 1, 0, 25_000);
+        assertNull(mFixture.giveUp);
+    }
+
+    /**
+     * Left while it's late: left, then, with how long it ran
+     */
+    @Test
+    public void aLateStartThatIsLeftIsRecordedAsLeft() {
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(VideoStarts.MAX_START_MS);
+        mFixture.fireGiveUp();
+
+        mFixture.at(21_000);
+        VideoStarts.abandon(VideoStart.OUTCOME_LEFT);
+
+        assertEquals(VideoStart.OUTCOME_LEFT, last().outcome);
+        assertEquals(21_000, last().totalMs);
+        assertNull(mFixture.giveUp);
+    }
+
+    /**
+     * Its give-up not run yet when an event comes past the minute (e.g. the main thread busy): given up then
+     */
+    @Test
+    public void aLateStartPastItsMinuteIsGivenUpByItsNextEvent() {
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(VideoStarts.MAX_START_MS);
+        mFixture.fireGiveUp();
+
+        mFixture.at(VideoStarts.MAX_RECORDED_MS + 1);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+
+        assertEquals(VideoStart.OUTCOME_GAVE_UP, last().outcome);
+        assertNull(VideoStarts.snapshot());
     }
 
     /**
@@ -1331,21 +1410,19 @@ public class VideoStartsTest {
     @Test
     public void theReloadThatRecoversAStartThatGaveUp_isRecordedWithItsCount() {
         start(VIDEO_ID);
-        mFixture.at(VideoStarts.MAX_START_MS);
-        mFixture.fireGiveUp();
+        giveUp(0);
         int recorded = mFixture.recorded.size();
 
-        mFixture.at(20_000);
+        mFixture.at(65_000);
         VideoStarts.onReload(VIDEO_ID, "stall");
         VideoStarts.onFetch(VIDEO_ID);
-        mFixture.at(35_000);
-        mFixture.fireGiveUp();
+        giveUp(65_000);
         assertEquals(recorded, mFixture.recorded.size());
 
-        mFixture.at(41_000);
+        mFixture.at(130_000);
         VideoStarts.onReload(VIDEO_ID, "format_error");
         VideoStarts.onFetch(VIDEO_ID);
-        playOn(42_000);
+        playOn(131_000);
 
         assertEquals(recorded + 1, mFixture.recorded.size());
         VideoStart start = last();
@@ -1359,7 +1436,7 @@ public class VideoStartsTest {
             }
         }
 
-        assertEquals("reload 2 since a start gave up 41 s before it", recovery.detail);
+        assertEquals("reload 2 since a start gave up 130 s before it", recovery.detail);
     }
 
     /**
@@ -1368,9 +1445,8 @@ public class VideoStartsTest {
     @Test
     public void anotherVideoEndsTheRecovery() {
         start(VIDEO_ID);
-        mFixture.at(VideoStarts.MAX_START_MS);
-        mFixture.fireGiveUp();
-        mFixture.at(20_000);
+        giveUp(0);
+        mFixture.at(65_000);
         VideoStarts.start("otherVideoId", VideoStart.TRIGGER_OPEN);
         VideoStarts.abandon(VideoStart.OUTCOME_LEFT);
 
@@ -1427,8 +1503,129 @@ public class VideoStartsTest {
                 new StackTraceElement("android.os.Handler", "dispatchMessage", null, 1)}));
     }
 
+    /**
+     * 2M1DY5CD -BwLZBMKW4g: nothing loaded from 0.96 s to a jump to the live position at 1.76 s, then the first chunks took 2.3-2.6 s
+     * on new connections: a load cancelled left nothing. It's a row, and the one still loading after it is timed from its own start.
+     */
+    @Test
+    public void aLoadCancelledWhileItStartsIsARow() {
+        start(VIDEO_ID);
+        VideoStarts.onLoadStarted(false, true, false, T0 + 960);
+        mFixture.at(1_763);
+        VideoStarts.onLoadCanceled(false, true, false, T0 + 960, T0 + 1_763, 36_000);
+        VideoStarts.onLoadStarted(false, true, false, T0 + 1_790);
+        mFixture.at(4_300);
+        VideoStarts.onFirstFrame();
+        VideoStarts.onPlaying(true);
+
+        VideoStart start = last();
+
+        assertStage(find(start, VideoStarts.STAGE_LOAD_CANCELLED), VideoStarts.STAGE_LOAD_CANCELLED, "video chunk, 36 KB", 1, 960,
+                1_763);
+        assertStage(find(start, VideoStarts.STAGE_FIRST_VIDEO_CHUNK), VideoStarts.STAGE_FIRST_VIDEO_CHUNK, "still loading", 1, 1_790,
+                4_300);
+    }
+
+    /**
+     * A live stream's seek says where it was and how far from the live end: its jump to the live position is made within 1 s of it
+     * (2M1DY5CD -BwLZBMKW4g: jumped there at 1.76 s, 15 s behind it since 0.74 s, by what wasn't known)
+     */
+    @Test
+    public void aLiveSeekSaysWhereItWasAndTheLiveEnd() {
+        start(VIDEO_ID);
+        mFixture.at(1_763);
+        VideoStarts.onSeek(551_000, 550_150, 551_000);
+        mFixture.at(4_000);
+        VideoStarts.onFirstFrame();
+        VideoStarts.onPlaying(true);
+
+        assertStage(find(last(), VideoStarts.STAGE_SEEK), VideoStarts.STAGE_SEEK, "to 9:11, from 9:10, 850 ms before the live end", 1,
+                1_763, 1_763);
+        assertEquals("to 0:30", VideoStarts.describeSeek(30_000, -1, -1));
+        assertEquals("to 9:11, live end 9:12", VideoStarts.describeSeek(551_000, -1, 552_000));
+        assertEquals("to 9:11, from 9:12, 300 ms past the live end", VideoStarts.describeSeek(551_000, 552_300, 552_000));
+    }
+
+    /**
+     * WVE7ZKDD 11-24 22:43:55: a resume decoded 72 4K frames in 1084 ms, not gone back to its keyframe, and why went to the log only.
+     * What the resume made of its keyframe is on its "to the position" row.
+     */
+    @Test
+    public void aResumesKeyframeDecisionIsOnItsToThePositionRow() {
+        start(VIDEO_ID);
+        mFixture.at(300);
+        VideoStarts.onKeyframeResume(VideoStarts.KEYFRAME_AUDIO_LOADING);
+        mFixture.at(700);
+        VideoStarts.onKeyframeResume(VideoStarts.describeKeyframeNotWorthIt(380, true));
+        mFixture.at(1_384);
+        VideoStarts.onFirstFrame(new VideoStarts.FirstFrame(1_342_000, "3840x2160 vp09 60fps", 25_000, 72, T0 + 300));
+        VideoStarts.onPlaying(true);
+
+        assertStage(find(last(), VideoStarts.STAGE_TO_POSITION), VideoStarts.STAGE_TO_POSITION,
+                "72 frames, after the audio, not worth going back, 380 ms to go", 1, 300, 1_384);
+    }
+
+    /**
+     * Sent elsewhere after the resume's decision (e.g. by the user): the frames to the position are another's
+     */
+    @Test
+    public void aSeekEndsTheKeyframeDecision() {
+        start(VIDEO_ID);
+        mFixture.at(300);
+        VideoStarts.onKeyframeResume(VideoStarts.KEYFRAME_DECODER_THERE);
+        mFixture.at(400);
+        VideoStarts.onSeek(60_000);
+        mFixture.at(900);
+        VideoStarts.onFirstFrame(new VideoStarts.FirstFrame(60_000, "1920x1080 vp09 30fps", 4_000, 12, T0 + 500));
+        VideoStarts.onPlaying(true);
+
+        assertStage(find(last(), VideoStarts.STAGE_TO_POSITION), VideoStarts.STAGE_TO_POSITION, "12 frames", 1, 500, 900);
+    }
+
+    /**
+     * A ready TV player standing in for a new one being preprocessed is a moment of the player JS: kept, though 0 ms. The web solver's
+     * stages are the player JS's work, not the network's.
+     */
+    @Test
+    public void thePlayerJsStagesHaveTheirCategory() {
+        mFixture.at(0);
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.fetchStages = stages(
+                stage("fetch", null, 0, 0, 900),
+                stage("player JS", null, 1, 10, 600),
+                stage("player stand-in", "new player", 2, 20, 20),
+                stage("player load", null, 2, 20, 300),
+                stage("solve", null, 2, 300, 600));
+        mFixture.at(1_000);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+        VideoStarts.onPrepare();
+        mFixture.at(1_500);
+        VideoStarts.onFirstFrame();
+        VideoStarts.onPlaying(true);
+
+        VideoStart start = last();
+
+        assertStage(find(start, "player stand-in"), "player stand-in", "new player", 2, 20, 20);
+        assertEquals(VideoStart.Category.MARK, find(start, "player stand-in").getCategory());
+        assertEquals(VideoStart.Category.PLAYER_JS, find(start, "player load").getCategory());
+        assertEquals(VideoStart.Category.PLAYER_JS, find(start, "solve").getCategory());
+    }
+
     private static StackTraceElement frame(String className, String method) {
         return new StackTraceElement("com.liskovsoft.smartyoutubetv2.common." + className, method, null, 1);
+    }
+
+    /**
+     * Not playing by its time, nor by MAX_RECORDED_MS: late, then given up
+     *
+     * @param t0Ms when it started, in ms since T0
+     */
+    private void giveUp(long t0Ms) {
+        mFixture.at(t0Ms + VideoStarts.MAX_START_MS);
+        mFixture.fireGiveUp();
+        mFixture.at(t0Ms + VideoStarts.MAX_RECORDED_MS);
+        mFixture.fireGiveUp();
     }
 
     private void start(String videoId) {
@@ -1506,11 +1703,10 @@ public class VideoStartsTest {
         mFixture.at(2_500);
         VideoStarts.onPlayerState(false, false);
 
-        mFixture.at(VideoStarts.MAX_START_MS);
-        mFixture.fireGiveUp();
+        giveUp(0);
 
         assertEquals(VideoStart.OUTCOME_GAVE_UP, last().outcome);
-        assertEquals(VideoStarts.MAX_START_MS, last().totalMs);
+        assertEquals(VideoStarts.MAX_RECORDED_MS, last().totalMs);
     }
 
     /**
@@ -1544,8 +1740,7 @@ public class VideoStartsTest {
         VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
         VideoStarts.onFetch(VIDEO_ID);
 
-        mFixture.at(VideoStarts.MAX_START_MS);
-        mFixture.fireGiveUp();
+        giveUp(0);
 
         JSONObject json = last().toJson();
 
