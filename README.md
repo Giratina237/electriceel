@@ -43,7 +43,7 @@ Electric Eel is a fork of [SmartTube](https://github.com/yuliskov/SmartTube), an
 - "Don't recommend channel" and "Not interested" are available in Gaming, Music, Sports, etc now
 - Settings are per account
 - Apply to copy all settings from one account to another
-- Refactored Settings to use more cards
+- Refactored Settings to use more cards in the Classic skin
 - Keyword filtering that hides videos by the words in their titles
 - Full-screen word picker for keywords and a Hide words item to the context menu
 - Blocking videos in different sections by category
