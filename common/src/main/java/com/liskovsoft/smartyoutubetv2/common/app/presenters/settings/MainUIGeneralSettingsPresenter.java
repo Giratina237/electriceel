@@ -45,6 +45,8 @@ public class MainUIGeneralSettingsPresenter extends BasePresenter<Void> implemen
                 () -> MainUISettingsPresenter.instance(context).showTime(), R.drawable.settings_time));
         items.add(new SettingsItem(context.getString(R.string.settings_channels_options),
                 () -> MainUISettingsPresenter.instance(context).showChannels(), R.drawable.settings_channels));
+        items.add(new SettingsItem(context.getString(R.string.settings_sort_options),
+                () -> MainUISettingsPresenter.instance(context).showSorting(), R.drawable.settings_sort));
         items.add(new SettingsItem(context.getString(R.string.settings_color_scheme_options),
                 () -> MainUISettingsPresenter.instance(context).showColors(), R.drawable.settings_color_scheme));
         items.add(new SettingsItem(context.getString(R.string.settings_misc_options),

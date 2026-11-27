@@ -135,6 +135,8 @@
     <string name="sorting_by_new_content">เนื้อหาใหม่</string>
     <string name="sorting_alphabetically">ตามตัวอักษร</string>
     <string name="sorting_last_viewed">ดูล่าสุด</string>
+    <string name="add_to_playlist_sorting">การเรียงลำดับใน บันทึกไปยังเพลย์ลิสต์</string>
+    <string name="sorting_last_edited">แก้ไขล่าสุด (เหมือนใน YouTube)</string>
     <string name="player_pause_when_seek">หยุดชั่วคราวเมื่อกรอวิดีโอ</string>
     <string name="playlists_style">รูปแบบของส่วนเพลย์ลิสต์</string>
     <string name="playlists_style_grid">ตาราง</string>
@@ -189,6 +191,7 @@
     <string name="settings_content_filtering">การกรองเนื้อหา</string>
     <string name="settings_cards_options">ตัวเลือกการ์ด</string>
     <string name="settings_channels_options">ตัวเลือกช่อง</string>
+    <string name="settings_sort_options">ตัวเลือกการเรียงลำดับ</string>
     <string name="settings_time_options">ตัวเลือกเวลา</string>
     <string name="settings_system">ระบบ</string>
     <string name="settings_exit_options">ตัวเลือกการออก</string>
