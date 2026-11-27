@@ -1,9 +1,11 @@
 package com.liskovsoft.smartyoutubetv2.common.exoplayer.selector;
 
+import android.media.MediaCodecInfo.CodecProfileLevel;
 import android.text.TextUtils;
 import android.util.Pair;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.Player;
@@ -11,10 +13,12 @@ import com.google.android.exoplayer2.mediacodec.MediaCodecInfo;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil;
 import com.google.android.exoplayer2.mediacodec.MediaCodecUtil.DecoderQueryException;
 import com.google.android.exoplayer2.util.MimeTypes;
+import com.liskovsoft.sharedutils.helpers.DeviceHelpers;
 import com.liskovsoft.sharedutils.helpers.Helpers;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.SubtitleTrack;
 
 import java.util.HashMap;
+import java.util.List;
 
 public class TrackSelectorUtil {
     private static final String CODEC_PREFIX_AV1 = "av01";
@@ -28,6 +32,13 @@ public class TrackSelectorUtil {
     private static final String CODEC_SUFFIX_AV1_HDR2 = "10.0.110.09.16.09.0";
     private static final String CODEC_SHORT_AV1 = "av1";
     private static final String HDR_PROFILE_ENDING = "hdr";
+    // The profiles YouTube's HDR formats are in (see isHdrFormat), with the HDR flags or without, as CodecProfileLevel has them:
+    // VP9Profile2, VP9Profile2HDR, VP9Profile2HDR10Plus and AV1ProfileMain10, AV1ProfileMain10HDR10, AV1ProfileMain10HDR10Plus
+    // (the numbers: the constants are Android 7's and 10's)
+    private static final int[] VP9_HDR_PROFILES = {0x4, 0x1000, 0x4000};
+    private static final int[] AV1_HDR_PROFILES = {0x2, 0x1000, 0x2000};
+    private static Boolean sIsVP9HdrDecodable;
+    private static Boolean sIsAV1HdrDecodable;
     private static final String SEPARATOR = ", ";
     private static final HashMap<Integer, Integer> mResolutionMap = new HashMap<>();
     // Unicode chars: https://symbl.cc/en/search/?q=mark
@@ -475,6 +486,89 @@ public class TrackSelectorUtil {
         } catch (DecoderQueryException e) {
             return false;
         }
+    }
+
+    /**
+     * A hardware VP9 decoder takes profile 2, the one of YouTube's HDR in VP9 (itags 330-337, see isHdrFormat). A Shield's take
+     * profile 0 only (shield2, a darcy on Android 11: OMX.Nvidia.vp9.decode and its .secure list 1/512, profile 0 at level 5.1),
+     * and the player gave them the HDR anyway, as ExoPlayer 2.10 can't read a VP9 or AV1 profile (see
+     * MediaCodecUtil#getCodecProfileAndLevel): it failed, "Unexpected playback error null" (yuliskov/SmartTube#5751). The software
+     * decoders don't count, as for the sizes (see DeviceHelpers#isVP9ResolutionSupported): the Shield's lists profile 2, at
+     * 2048x2048 at most, in 8-bit colours.
+     */
+    public static boolean isVP9HdrDecodable() {
+        if (sIsVP9HdrDecodable == null) {
+            sIsVP9HdrDecodable = isVP9HdrDecodable(getDecoderInfos(MimeTypes.VIDEO_VP9));
+        }
+
+        return sIsVP9HdrDecodable;
+    }
+
+    @VisibleForTesting
+    static boolean isVP9HdrDecodable(@Nullable List<MediaCodecInfo> decoders) {
+        return hasHardwareDecoder(decoders, VP9_HDR_PROFILES);
+    }
+
+    /**
+     * A hardware AV1 decoder takes Main 10, the profile of YouTube's HDR in AV1 (itags 694-701), as for VP9 (see
+     * isVP9HdrDecodable)
+     */
+    public static boolean isAV1HdrDecodable() {
+        if (sIsAV1HdrDecodable == null) {
+            sIsAV1HdrDecodable = isAV1HdrDecodable(getDecoderInfos(MimeTypes.VIDEO_AV1));
+        }
+
+        return sIsAV1HdrDecodable;
+    }
+
+    @VisibleForTesting
+    static boolean isAV1HdrDecodable(@Nullable List<MediaCodecInfo> decoders) {
+        return hasHardwareDecoder(decoders, AV1_HDR_PROFILES);
+    }
+
+    /**
+     * ExoPlayer's list, read once (see MediaCodecUtil#getDecoderInfos), null when it can't be read
+     */
+    @Nullable
+    private static List<MediaCodecInfo> getDecoderInfos(String mimeType) {
+        try {
+            return MediaCodecUtil.getDecoderInfos(mimeType, false, false);
+        } catch (DecoderQueryException e) {
+            return null;
+        }
+    }
+
+    /**
+     * A hardware decoder lists one of the profiles, or lists none at all: it says nothing, so it's given the benefit of the doubt,
+     * as ExoPlayer gives it for a codec it can't read (see MediaCodecInfo#isCodecSupported). The decoders that can't be read: the
+     * formats are shown, as before.
+     */
+    private static boolean hasHardwareDecoder(@Nullable List<MediaCodecInfo> decoders, int[] profiles) {
+        if (decoders == null) {
+            return true;
+        }
+
+        for (MediaCodecInfo decoder : decoders) {
+            if (!DeviceHelpers.isHardwareAccelerated(decoder.name)) {
+                continue;
+            }
+
+            CodecProfileLevel[] profileLevels = decoder.getProfileLevels();
+
+            if (profileLevels.length == 0) {
+                return true;
+            }
+
+            for (CodecProfileLevel profileLevel : profileLevels) {
+                for (int profile : profiles) {
+                    if (profileLevel.profile == profile) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

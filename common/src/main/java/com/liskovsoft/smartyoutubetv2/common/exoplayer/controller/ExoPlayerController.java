@@ -1049,6 +1049,10 @@ public class ExoPlayerController implements Player.EventListener {
     public List<FormatItem> getVideoFormats() {
         return ExoFormatItem.from(mTrackSelectorManager.getVideoTracks());
     }
+
+    public boolean hasHiddenHdrFormats() {
+        return mTrackSelectorManager.hasHiddenHdrFormats();
+    }
     
     public List<FormatItem> getAudioFormats() {
         return ExoFormatItem.from(mTrackSelectorManager.getAudioTracks());

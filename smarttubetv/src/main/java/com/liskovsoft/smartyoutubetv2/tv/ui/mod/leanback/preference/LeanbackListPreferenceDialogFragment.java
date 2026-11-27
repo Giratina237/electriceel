@@ -266,9 +266,15 @@ public class LeanbackListPreferenceDialogFragment extends LeanbackPreferenceDial
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
             final LayoutInflater inflater = LayoutInflater.from(parent.getContext());
-            final View view = inflater.inflate(androidx.leanback.preference.R.layout.leanback_list_preference_item_single,
-                    parent, false);
+            // MOD: note rows (see RadioListPreference)
+            final View view = inflater.inflate(viewType == VIEW_TYPE_NOTE ? R.layout.dialog_list_preference_item_radio_note
+                            : androidx.leanback.preference.R.layout.leanback_list_preference_item_single, parent, false);
             return new ViewHolder(view, this);
+        }
+
+        @Override
+        public int getItemViewType(int position) {
+            return isNote(position) ? VIEW_TYPE_NOTE : VIEW_TYPE_RADIO;
         }
 
         @Override
@@ -287,6 +293,15 @@ public class LeanbackListPreferenceDialogFragment extends LeanbackPreferenceDial
             return preference instanceof RadioListPreference && ((RadioListPreference) preference).isDisabled(mEntryValues[position].toString());
         }
 
+        /**
+         * MOD: a line of text, it can't be chosen (see RadioListPreference)
+         */
+        protected boolean isNote(int position) {
+            final DialogPreference preference = getPreference();
+
+            return preference instanceof RadioListPreference && ((RadioListPreference) preference).isNote(mEntryValues[position].toString());
+        }
+
         @Override
         public int getItemCount() {
             return mEntries.length;
@@ -295,7 +310,7 @@ public class LeanbackListPreferenceDialogFragment extends LeanbackPreferenceDial
         @Override
         public void onItemClick(ViewHolder viewHolder) {
             final int index = viewHolder.getAdapterPosition();
-            if (index == RecyclerView.NO_POSITION || isDisabled(index)) {
+            if (index == RecyclerView.NO_POSITION || isDisabled(index) || isNote(index)) {
                 return;
             }
             final CharSequence entry = mEntryValues[index];

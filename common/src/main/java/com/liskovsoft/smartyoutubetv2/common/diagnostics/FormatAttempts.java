@@ -84,9 +84,9 @@ public final class FormatAttempts {
     static final int MAX_ATTEMPTS = 20;
     private static final String AUTO = "auto";
     /**
-     * E.g. 1920x1080 vp09 30fps (see PlayerFailure#describeVideo)
+     * E.g. 1920x1080 vp09 30fps, 3840x2160 vp09 hdr 60fps (see PlayerFailure#describeVideo)
      */
-    private static final Pattern VIDEO = Pattern.compile("^(\\d+)x(\\d+) (\\S+)(?: (\\d+)fps)?$");
+    private static final Pattern VIDEO = Pattern.compile("^(\\d+)x(\\d+) (\\S+)( hdr)?(?: (\\d+)fps)?$");
     private static String sVideoId;
     private static String sClient;
     private static String sProtocol;
@@ -1025,7 +1025,8 @@ public final class FormatAttempts {
     }
 
     /**
-     * E.g. "vp9 1080p30" of "1920x1080 vp09 30fps": the codec, the shorter side and the frame rate
+     * E.g. "vp9 1080p30" of "1920x1080 vp09 30fps": the codec, the shorter side and the frame rate. "vp9 hdr 2160p60" of
+     * "3840x2160 vp09 hdr 60fps".
      */
     @Nullable
     @VisibleForTesting
@@ -1041,9 +1042,10 @@ public final class FormatAttempts {
         }
 
         int side = Math.min(Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2)));
-        String fps = matcher.group(4) != null ? matcher.group(4) : "";
+        String hdr = matcher.group(4) != null ? " hdr" : "";
+        String fps = matcher.group(5) != null ? matcher.group(5) : "";
 
-        return getCodecFamily(matcher.group(3)) + " " + side + "p" + fps;
+        return getCodecFamily(matcher.group(3)) + hdr + " " + side + "p" + fps;
     }
 
     /**
@@ -1198,7 +1200,7 @@ public final class FormatAttempts {
     }
 
     /**
-     * The longer side (1920 of 1920x800 or 1080x1920 is 1080p), the codec and the frame rate (when both have one)
+     * The longer side (1920 of 1920x800 or 1080x1920 is 1080p), the codec, HDR or not, and the frame rate (when both have one)
      */
     @VisibleForTesting
     static boolean isSameVideo(String requested, String tried) {
@@ -1211,9 +1213,10 @@ public final class FormatAttempts {
 
         int sideA = Math.max(Integer.parseInt(a.group(1)), Integer.parseInt(a.group(2)));
         int sideB = Math.max(Integer.parseInt(b.group(1)), Integer.parseInt(b.group(2)));
-        boolean isSameFps = a.group(4) == null || b.group(4) == null || Math.abs(Integer.parseInt(a.group(4)) - Integer.parseInt(b.group(4))) <= 1;
+        boolean isSameHdr = (a.group(4) != null) == (b.group(4) != null);
+        boolean isSameFps = a.group(5) == null || b.group(5) == null || Math.abs(Integer.parseInt(a.group(5)) - Integer.parseInt(b.group(5))) <= 1;
 
-        return sideA == sideB && getCodecFamily(a.group(3)).equals(getCodecFamily(b.group(3))) && isSameFps;
+        return sideA == sideB && getCodecFamily(a.group(3)).equals(getCodecFamily(b.group(3))) && isSameHdr && isSameFps;
     }
 
     /**

@@ -1417,6 +1417,11 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     }
 
     @Override
+    public boolean hasHiddenHdrFormats() {
+        return mExoPlayerController.hasHiddenHdrFormats();
+    }
+
+    @Override
     public List<FormatItem> getAudioFormats() {
         return mExoPlayerController.getAudioFormats();
     }

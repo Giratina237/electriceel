@@ -294,11 +294,16 @@ public class AppDialogUtil {
         FormatItem selectedFormat = playerData.getFormat(FormatItem.TYPE_VIDEO);
         boolean isPresetSelection = selectedFormat != null && selectedFormat.isPreset();
         boolean isAllFormatsUnlocked = playerTweaksData.isAllFormatsUnlocked();
+        boolean isHdrHidden = false;
+        boolean isHdrShown = false;
 
         for (VideoPreset preset : presets) {
             if (!isAllFormatsUnlocked && !Utils.isPresetSupported(preset)) {
+                isHdrHidden |= Utils.isHdrUndecodable(preset);
                 continue;
             }
+
+            isHdrShown |= preset.isHdrPreset();
 
             result.add(0, UiOptionItem.from(preset.name,
                     option -> setFormat(preset.format, playerData, onFormatSelected),
@@ -317,7 +322,22 @@ public class AppDialogUtil {
                 optionItem -> setFormat(playerData.getDefaultVideoFormat(), playerData, onFormatSelected),
                 !isPresetSelection));
 
+        // Not with some HDR left: e.g. vp9+hdr shown and av01+hdr hidden on a device without an AV1 decoder
+        if (isHdrHidden && !isHdrShown) {
+            result.add(0, createHdrNotDecodableNote(context));
+        }
+
         return result;
+    }
+
+    /**
+     * The line above the presets or the formats when their HDR ones are hidden and none is left, so HDR not working on e.g. a
+     * Shield isn't taken for a bug (see TrackSelectorUtil#isVP9HdrDecodable). It can't be focused or chosen.
+     */
+    public static OptionItem createHdrNotDecodableNote(Context context) {
+        OptionItem note = UiOptionItem.from(context.getString(R.string.hdr_not_decodable));
+        note.setNote(true);
+        return note;
     }
 
     public static OptionCategory createVideoBufferCategory(Context context) {

@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import androidx.annotation.Nullable;
 import androidx.leanback.widget.VerticalGridView;
+import androidx.preference.DialogPreference;
 import androidx.preference.ListPreference;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.Adapter;
@@ -68,6 +69,18 @@ public class RadioListPreferenceDialogFragment extends LeanbackListPreferenceDia
             }
         }
 
+        // None chosen (e.g. a saved HDR preset now hidden): the first entry that takes focus. A note above it can't, and the
+        // grid gives focus to the one at this position only (see GridLayoutManager#gridOnRequestFocusInDescendantsAligned).
+        DialogPreference preference = getPreference();
+
+        if (preference instanceof RadioListPreference) {
+            for (int i = 0; i < mEntryValues.length; i++) {
+                if (!((RadioListPreference) preference).isNote(mEntryValues[i].toString())) {
+                    return i;
+                }
+            }
+        }
+
         return 0;
     }
 
@@ -82,7 +95,7 @@ public class RadioListPreferenceDialogFragment extends LeanbackListPreferenceDia
         @Override
         public void onItemClick(ViewHolder viewHolder) {
             final int index = viewHolder.getAdapterPosition();
-            if (index == RecyclerView.NO_POSITION || isDisabled(index)) {
+            if (index == RecyclerView.NO_POSITION || isDisabled(index) || isNote(index)) {
                 return;
             }
             final CharSequence entry = mEntryValues[index];

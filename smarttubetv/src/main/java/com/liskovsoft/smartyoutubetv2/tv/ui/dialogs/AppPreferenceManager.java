@@ -317,6 +317,10 @@ public class AppPreferenceManager {
             if (!item.isEnabled()) {
                 pref.setDisabled(item.toString());
             }
+
+            if (item.isNote()) {
+                pref.setNote(item.toString());
+            }
         }
 
         return pref;

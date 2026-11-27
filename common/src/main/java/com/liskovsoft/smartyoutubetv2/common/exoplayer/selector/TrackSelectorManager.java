@@ -218,6 +218,8 @@ public class TrackSelectorManager implements TrackSelectorCallback {
                 }
 
                 if (!PlayerTweaksData.instance(mContext).isAllFormatsUnlocked() && !Utils.isFormatSupported(mediaTrack)) {
+                    // The formats dialog says why its HDR ones are missing (see hasHiddenHdrFormats)
+                    renderer.hasHiddenHdr |= Utils.isHdrUndecodable(mediaTrack);
                     continue;
                 }
 
@@ -309,6 +311,28 @@ public class TrackSelectorManager implements TrackSelectorCallback {
 
     public Set<MediaTrack> getSubtitleTracks() {
         return getAvailableTracks(RENDERER_INDEX_SUBTITLE);
+    }
+
+    /**
+     * The video has formats in HDR that aren't in getVideoTracks, as no hardware decoder plays them in HDR (see
+     * Utils#isHdrUndecodable), and none in HDR that is: e.g. not VP9's shown and AV1's hidden on a device without an AV1 decoder
+     */
+    public boolean hasHiddenHdrFormats() {
+        initRenderer(RENDERER_INDEX_VIDEO);
+
+        Renderer renderer = mRenderers[RENDERER_INDEX_VIDEO];
+
+        if (renderer == null || !renderer.hasHiddenHdr || renderer.sortedTracks == null) {
+            return false;
+        }
+
+        for (MediaTrack track : renderer.sortedTracks) {
+            if (TrackSelectorUtil.isHdrFormat(track.format)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private Pair<Definition, MediaTrack> createSelection(TrackGroupArray groups, MediaTrack selectedTrack) {
@@ -835,6 +859,10 @@ public class TrackSelectorManager implements TrackSelectorCallback {
 
     private static class Renderer {
         public boolean isDisabled;
+        /**
+         * Formats in HDR were left out: no hardware decoder plays them in HDR (see Utils#isHdrUndecodable)
+         */
+        public boolean hasHiddenHdr;
         public TrackGroupArray trackGroups;
         public MediaTrack[][] mediaTracks;
         public SortedSet<MediaTrack> sortedTracks;

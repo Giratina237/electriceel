@@ -411,6 +411,12 @@ public class EmbedPlayerView extends PlayerView implements PlaybackView {
     }
 
     @Override
+    public boolean hasHiddenHdrFormats() {
+        // Made with the player (see initPlayer)
+        return mExoPlayerController != null && mExoPlayerController.hasHiddenHdrFormats();
+    }
+
+    @Override
     public List<FormatItem> getAudioFormats() {
         return mExoPlayerController.getAudioFormats();
     }

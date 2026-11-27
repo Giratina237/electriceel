@@ -83,11 +83,17 @@ public class HQDialogController extends BasePlayerController {
         List<FormatItem> audioFormats = getPlayer().getAudioFormats();
         String audioFormatsTitle = getContext().getString(R.string.title_audio_formats);
 
+        List<OptionItem> videoOptions = UiOptionItem.from(videoFormats, this::selectFormatOption, getContext().getString(R.string.option_disabled));
+
+        if (videoOptions != null && getPlayer().hasHiddenHdrFormats()) {
+            videoOptions.add(0, AppDialogUtil.createHdrNotDecodableNote(getContext()));
+        }
+
         addCategoryInt(OptionCategory.from(
                 VIDEO_FORMATS_ID,
                 OptionCategory.TYPE_RADIO_LIST,
                 videoFormatsTitle,
-                UiOptionItem.from(videoFormats, this::selectFormatOption, getContext().getString(R.string.option_disabled))));
+                videoOptions));
         addCategoryInt(OptionCategory.from(
                 AUDIO_FORMATS_ID,
                 OptionCategory.TYPE_RADIO_LIST,
