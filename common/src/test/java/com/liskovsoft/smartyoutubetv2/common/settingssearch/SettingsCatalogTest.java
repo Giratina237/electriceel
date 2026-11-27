@@ -3,8 +3,10 @@ package com.liskovsoft.smartyoutubetv2.common.settingssearch;
 import android.app.Application;
 
 import com.liskovsoft.smartyoutubetv2.common.R;
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.BackupSettingsPresenter;
+import com.liskovsoft.smartyoutubetv2.common.misc.AppDataSourceManager;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -14,7 +16,10 @@ import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowToast;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -25,50 +30,54 @@ import static org.junit.Assert.assertTrue;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
 public class SettingsCatalogTest {
-    /**
-     * Every card is clicked, and nothing shows: no screen starts, no dialog is left to show, no message
-     */
     @Test
-    public void build_showsNothing() {
-        Application app = RuntimeEnvironment.getApplication();
+    public void build_findsTheSettings() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
 
-        SettingsCatalog catalog = SettingsCatalog.build(app);
-
-        assertNull(Shadows.shadowOf(app).getNextStartedActivity());
-        assertEquals(0, ShadowToast.shownToastCount());
-        assertTrue(AppDialogPresenter.instance(app).isEmpty());
         assertTrue("Only " + catalog.getEntries().size(), catalog.getEntries().size() > 150);
     }
 
     /**
-     * What each panel holds is let go as it would be once closed (e.g. Backup lets the auto-backups run again, they wait while
-     * it's held)
+     * Read from what the cards declare: no panel is made by its presenter (e.g. Backup isn't held, its auto-backups wait while it
+     * is), no screen started, no message
      */
     @Test
-    public void build_closesThePanels() {
+    public void build_opensNothing() {
         Application app = RuntimeEnvironment.getApplication();
 
         SettingsCatalog.build(app);
 
         assertFalse(BackupSettingsPresenter.hasInstance());
-        assertFalse(SettingsCapture.isActive());
+        assertNull(Shadows.shadowOf(app).getNextStartedActivity());
+        assertEquals(0, ShadowToast.shownToastCount());
+        assertTrue(AppDialogPresenter.instance(app).isEmpty());
     }
 
     /**
-     * Of the close callbacks of a panel looked through, only the ones that let go of something run: the others apply what was
-     * changed in it (e.g. Search clears the search history), and nothing was
+     * Each card declares what it opens, a section or a panel, so the search finds what's in it. Not the two whose rows are loaded
+     * in the background: Accounts, Android channels.
      */
     @Test
-    public void capture_runsOnlyReleases() {
-        int[] runs = new int[2];
+    public void cards_declareWhatTheyOpen() {
+        Application app = RuntimeEnvironment.getApplication();
+        Set<String> loaded = new HashSet<>();
+        loaded.add(app.getString(R.string.settings_accounts));
+        loaded.add(app.getString(R.string.home_screen_channels));
+        List<String> missing = new ArrayList<>();
 
-        SettingsCapture.capture(() -> {
-            assertTrue(SettingsCapture.offerOnClose(() -> runs[0]++));
-            assertTrue(SettingsCapture.offerOnClose(SettingsCapture.release(() -> runs[1]++)));
-        });
+        checkCards(app, AppDataSourceManager.instance().getSettingItems(app), loaded, missing);
 
-        assertEquals(0, runs[0]);
-        assertEquals(1, runs[1]);
+        assertTrue(missing.toString(), missing.isEmpty());
+    }
+
+    private static void checkCards(Application app, List<SettingsItem> cards, Set<String> loaded, List<String> missing) {
+        for (SettingsItem card : cards) {
+            if (card.getCards() != null) {
+                checkCards(app, card.getCards().getItems(app), loaded, missing);
+            } else if (card.getPanel() == null && !loaded.contains(card.title)) {
+                missing.add(card.title);
+            }
+        }
     }
 
     /**

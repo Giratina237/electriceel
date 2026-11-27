@@ -4,7 +4,7 @@ import android.content.Context;
 
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.smartyoutubetv2.common.R;
-import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCapture;
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsRows;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
@@ -34,6 +34,18 @@ public class SearchSettingsPresenter extends BasePresenter<Void> {
      * The General card of the Search settings (was Misc). The disables were the Disables card.
      */
     public void showGeneral() {
+        AppDialogPresenter.instance(getContext()).showPanel(getContext().getString(R.string.settings_general),
+                this::appendGeneralRows, () -> {
+            if (mSearchData.isSearchHistoryDisabled()) {
+                MediaServiceManager.instance().clearSearchHistory();
+            }
+        });
+    }
+
+    /**
+     * The rows of the panel showGeneral shows (see SettingsPanel)
+     */
+    public void appendGeneralRows(SettingsRows rows) {
         List<OptionItem> options = new ArrayList<>();
 
         //options.add(UiOptionItem.from(getContext().getString(R.string.disable_popular_searches),
@@ -76,19 +88,10 @@ public class SearchSettingsPresenter extends BasePresenter<Void> {
         globalSearch.setMenu(true);
         options.add(globalSearch);
 
-        showCheckedList(R.string.settings_general, options, () -> {
-            if (mSearchData.isSearchHistoryDisabled()) {
-                MediaServiceManager.instance().clearSearchHistory();
-            }
-        });
+        rows.appendCheckedCategory(getContext().getString(R.string.settings_general), options);
     }
 
     private void startBridgePresenter() {
-        // Clicked by the settings search as it looks the menus through: does nothing then (see SettingsCapture)
-        if (SettingsCapture.isActive()) {
-            return;
-        }
-
         MessageHelpers.showLongMessage(getContext(), R.string.enable_voice_search_desc);
 
         ATVBridgePresenter atvPresenter = ATVBridgePresenter.instance(getContext());
@@ -104,6 +107,14 @@ public class SearchSettingsPresenter extends BasePresenter<Void> {
      * The Voice engine card of the Search settings
      */
     public void showVoiceEngine() {
+        AppDialogPresenter.instance(getContext()).showPanel(getContext().getString(R.string.settings_voice_engine),
+                this::appendVoiceEngineRows, null);
+    }
+
+    /**
+     * The rows of the panel showVoiceEngine shows (see SettingsPanel)
+     */
+    public void appendVoiceEngineRows(SettingsRows settingsPresenter) {
         List<OptionItem> options = new ArrayList<>();
 
         for (int[] pair : new int[][] {
@@ -115,18 +126,8 @@ public class SearchSettingsPresenter extends BasePresenter<Void> {
                     mSearchData.getSpeechRecognizerType() == pair[1]));
         }
 
-        AppDialogPresenter settingsPresenter = AppDialogPresenter.instance(getContext());
-
         String title = getContext().getString(R.string.settings_voice_engine);
         settingsPresenter.appendRadioCategory(title, options);
-        settingsPresenter.showDialog(title);
     }
 
-    private void showCheckedList(int titleResId, List<OptionItem> options, Runnable onFinish) {
-        AppDialogPresenter settingsPresenter = AppDialogPresenter.instance(getContext());
-
-        String title = getContext().getString(titleResId);
-        settingsPresenter.appendCheckedCategory(title, options);
-        settingsPresenter.showDialog(title, onFinish);
-    }
 }

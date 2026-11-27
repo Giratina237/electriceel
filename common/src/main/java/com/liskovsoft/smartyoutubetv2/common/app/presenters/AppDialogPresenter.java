@@ -7,11 +7,12 @@ import android.os.Looper;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsPanel;
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsRows;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionCategory;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.AppDialogView;
-import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCapture;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class AppDialogPresenter extends BasePresenter<AppDialogView> {
+public class AppDialogPresenter extends BasePresenter<AppDialogView> implements SettingsRows {
     @SuppressLint("StaticFieldLeak")
     private static AppDialogPresenter sInstance;
     private final Handler mHandler;
@@ -148,14 +149,15 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
         showDialog(null, onFinish);
     }
 
-    public void showDialog(CharSequence dialogTitle, Runnable onFinish) {
-        // Looked through by the settings search instead: not shown, closed after (onFinish runs then)
-        if (SettingsCapture.offerPanel(dialogTitle, mCategories)) {
-            SettingsCapture.offerOnClose(onFinish);
-            resetData();
-            return;
-        }
+    /**
+     * The rows of the panel, then the panel shown (see SettingsPanel)
+     */
+    public void showPanel(CharSequence dialogTitle, SettingsPanel panel, Runnable onFinish) {
+        panel.appendRows(this);
+        showDialog(dialogTitle, onFinish);
+    }
 
+    public void showDialog(CharSequence dialogTitle, Runnable onFinish) {
         if (mFocusedItem == null && mFocusedItemMatcher != null) {
             mFocusedItem = findItem(mCategories, mFocusedItemMatcher);
         }
@@ -198,6 +200,7 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
      * The row of the next dialog that has the focus when it opens, instead of the first one: e.g. the one opened last,
      * when the dialog is opened again after it. Of the items appended to it.
      */
+    @Override
     public void setFocusedItem(OptionItem item) {
         mFocusedItem = item;
     }
@@ -312,61 +315,9 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
         return isDialogShown() && isTypeComments();
     }
 
+    @Override
     public void appendCategory(OptionCategory category) {
         mCategories.add(category);
-    }
-
-    public void appendRadioCategory(CharSequence categoryTitle, List<OptionItem> items) {
-        mCategories.add(OptionCategory.radioList(categoryTitle, items));
-    }
-
-    public void appendCheckedCategory(CharSequence categoryTitle, List<OptionItem> items) {
-        mCategories.add(OptionCategory.checkedList(categoryTitle, items));
-    }
-
-    /**
-     * Its items are moved up and down, see {@link OptionCategory#reorderList}
-     */
-    public void appendReorderCategory(CharSequence categoryTitle, List<OptionItem> items, OptionCategory.OnReorder onReorder) {
-        mCategories.add(OptionCategory.reorderList(categoryTitle, items, onReorder));
-    }
-
-    public void appendStringsCategory(CharSequence categoryTitle, List<OptionItem> items) {
-        mCategories.add(OptionCategory.stringList(categoryTitle, items));
-    }
-
-    public void appendLongTextCategory(CharSequence categoryTitle, OptionItem item) {
-        mCategories.add(OptionCategory.longText(categoryTitle, item));
-    }
-
-    /**
-     * @param isLinkified its addresses and time codes are links
-     */
-    public void appendLongTextCategory(CharSequence categoryTitle, OptionItem item, boolean isLinkified) {
-        mCategories.add(OptionCategory.longText(categoryTitle, item, isLinkified));
-    }
-
-    public void appendChatCategory(CharSequence categoryTitle, OptionItem item) {
-        mCategories.add(OptionCategory.chat(categoryTitle, item));
-    }
-
-    public void appendCommentsCategory(CharSequence categoryTitle, OptionItem item) {
-        mCategories.add(OptionCategory.comments(categoryTitle, item));
-    }
-
-    public void appendSingleSwitch(OptionItem optionItem) {
-        mCategories.add(OptionCategory.singleSwitch(optionItem));
-    }
-
-    public void appendSingleButton(OptionItem optionItem) {
-        mCategories.add(OptionCategory.singleButton(optionItem));
-    }
-
-    /**
-     * A QR code of the text (e.g. an address) with its title above it
-     */
-    public void appendQrCode(CharSequence title, String text) {
-        mCategories.add(OptionCategory.qrCode(title, text));
     }
 
     public void showDialogMessage(String dialogTitle, Runnable onClose, int timeoutMs) {
@@ -384,20 +335,10 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     public void setOnStart(Runnable onStart) {
-        // Of a dialog that isn't shown (see SettingsCapture): it doesn't start
-        if (SettingsCapture.isActive()) {
-            return;
-        }
-
         Utils.addMyCallback(mOnStart, onStart);
     }
 
     public void setOnFinish(Runnable onFinish) {
-        // Of a dialog that isn't shown: run as it's closed, after it's looked through
-        if (SettingsCapture.offerOnClose(onFinish)) {
-            return;
-        }
-
         Utils.addMyCallback(mOnFinish, onFinish);
     }
 

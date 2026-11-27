@@ -19,7 +19,6 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.AccountSelec
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AccountsData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.AppPrefs;
-import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCapture;
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil;
 import com.liskovsoft.smartyoutubetv2.common.utils.GlideIconFetcher;
 import com.liskovsoft.smartyoutubetv2.common.utils.SimpleEditDialog;
@@ -54,11 +53,6 @@ public class AccountSettingsPresenter extends BasePresenter<Void> {
     }
 
     public void show() {
-        // Loaded in the background, and the accounts are the user's own: the settings search finds the Accounts card only
-        if (SettingsCapture.isActive()) {
-            return;
-        }
-
         mMediaServiceManager.loadAccounts(this::fetchImagesAndShowDialog);
     }
 
@@ -82,7 +76,7 @@ public class AccountSettingsPresenter extends BasePresenter<Void> {
         int accountIndex = accounts != null ? accounts.indexOf(account) : -1;
         CharSequence accountIcon = accountIndex != -1 ? Utils.icon(icons.get(accountIndex)) : null;
         settingsPresenter.showDialog(account != null ? TextUtils.concat(accountIcon, " ", account.getName())
-                : getContext().getString(R.string.settings_accounts), SettingsCapture.release(this::unhold));
+                : getContext().getString(R.string.settings_accounts), this::unhold);
     }
 
     private void appendSelectAccountSection(List<Account> accounts, List<Drawable> icons, AppDialogPresenter settingsPresenter) {

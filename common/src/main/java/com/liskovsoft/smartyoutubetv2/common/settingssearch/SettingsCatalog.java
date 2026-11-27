@@ -7,6 +7,7 @@ import androidx.annotation.Nullable;
 
 import com.liskovsoft.sharedutils.mylogger.Log;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsItem;
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsPanel;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionCategory;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
@@ -20,12 +21,11 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Every setting of the app, for the settings search: the cards of the Settings section, the cards of their sections, and the rows of
- * the settings panels they open. Made from the settings themselves, as they are now: each card is clicked, and what it opens is
- * taken instead of shown (see SettingsCapture). So nothing is listed by hand: a new setting is found as soon as its panel has it.
- * <br/>
- * The menus a row of a panel opens (e.g. Shorts, in Hide content) are looked through too, one level down. The lists a row opens
- * otherwise (e.g. Video speed) aren't: their rows run as they're clicked. The row itself is found.
+ * The search index of the settings: the cards of the Settings section, the cards of their sections, and the rows of the settings
+ * panels they open. Read from what each of them declares, the way Android indexes its settings screens: a section its cards
+ * (SettingsItem.getCards), a panel its rows (SettingsItem.getPanel, see SettingsPanel), a row that opens a menu the rows of the menu
+ * (OptionItem.getPanel), one level down. Nothing is opened, shown or run to make it: the panels show the same rows.<br/>
+ * A row that opens a menu without declaring it (e.g. a list loaded in the background) is found, not the rows of its menu.
  */
 public final class SettingsCatalog {
     private static final String TAG = SettingsCatalog.class.getSimpleName();
@@ -78,7 +78,7 @@ public final class SettingsCatalog {
     }
 
     /**
-     * On the main thread: the settings panels are made there
+     * On the main thread: the rows of the panels are made there
      */
     public static SettingsCatalog build(Context context) {
         Builder builder = new Builder(context);
@@ -129,7 +129,7 @@ public final class SettingsCatalog {
                 break;
             }
 
-            SettingsCardsPresenter.Cards section = captureCards(card);
+            SettingsCardsPresenter.Cards section = card.getCards();
 
             if (section == null) {
                 return false;
@@ -148,7 +148,7 @@ public final class SettingsCatalog {
         }
 
         if (entry.kind == SettingEntry.KIND_SECTION) {
-            SettingsCardsPresenter.Cards section = captureCards(card);
+            SettingsCardsPresenter.Cards section = card.getCards();
 
             if (section == null) {
                 return false;
@@ -163,7 +163,7 @@ public final class SettingsCatalog {
             return true;
         }
 
-        if (entry.isRow && !hasRow(context, card, entry)) {
+        if (entry.isRow && !hasRow(card, entry)) {
             return false;
         }
 
@@ -206,14 +206,14 @@ public final class SettingsCatalog {
     }
 
     /**
-     * Its row is in the panel of the card, and in the menu of the row it's in, the menu not greyed out: looked through first
+     * Its row is in the panel of the card, and in the menu of the row it's in, the menu not greyed out: as they are now
      */
-    private static boolean hasRow(Context context, SettingsItem card, SettingEntry entry) {
-        List<OptionCategory> panel = capturePanel(context, card.onClick);
-
-        if (panel == null) {
+    private static boolean hasRow(SettingsItem card, SettingEntry entry) {
+        if (card.getPanel() == null) {
             return false;
         }
+
+        List<OptionCategory> panel = SettingsPanel.collect(card.getPanel());
 
         if (entry.menuItemTitle == null) {
             return AppDialogPresenter.findItem(panel, entry::matches) != null;
@@ -221,26 +221,11 @@ public final class SettingsCatalog {
 
         OptionItem menu = AppDialogPresenter.findItem(panel, entry::matchesMenu);
 
-        if (menu == null || isDisabled(menu)) {
+        if (menu == null || isDisabled(menu) || menu.getPanel() == null) {
             return false;
         }
 
-        if (!entry.isRow) {
-            return true;
-        }
-
-        List<OptionCategory> menuPanel = capturePanel(context, () -> menu.onSelect(isPressedSelected(panel, menu)));
-
-        return menuPanel != null && AppDialogPresenter.findItem(menuPanel, entry::matches) != null;
-    }
-
-    @Nullable
-    private static List<OptionCategory> capturePanel(Context context, Runnable open) {
-        try {
-            return SettingsCapture.capture(open).panel;
-        } finally {
-            AppDialogPresenter.instance(context).clearPending();
-        }
+        return !entry.isRow || AppDialogPresenter.findItem(SettingsPanel.collect(menu.getPanel()), entry::matches) != null;
     }
 
     /**
@@ -271,10 +256,6 @@ public final class SettingsCatalog {
         }
 
         return false;
-    }
-
-    private static SettingsCardsPresenter.Cards captureCards(SettingsItem card) {
-        return card.onClick != null ? SettingsCapture.capture(card.onClick).cards : null;
     }
 
     /**
@@ -315,22 +296,16 @@ public final class SettingsCatalog {
                 return;
             }
 
-            SettingsCapture.Result result = capture(card);
-            boolean isSection = result != null && result.cards != null;
-            add(isSection ? SettingEntry.KIND_SECTION : SettingEntry.KIND_CARD, title, path, Collections.emptyList(), cards, false,
-                    null, null);
-
-            if (result == null) {
-                return;
-            }
-
+            SettingsCardsPresenter.Cards section = card.getCards();
+            add(section != null ? SettingEntry.KIND_SECTION : SettingEntry.KIND_CARD, title, path, Collections.emptyList(), cards,
+                    false, null, null);
             List<String> inside = plus(path, title);
 
-            if (isSection && cards.length < MAX_DEPTH) {
+            if (section != null && cards.length < MAX_DEPTH) {
                 List<SettingsItem> items;
 
                 try {
-                    items = result.cards.getItems(mContext);
+                    items = section.getItems(mContext);
                 } catch (RuntimeException e) {
                     Log.e(TAG, "Can't get the cards of " + title + ": " + e);
                     return;
@@ -339,30 +314,25 @@ public final class SettingsCatalog {
                 for (int i = 0; i < items.size(); i++) {
                     addCard(items.get(i), plus(cards, i), inside);
                 }
-            } else if (result.panel != null) {
-                addPanel(result.panel, cards, inside);
+            } else if (card.getPanel() != null) {
+                List<OptionCategory> panel = collect(card.getPanel(), title);
+
+                if (panel != null) {
+                    addPanel(panel, cards, inside);
+                }
             }
         }
 
         /**
-         * @return null when the card failed to open
+         * @return null when it failed
          */
         @Nullable
-        private SettingsCapture.Result capture(SettingsItem card) {
-            if (card.onClick == null) {
-                return null;
-            }
-
-            AppDialogPresenter dialog = AppDialogPresenter.instance(mContext);
-
+        private static List<OptionCategory> collect(SettingsPanel panel, CharSequence title) {
             try {
-                return SettingsCapture.capture(card.onClick);
+                return SettingsPanel.collect(panel);
             } catch (RuntimeException e) {
-                Log.e(TAG, "Can't look through " + card.title + ": " + e);
+                Log.e(TAG, "Can't get the rows of " + title + ": " + e);
                 return null;
-            } finally {
-                // Appended but not shown (e.g. it failed meanwhile): not for the next dialog
-                dialog.clearPending();
             }
         }
 
@@ -392,8 +362,7 @@ public final class SettingsCatalog {
 
                             boolean isSwitch = category.type == OptionCategory.TYPE_SINGLE_SWITCH;
                             // A button that opens a list (e.g. Order of the sidebar, Set-up sections), unless it's greyed out
-                            List<OptionCategory> opened = !isSwitch && item.isMenu() && !isDisabled(item) && mMenuItemTitle == null ?
-                                    captureClick(item, true) : null;
+                            List<OptionCategory> opened = !isSwitch ? collectMenu(item) : null;
                             // To put in order: its items, as its choices
                             List<String> items = opened != null ? getOrderItems(opened) : Collections.emptyList();
                             add(isSwitch ? SettingEntry.KIND_TOGGLE : SettingEntry.KIND_BUTTON, title, path, items, cards, true,
@@ -476,27 +445,25 @@ public final class SettingsCatalog {
                         true, categoryTitle, title);
 
                 // Not what a greyed out one opens (e.g. Categories, without a key of the Data API): it can't be opened
-                if (isMenu && !isDisabled(item) && mMenuItemTitle == null) {
-                    addMenu(item, categoryTitle, title, cards, plusOther(itemPath, title));
+                List<OptionCategory> menu = isMenu ? collectMenu(item) : null;
+
+                if (menu != null) {
+                    addMenuRows(menu, categoryTitle, title, cards, plusOther(itemPath, title));
                 }
             }
         }
 
         /**
-         * What a row opens when clicked, null when it opens no panel
+         * The rows of the menu the row opens: null when it opens none, declares none, is greyed out (e.g. Categories, without a
+         * key of the Data API: it can't be opened), or is in a menu itself (one level down only)
          */
         @Nullable
-        private List<OptionCategory> captureClick(OptionItem item, boolean selected) {
-            AppDialogPresenter dialog = AppDialogPresenter.instance(mContext);
-
-            try {
-                return SettingsCapture.capture(() -> item.onSelect(selected)).panel;
-            } catch (RuntimeException e) {
-                Log.e(TAG, "Can't look through what " + item.getTitle() + " opens: " + e);
+        private List<OptionCategory> collectMenu(OptionItem item) {
+            if (!item.isMenu() || item.getPanel() == null || isDisabled(item) || mMenuItemTitle != null) {
                 return null;
-            } finally {
-                dialog.clearPending();
             }
+
+            return collect(item.getPanel(), item.getTitle());
         }
 
         /**
@@ -520,18 +487,6 @@ public final class SettingsCatalog {
             }
 
             return result;
-        }
-
-        /**
-         * The rows of the menu a row opens, under the row
-         */
-        private void addMenu(OptionItem item, @Nullable String categoryTitle, String title, int[] cards, List<String> path) {
-            // A menu of a list stays unchecked as it's pressed (see AppPreferenceManager)
-            List<OptionCategory> panel = captureClick(item, false);
-
-            if (panel != null) {
-                addMenuRows(panel, categoryTitle, title, cards, path);
-            }
         }
 
         private void addMenuRows(List<OptionCategory> panel, @Nullable String categoryTitle, String title, int[] cards, List<String> path) {
