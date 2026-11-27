@@ -133,6 +133,8 @@
   <string name="sorting_by_new_content">Uusi sisältö</string>
   <string name="sorting_alphabetically">Aakkosittain</string>
   <string name="sorting_last_viewed">Viimeksi katsotut</string>
+  <string name="add_to_playlist_sorting">Lisää/poista soittolistasta -lajittelu</string>
+  <string name="sorting_last_edited">Viimeksi muokatut (kuten YouTubessa)</string>
   <string name="player_pause_when_seek">Pysäytä selauksen ajaksi</string>
   <string name="playlists_style">Soittolistan tyyli</string>
   <string name="playlists_style_grid">Ruudukko</string>
@@ -186,6 +188,7 @@
   <string name="settings_content_filtering">Sisällön suodatus</string>
   <string name="settings_cards_options">Korttien asetukset</string>
   <string name="settings_channels_options">Kanavien asetukset</string>
+  <string name="settings_sort_options">Lajitteluasetukset</string>
   <string name="settings_time_options">Ajan asetukset</string>
   <string name="settings_system">Järjestelmä</string>
   <string name="settings_exit_options">Poistumisen asetukset</string>

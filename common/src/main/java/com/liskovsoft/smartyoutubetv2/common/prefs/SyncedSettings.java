@@ -312,6 +312,7 @@ public final class SyncedSettings {
         add("ui.menuOrderHistory", 28, Type.RAW, "History menu order");
         add("ui.menuOrderPlaylists", 29, Type.RAW, "Playlists menu order");
         add("ui.menuOrderSidebar", 30, Type.RAW, "Sidebar menu order");
+        add("ui.addToPlaylistSorting", 34, Type.INT, "Add/Remove from playlist sorting");
 
         section("SponsorBlock", SponsorBlockData.SPONSOR_BLOCK_DATA, true);
         add("sponsorBlock.enabled", 0, Type.BOOL, "SponsorBlock");
@@ -420,6 +421,8 @@ public final class SyncedSettings {
                 5, "Dark Grey (monochrome)", 6, "Dark Blue", 7, "Dark Blue (OLED)");
         choices("ui.channelCategorySorting", MainUIData.CHANNEL_SORTING_NEW_CONTENT, "New content", MainUIData.CHANNEL_SORTING_NAME,
                 "Alphabetically", MainUIData.CHANNEL_SORTING_LAST_VIEWED, "Last viewed", MainUIData.CHANNEL_SORTING_DEFAULT, "Default");
+        choices("ui.addToPlaylistSorting", MainUIData.ADD_TO_PLAYLIST_SORTING_NAME, "Alphabetically",
+                MainUIData.ADD_TO_PLAYLIST_SORTING_LAST_EDITED, "Last edited");
         choices("ui.playlistsStyle", MainUIData.PLAYLISTS_STYLE_GRID, "Grid", MainUIData.PLAYLISTS_STYLE_ROWS, "Rows");
         choices("ui.cardPreviewType", MainUIData.CARD_PREVIEW_DISABLED, "Off", MainUIData.CARD_PREVIEW_MUTED, "Video without sound",
                 MainUIData.CARD_PREVIEW_FULL, "Video with sound");

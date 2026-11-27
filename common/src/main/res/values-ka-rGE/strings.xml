@@ -144,6 +144,8 @@
   <string name="sorting_by_new_content">ახალი კონტენტი</string>
   <string name="sorting_alphabetically">ანბანის მიხედვით</string>
   <string name="sorting_last_viewed">ბოლო ნანახი</string>
+  <string name="add_to_playlist_sorting">დასაკრავ სიაში დამატება/წაშლის დახარისხება</string>
+  <string name="sorting_last_edited">ბოლოს რედაქტირებული (როგორც YouTube-ზე)</string>
   <string name="player_pause_when_seek">პაუზა გადახვევისას</string>
   <string name="playlists_style">ფლეილისტების განყოფილების სტილი</string>
   <string name="playlists_style_grid">ბადე</string>
@@ -201,6 +203,7 @@
   <string name="settings_content_filtering">კონტენტის ფილტრაცია</string>
   <string name="settings_cards_options">ბარათების პარამეტრები</string>
   <string name="settings_channels_options">არხების პარამეტრები</string>
+  <string name="settings_sort_options">დახარისხების პარამეტრები</string>
   <string name="settings_time_options">დროის პარამეტრები</string>
   <string name="settings_system">სისტემა</string>
   <string name="settings_exit_options">გასვლის პარამეტრები</string>

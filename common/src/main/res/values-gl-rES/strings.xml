@@ -139,6 +139,8 @@
   <string name="sorting_by_new_content">Novo contido</string>
   <string name="sorting_alphabetically">Alfabéticamente</string>
   <string name="sorting_last_viewed">Derradeira visualización</string>
+  <string name="add_to_playlist_sorting">Ordenación de Engadir/Eliminar da lista de reprodución</string>
+  <string name="sorting_last_edited">Última edición (como en YouTube)</string>
   <string name="player_pause_when_seek">Pausa ao buscar</string>
   <string name="playlists_style">Estilo de sección de listas de reprodución</string>
   <string name="playlists_style_grid">Grade</string>
@@ -195,6 +197,7 @@
   <string name="settings_content_filtering">Filtrado de contido</string>
   <string name="settings_cards_options">Opcións das tarxetas</string>
   <string name="settings_channels_options">Opcións das canles</string>
+  <string name="settings_sort_options">Opcións de ordenación</string>
   <string name="settings_time_options">Opcións da hora</string>
   <string name="settings_system">Sistema</string>
   <string name="settings_exit_options">Opcións de saída</string>
