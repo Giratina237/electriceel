@@ -50,20 +50,11 @@ public final class SettingsCatalog {
         return mEntries;
     }
 
-    @Nullable
-    public SettingEntry find(String id) {
-        for (SettingEntry entry : mEntries) {
-            if (entry.id.equals(id)) {
-                return entry;
-            }
-        }
-
-        return null;
-    }
-
     /**
-     * Built on the first search, then kept, as the search index of most apps: built again when the language of the app changes
-     * (the names are in it). A setting that isn't there anymore is reported as it's opened (see open). On the main thread.
+     * Built on the first search, then kept, as the search index of most apps: built again after {@link #clearCache()} (the
+     * settings may have changed meanwhile, and some panels have other rows then, e.g. Storage sync once it's on) and when the
+     * language of the app changes (the names are in it). A setting that isn't there anymore is reported as it's opened (see
+     * open). On the main thread.
      */
     public static SettingsCatalog get(Context context) {
         String locale = context.getResources().getConfiguration().locale.toString();
@@ -79,7 +70,7 @@ public final class SettingsCatalog {
     }
 
     /**
-     * Listed again on the next search
+     * Built again on the next search
      */
     public static void clearCache() {
         sCached = null;
@@ -91,7 +82,7 @@ public final class SettingsCatalog {
      */
     public static SettingsCatalog build(Context context) {
         Builder builder = new Builder(context);
-        List<SettingsItem> cards = AppDataSourceManager.instance().getSettingSections(context);
+        List<SettingsItem> cards = AppDataSourceManager.instance().getSettingItems(context);
 
         for (int i = 0; i < cards.size(); i++) {
             builder.addCard(cards.get(i), new int[] {i}, new ArrayList<>());
@@ -101,25 +92,26 @@ public final class SettingsCatalog {
     }
 
     /**
-     * Opens it as its card would.<br/>
-     * A section: on its own screen, the sections before it under it (onScreen is called first: e.g. the results are closed).<br/>
-     * A card or a row of its panel: the panel over the dialog shown (the results: Back goes to them), titled as from its section
-     * (e.g. "Player - Video"), the row focused.<br/>
+     * Opens it as its card would, the settings password asked before as for a card (see the caller).<br/>
+     * A section: on its own screen, the sections before it under it.<br/>
+     * A card or a row of its panel: the panel, titled as from its section (e.g. "Player - Video", "Updates - Release notes"), the
+     * row focused. A row of a menu: the menu over it.<br/>
      * The cards are found again by their place: they're made in the same order each time.
      *
-     * @return false when it isn't there anymore (e.g. the language changed meanwhile): nothing opened
+     * @return false when it isn't there anymore (e.g. the settings changed since they were listed), or the menu it's in is greyed
+     * out: nothing opened
      */
-    public static boolean open(Context context, SettingEntry entry, Runnable onScreen) {
+    public static boolean open(Context context, SettingEntry entry) {
         try {
-            return openCard(context, entry, onScreen);
+            return openCard(context, entry);
         } catch (RuntimeException e) {
             Log.e(TAG, "Can't open " + entry + ": " + e);
             return false;
         }
     }
 
-    private static boolean openCard(Context context, SettingEntry entry, Runnable onScreen) {
-        List<SettingsItem> cards = AppDataSourceManager.instance().getSettingSections(context);
+    private static boolean openCard(Context context, SettingEntry entry) {
+        List<SettingsItem> cards = AppDataSourceManager.instance().getSettingItems(context);
         List<SettingsCardsPresenter.Cards> sections = new ArrayList<>();
         List<Integer> openers = new ArrayList<>();
         SettingsItem card = null;
@@ -167,16 +159,15 @@ public final class SettingsCatalog {
             }
 
             sections.add(section);
-            onScreen.run();
             SettingsCardsPresenter.instance(context).showPath(sections, openers, -1);
             return true;
         }
 
-        AppDialogPresenter dialog = AppDialogPresenter.instance(context);
-
-        if (!sections.isEmpty()) {
-            dialog.setNextTitlePrefix(sections.get(sections.size() - 1).getTitle(context));
+        if (entry.isRow && !hasRow(context, card, entry)) {
+            return false;
         }
+
+        AppDialogPresenter dialog = AppDialogPresenter.instance(context);
 
         if (entry.menuItemTitle != null) {
             // The panel with the row of the menu focused, then the menu over it, once the panel is shown (Back goes to it)
@@ -184,7 +175,7 @@ public final class SettingsCatalog {
             dialog.setOnStart(() -> Utils.post(() -> {
                 OptionItem menu = dialog.getFocusedItem();
 
-                if (menu == null || !menu.isMenu()) {
+                if (menu == null || !menu.isMenu() || isDisabled(menu)) {
                     return;
                 }
 
@@ -198,9 +189,65 @@ public final class SettingsCatalog {
             dialog.setFocusedItemMatcher(entry::matches);
         }
 
-        card.onClick.run();
+        // Titled as the card opens it: "<Section> - <Card>" in a section (see SettingsCardsFragment), its lists "<Parent> - <List>"
+        // (see SettingsGridFragment)
+        dialog.setTitlePrefix(sections.isEmpty() ? null : sections.get(sections.size() - 1).getTitle(context));
+        dialog.enableNestedTitles(true);
+
+        try {
+            card.onClick.run();
+        } finally {
+            // Only the panel opened right away
+            dialog.setTitlePrefix(null);
+            dialog.enableNestedTitles(false);
+        }
 
         return true;
+    }
+
+    /**
+     * Its row is in the panel of the card, and in the menu of the row it's in, the menu not greyed out: looked through first
+     */
+    private static boolean hasRow(Context context, SettingsItem card, SettingEntry entry) {
+        List<OptionCategory> panel = capturePanel(context, card.onClick);
+
+        if (panel == null) {
+            return false;
+        }
+
+        if (entry.menuItemTitle == null) {
+            return AppDialogPresenter.findItem(panel, entry::matches) != null;
+        }
+
+        OptionItem menu = AppDialogPresenter.findItem(panel, entry::matchesMenu);
+
+        if (menu == null || isDisabled(menu)) {
+            return false;
+        }
+
+        if (!entry.isRow) {
+            return true;
+        }
+
+        List<OptionCategory> menuPanel = capturePanel(context, () -> menu.onSelect(isPressedSelected(panel, menu)));
+
+        return menuPanel != null && AppDialogPresenter.findItem(menuPanel, entry::matches) != null;
+    }
+
+    @Nullable
+    private static List<OptionCategory> capturePanel(Context context, Runnable open) {
+        try {
+            return SettingsCapture.capture(open).panel;
+        } finally {
+            AppDialogPresenter.instance(context).clearPending();
+        }
+    }
+
+    /**
+     * Greyed out in the panel: it can't be clicked (e.g. Categories, without a key of the Data API)
+     */
+    static boolean isDisabled(OptionItem item) {
+        return !item.isEnabled() || item.getDisabledBy() != null && item.getDisabledBy().isSelected();
     }
 
     /**
@@ -211,7 +258,6 @@ public final class SettingsCatalog {
         return isCard && level == entry.cards.length - 1 ? entry.title : entry.path.get(level);
     }
 
-    @Nullable
     /**
      * As the row is pressed on the screen (see AppPreferenceManager): a button selected, a menu of a list not
      */
@@ -271,8 +317,8 @@ public final class SettingsCatalog {
 
             SettingsCapture.Result result = capture(card);
             boolean isSection = result != null && result.cards != null;
-            add(isSection ? SettingEntry.KIND_SECTION : SettingEntry.KIND_CARD, title, path, card.getDescription(),
-                    Collections.emptyList(), null, false, cards, false, null, null);
+            add(isSection ? SettingEntry.KIND_SECTION : SettingEntry.KIND_CARD, title, path, Collections.emptyList(), cards, false,
+                    null, null);
 
             if (result == null) {
                 return;
@@ -345,12 +391,13 @@ public final class SettingsCatalog {
                             }
 
                             boolean isSwitch = category.type == OptionCategory.TYPE_SINGLE_SWITCH;
-                            // A button that opens a list (e.g. Order of the sidebar, Set-up sections)
-                            List<OptionCategory> opened = !isSwitch && item.isMenu() && mMenuItemTitle == null ? captureClick(item, true) : null;
+                            // A button that opens a list (e.g. Order of the sidebar, Set-up sections), unless it's greyed out
+                            List<OptionCategory> opened = !isSwitch && item.isMenu() && !isDisabled(item) && mMenuItemTitle == null ?
+                                    captureClick(item, true) : null;
                             // To put in order: its items, as its choices
                             List<String> items = opened != null ? getOrderItems(opened) : Collections.emptyList();
-                            add(isSwitch ? SettingEntry.KIND_TOGGLE : SettingEntry.KIND_BUTTON, title, path, toText(item.getDescription()),
-                                    items, null, isSwitch && item.isSelected(), cards, true, categoryTitle, title);
+                            add(isSwitch ? SettingEntry.KIND_TOGGLE : SettingEntry.KIND_BUTTON, title, path, items, cards, true,
+                                    categoryTitle, title);
 
                             // Otherwise its rows, under it
                             if (opened != null && items.isEmpty()) {
@@ -375,8 +422,7 @@ public final class SettingsCatalog {
                                 }
                             }
 
-                            add(SettingEntry.KIND_BUTTON, categoryTitle, path, null, items, null, false, cards, true,
-                                    categoryTitle, null);
+                            add(SettingEntry.KIND_BUTTON, categoryTitle, path, items, cards, true, categoryTitle, null);
                         }
                         break;
                     default:
@@ -388,7 +434,6 @@ public final class SettingsCatalog {
 
         private void addChoices(OptionCategory category, @Nullable String categoryTitle, int[] cards, List<String> path) {
             List<String> choices = new ArrayList<>();
-            String picked = null;
 
             for (OptionItem item : category.options) {
                 String title = toText(item.getTitle());
@@ -398,15 +443,11 @@ public final class SettingsCatalog {
                 }
 
                 choices.add(title);
-
-                if (picked == null && item.isSelected()) {
-                    picked = title;
-                }
             }
 
             // Untitled: the only list of the panel, named as its card
             String title = categoryTitle != null ? categoryTitle : path.get(path.size() - 1);
-            add(SettingEntry.KIND_CHOICE, title, path, null, choices, picked, false, cards, true, categoryTitle, null);
+            add(SettingEntry.KIND_CHOICE, title, path, choices, cards, true, categoryTitle, null);
         }
 
         /**
@@ -431,11 +472,11 @@ public final class SettingsCatalog {
 
                 boolean isMenu = item.isMenu();
                 List<String> itemPath = label != null ? plus(inside, label) : inside;
-                add(isMenu ? SettingEntry.KIND_BUTTON : SettingEntry.KIND_TOGGLE, title, itemPath,
-                        toText(item.getDescription()), Collections.emptyList(), null, !isMenu && item.isSelected(), cards, true,
-                        categoryTitle, title);
+                add(isMenu ? SettingEntry.KIND_BUTTON : SettingEntry.KIND_TOGGLE, title, itemPath, Collections.emptyList(), cards,
+                        true, categoryTitle, title);
 
-                if (isMenu && mMenuItemTitle == null) {
+                // Not what a greyed out one opens (e.g. Categories, without a key of the Data API): it can't be opened
+                if (isMenu && !isDisabled(item) && mMenuItemTitle == null) {
                     addMenu(item, categoryTitle, title, cards, plusOther(itemPath, title));
                 }
             }
@@ -509,11 +550,10 @@ public final class SettingsCatalog {
             }
         }
 
-        private void add(int kind, String title, List<String> path, @Nullable String description, List<String> choices,
-                         @Nullable String picked, boolean isOn, int[] cards, boolean isRow, @Nullable String categoryTitle,
-                         @Nullable String itemTitle) {
-            mEntries.add(new SettingEntry("s" + (mEntries.size() + 1), kind, title, path, toText(description), choices, picked,
-                    isOn, cards, isRow, categoryTitle, itemTitle, mMenuCategoryTitle, mMenuItemTitle));
+        private void add(int kind, String title, List<String> path, List<String> choices, int[] cards, boolean isRow,
+                         @Nullable String categoryTitle, @Nullable String itemTitle) {
+            mEntries.add(new SettingEntry(kind, title, path, choices, cards, isRow, categoryTitle, itemTitle, mMenuCategoryTitle,
+                    mMenuItemTitle));
         }
 
         /**

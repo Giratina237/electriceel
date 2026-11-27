@@ -2,6 +2,7 @@ package com.liskovsoft.smartyoutubetv2.common.settingssearch;
 
 import android.app.Application;
 
+import com.liskovsoft.smartyoutubetv2.common.R;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.BackupSettingsPresenter;
 
@@ -13,9 +14,7 @@ import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowToast;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -42,8 +41,8 @@ public class SettingsCatalogTest {
     }
 
     /**
-     * Each panel is closed as it would be: what it does as it closes is done (e.g. Backup lets the auto-backups run again, they
-     * wait while it's held)
+     * What each panel holds is let go as it would be once closed (e.g. Backup lets the auto-backups run again, they wait while
+     * it's held)
      */
     @Test
     public void build_closesThePanels() {
@@ -56,24 +55,39 @@ public class SettingsCatalogTest {
     }
 
     /**
-     * A question of words about no setting alone is searched all the same
+     * Of the close callbacks of a panel looked through, only the ones that let go of something run: the others apply what was
+     * changed in it (e.g. Search clears the search history), and nothing was
      */
     @Test
-    public void search_onlyCommonWords() {
-        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+    public void capture_runsOnlyReleases() {
+        int[] runs = new int[2];
 
-        assertFalse(SettingsSearch.find(catalog.getEntries(), "like", 10).isEmpty());
+        SettingsCapture.capture(() -> {
+            assertTrue(SettingsCapture.offerOnClose(() -> runs[0]++));
+            assertTrue(SettingsCapture.offerOnClose(SettingsCapture.release(() -> runs[1]++)));
+        });
+
+        assertEquals(0, runs[0]);
+        assertEquals(1, runs[1]);
     }
 
+    /**
+     * Not the rows of a menu greyed out in its panel: Categories, without a key of the Data API, can't be opened
+     */
     @Test
-    public void build_idsAreUnique() {
-        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
-        Set<String> ids = new HashSet<>();
+    public void build_notInGreyedOutMenus() {
+        Application app = RuntimeEnvironment.getApplication();
+        SettingsCatalog catalog = SettingsCatalog.build(app);
+        String categories = app.getString(R.string.hide_content_categories);
+        boolean isListed = false;
 
         for (SettingEntry entry : catalog.getEntries()) {
-            assertTrue(entry.id, ids.add(entry.id));
-            assertNotNull(catalog.find(entry.id));
+            assertFalse(entry.toString(), categories.equals(entry.menuItemTitle));
+            isListed |= categories.equals(entry.title);
         }
+
+        // The row itself is
+        assertTrue(isListed);
     }
 
     @Test

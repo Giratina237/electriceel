@@ -7,6 +7,7 @@ import androidx.annotation.Nullable;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionCategory;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,28 +37,16 @@ public final class SettingEntry {
      */
     public static final int KIND_BUTTON = 4;
 
-    public final String id;
     public final int kind;
     public final String title;
     /**
      * Where it is: the titles of the cards that lead to it, then of the list it's in (e.g. Player, General, Player buttons)
      */
     public final List<String> path;
-    @Nullable
-    public final String description;
     /**
-     * Of a list of choices, empty for the others
+     * Of a list of choices, and the items of a list a row opens (e.g. the sections to put in order): empty for the others
      */
     public final List<String> choices;
-    /**
-     * Of a list of choices: the title of the one picked, null when none is
-     */
-    @Nullable
-    public final String picked;
-    /**
-     * Of a switch or a checkbox
-     */
-    public final boolean isOn;
 
     /**
      * The index of each card that leads to it, from the cards of the Settings section down (see SettingsCatalog.open). As many as
@@ -81,24 +70,38 @@ public final class SettingEntry {
     final String menuCategoryTitle;
     @Nullable
     final String menuItemTitle;
+    /**
+     * The title and the choices as they're searched (see SettingsSearch.normalize): made once, not on each letter typed
+     */
+    final String searchTitle;
+    final List<String> searchChoices;
+    /**
+     * The same for the same setting listed twice (see SettingsSearch.getSameKey)
+     */
+    final String sameKey;
 
-    SettingEntry(String id, int kind, String title, List<String> path, @Nullable String description, List<String> choices,
-                 @Nullable String picked, boolean isOn, int[] cards, boolean isRow, @Nullable String categoryTitle,
-                 @Nullable String itemTitle, @Nullable String menuCategoryTitle, @Nullable String menuItemTitle) {
-        this.id = id;
+    SettingEntry(int kind, String title, List<String> path, List<String> choices, int[] cards, boolean isRow,
+                 @Nullable String categoryTitle, @Nullable String itemTitle, @Nullable String menuCategoryTitle,
+                 @Nullable String menuItemTitle) {
         this.kind = kind;
         this.title = title;
         this.path = Collections.unmodifiableList(path);
-        this.description = description;
         this.choices = Collections.unmodifiableList(choices);
-        this.picked = picked;
-        this.isOn = isOn;
         this.cards = cards;
         this.isRow = isRow;
         this.categoryTitle = categoryTitle;
         this.itemTitle = itemTitle;
         this.menuCategoryTitle = menuCategoryTitle;
         this.menuItemTitle = menuItemTitle;
+        searchTitle = SettingsSearch.normalize(title);
+        List<String> searchChoices = new ArrayList<>(choices.size());
+
+        for (String choice : choices) {
+            searchChoices.add(SettingsSearch.normalize(choice));
+        }
+
+        this.searchChoices = Collections.unmodifiableList(searchChoices);
+        sameKey = SettingsSearch.getSameKey(searchTitle, path);
     }
 
     /**
@@ -122,6 +125,6 @@ public final class SettingEntry {
 
     @Override
     public String toString() {
-        return id + " " + TextUtils.join(" › ", path) + " › " + title;
+        return TextUtils.join(" › ", path) + " › " + title;
     }
 }

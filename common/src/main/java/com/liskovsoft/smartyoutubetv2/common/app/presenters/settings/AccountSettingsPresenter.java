@@ -82,7 +82,7 @@ public class AccountSettingsPresenter extends BasePresenter<Void> {
         int accountIndex = accounts != null ? accounts.indexOf(account) : -1;
         CharSequence accountIcon = accountIndex != -1 ? Utils.icon(icons.get(accountIndex)) : null;
         settingsPresenter.showDialog(account != null ? TextUtils.concat(accountIcon, " ", account.getName())
-                : getContext().getString(R.string.settings_accounts), this::unhold);
+                : getContext().getString(R.string.settings_accounts), SettingsCapture.release(this::unhold));
     }
 
     private void appendSelectAccountSection(List<Account> accounts, List<Drawable> icons, AppDialogPresenter settingsPresenter) {

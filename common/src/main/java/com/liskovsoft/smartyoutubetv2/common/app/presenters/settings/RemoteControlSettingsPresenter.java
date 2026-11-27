@@ -7,6 +7,7 @@ import com.liskovsoft.mediaserviceinterfaces.RemoteControlService;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.helpers.PermissionHelpers;
 import com.liskovsoft.smartyoutubetv2.common.R;
+import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCapture;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AddDevicePresenter;
@@ -61,7 +62,7 @@ public class RemoteControlSettingsPresenter extends BasePresenter<Void> {
         appendRemoveAllDevicesButton(settingsPresenter);
         appendMiscCategory(settingsPresenter);
 
-        settingsPresenter.showDialog(getContext().getString(R.string.settings_remote_control), this::unhold);
+        settingsPresenter.showDialog(getContext().getString(R.string.settings_remote_control), SettingsCapture.release(this::unhold));
     }
 
     private void appendDeviceLinkSwitch(AppDialogPresenter settingsPresenter) {

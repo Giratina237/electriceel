@@ -12,8 +12,9 @@ import java.util.List;
  * (see AppDialogPresenter.showDialog, SettingsCardsPresenter.show and ViewManager.startView).<br/>
  * A panel that loads what it shows in the background (e.g. Accounts) isn't looked through: it checks {@link #isActive()} and
  * shows nothing. The card that opens it is found all the same.<br/>
- * A panel looked through is closed as well: what runs as it closes runs then (e.g. Backup lets its auto-backups run again only
- * then, see BackupSettingsPresenter.unhold). Still looked through: what it would show isn't shown.<br/>
+ * What a panel looked through holds is let go afterwards, as if it was closed: what's passed to {@link #release} for its close
+ * (e.g. Backup lets its auto-backups run again only then, see BackupSettingsPresenter.unhold). Its other close callbacks don't
+ * run: they apply what was changed in it (e.g. Search clears the search history), and nothing was.<br/>
  * On the main thread only.
  */
 public final class SettingsCapture {
@@ -57,7 +58,7 @@ public final class SettingsCapture {
             open.run();
         } finally {
             try {
-                // Closed as it was opened, still looked through
+                // Let go as it was held, still looked through
                 for (Runnable onClose : result.onClose) {
                     onClose.run();
                 }
@@ -107,19 +108,41 @@ public final class SettingsCapture {
     }
 
     /**
-     * From AppDialogPresenter: what runs as a panel looked through closes, run after it's looked through
+     * The close callback of a panel that lets go of what the panel holds while it's open (e.g. an instance held, a listener): run
+     * also when the panel is only looked through. As it is otherwise.
+     */
+    public static Runnable release(Runnable onClose) {
+        return new Release(onClose);
+    }
+
+    /**
+     * From AppDialogPresenter: the close callback of a panel looked through, run after it's looked through when it's a
+     * {@link #release}
      *
-     * @return taken
+     * @return taken: it doesn't run as a dialog closes
      */
     public static boolean offerOnClose(Runnable onClose) {
         if (sResult == null) {
             return false;
         }
 
-        if (onClose != null) {
+        if (onClose instanceof Release) {
             sResult.onClose.add(onClose);
         }
 
         return true;
+    }
+
+    private static final class Release implements Runnable {
+        private final Runnable mOnClose;
+
+        private Release(Runnable onClose) {
+            mOnClose = onClose;
+        }
+
+        @Override
+        public void run() {
+            mOnClose.run();
+        }
     }
 }

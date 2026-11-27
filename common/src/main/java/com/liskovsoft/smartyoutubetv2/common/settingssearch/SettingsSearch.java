@@ -63,7 +63,7 @@ public final class SettingsSearch {
                 }
 
                 // A card and the untitled list of its panel are one setting: the list is named as its card
-                if (shown.add(getSameKey(entry))) {
+                if (shown.add(entry.sameKey)) {
                     result.add(entry);
                 }
             }
@@ -73,7 +73,7 @@ public final class SettingsSearch {
     }
 
     private static int match(SettingEntry entry, String query) {
-        String title = normalize(entry.title);
+        String title = entry.searchTitle;
 
         if (title.startsWith(query)) {
             return TITLE_STARTS;
@@ -83,8 +83,8 @@ public final class SettingsSearch {
             return TITLE_HAS;
         }
 
-        for (String choice : entry.choices) {
-            if (normalize(choice).contains(query)) {
+        for (String choice : entry.searchChoices) {
+            if (choice.contains(query)) {
                 return CHOICE_HAS;
             }
         }
@@ -109,13 +109,11 @@ public final class SettingsSearch {
      * The title and the place of the setting, the place without a last part named as the setting (e.g. the untitled list of the
      * Video buffer card is Player, Video buffer, Video buffer: the same as the card)
      */
-    private static String getSameKey(SettingEntry entry) {
-        List<String> path = entry.path;
-
-        if (!path.isEmpty() && normalize(path.get(path.size() - 1)).equals(normalize(entry.title))) {
+    static String getSameKey(String searchTitle, List<String> path) {
+        if (!path.isEmpty() && normalize(path.get(path.size() - 1)).equals(searchTitle)) {
             path = path.subList(0, path.size() - 1);
         }
 
-        return normalize(entry.title) + "\n" + normalize(TextUtils.join("\n", path));
+        return searchTitle + "\n" + normalize(TextUtils.join("\n", path));
     }
 }

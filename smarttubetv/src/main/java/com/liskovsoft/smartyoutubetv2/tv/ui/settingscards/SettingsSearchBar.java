@@ -18,6 +18,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.util.Consumer;
 
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.mylogger.Log;
@@ -34,7 +35,8 @@ import java.util.List;
  * The search bar of the Settings section, at the end of the line of its title: the settings whose name has the text are listed
  * under it as it's typed in (see SettingsSearch). One opens as its card would, its row focused (see SettingsCatalog.open): Back
  * comes back here, the text and the list as they were.<br/>
- * The list shows while the bar or the list has the focus. Back in the bar empties it.
+ * The list shows while the bar or the list has the focus. Back in the bar empties it.<br/>
+ * The settings are listed again after the focus was elsewhere (a setting opened, a card): they may have changed.
  */
 public class SettingsSearchBar {
     private static final String TAG = SettingsSearchBar.class.getSimpleName();
@@ -52,16 +54,22 @@ public class SettingsSearchBar {
     private final ListView mResults;
     private final int mMinTop;
     private final ResultsAdapter mAdapter;
+    private final Consumer<Runnable> mRunWithPassword;
+    /**
+     * The focus was out of the bar and the list since the settings were listed
+     */
+    private boolean mIsStale = true;
     @Nullable
     private SettingsCatalog mCatalog;
     private final ViewTreeObserver.OnPreDrawListener mOnPreDraw = () -> {
         alignWithTitle();
         return true;
     };
-    private final ViewTreeObserver.OnGlobalFocusChangeListener mOnFocusChange = (oldFocus, newFocus) -> updateResultsShown();
+    private final ViewTreeObserver.OnGlobalFocusChangeListener mOnFocusChange = this::onFocusChange;
 
-    private SettingsSearchBar(View root) {
+    private SettingsSearchBar(View root, Consumer<Runnable> runWithPassword) {
         mContext = root.getContext();
+        mRunWithPassword = runWithPassword;
         mRoot = root;
         mContainer = root.findViewById(R.id.settings_search);
         mTitleView = root.findViewById(R.id.settings_cards_title);
@@ -77,9 +85,10 @@ public class SettingsSearchBar {
      * Shows the bar until {@link #detach()}
      *
      * @param root the view made by SettingsCardsLayout.wrap
+     * @param runWithPassword runs a setting opened once the settings password is typed in, as a card (see SettingsGridFragment)
      */
-    public static SettingsSearchBar attach(View root) {
-        SettingsSearchBar bar = new SettingsSearchBar(root);
+    public static SettingsSearchBar attach(View root, Consumer<Runnable> runWithPassword) {
+        SettingsSearchBar bar = new SettingsSearchBar(root, runWithPassword);
         bar.setup();
 
         return bar;
@@ -213,10 +222,15 @@ public class SettingsSearchBar {
     }
 
     /**
-     * Listed on the first search, then kept (see SettingsCatalog.get)
+     * Listed on the first search, then kept while the focus stays in the bar and the list (see SettingsCatalog.get)
      */
     @Nullable
     private SettingsCatalog getCatalog() {
+        if (mIsStale) {
+            SettingsCatalog.clearCache();
+            mIsStale = false;
+        }
+
         try {
             mCatalog = SettingsCatalog.get(mContext);
         } catch (RuntimeException e) {
@@ -232,12 +246,22 @@ public class SettingsSearchBar {
             return;
         }
 
-        if (!SettingsCatalog.open(mContext, entry, () -> { })) {
-            // The settings changed since they were listed
-            SettingsCatalog.clearCache();
-            MessageHelpers.showMessage(mContext, com.liskovsoft.smartyoutubetv2.common.R.string.find_setting_gone);
-            search(mField.getText().toString().trim());
+        mRunWithPassword.accept(() -> {
+            if (!SettingsCatalog.open(mContext, entry)) {
+                // The settings changed since they were listed
+                mIsStale = true;
+                MessageHelpers.showMessage(mContext, com.liskovsoft.smartyoutubetv2.common.R.string.find_setting_gone);
+                search(mField.getText().toString().trim());
+            }
+        });
+    }
+
+    private void onFocusChange(View oldFocus, View newFocus) {
+        if (newFocus != mField && newFocus != mResults) {
+            mIsStale = true;
         }
+
+        updateResultsShown();
     }
 
     /**

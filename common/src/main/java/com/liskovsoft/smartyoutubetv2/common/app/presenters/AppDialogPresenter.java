@@ -38,9 +38,6 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     private OptionItem mFocusedItem;
     private boolean mIsReplace;
     private ItemMatcher mFocusedItemMatcher;
-    private CharSequence mNextTitlePrefix;
-    private CharSequence mTitleRoot;
-    private CharSequence mBackupTitleRoot;
 
     /**
      * A row of a dialog built by someone else, e.g. a setting the settings search opens
@@ -95,7 +92,6 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
         mOnStart.clear();
         mOnFinish.clear();
         mFocusedItemMatcher = null;
-        mNextTitlePrefix = null;
     }
 
     /**
@@ -110,7 +106,6 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
         mBackupIsOverlay = mIsOverlay;
         mBackupTitlePrefix = mTitlePrefix;
         mBackupIsNestedTitlesEnabled = mIsNestedTitlesEnabled;
-        mBackupTitleRoot = mTitleRoot;
         mBackupFocusedItem = mFocusedItem;
         mBackupIsReplace = mIsReplace;
     }
@@ -124,7 +119,6 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
         mTitle = null;
         mFocusedItem = null;
         mIsReplace = false;
-        mTitleRoot = null;
     }
 
     @Override
@@ -162,14 +156,11 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
             return;
         }
 
-        mTitleRoot = mNextTitlePrefix;
-
         if (mFocusedItem == null && mFocusedItemMatcher != null) {
             mFocusedItem = findItem(mCategories, mFocusedItemMatcher);
         }
 
         // Of this dialog only
-        mNextTitlePrefix = null;
         mFocusedItemMatcher = null;
 
         mTitle = dialogTitle;
@@ -220,25 +211,18 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
     }
 
     /**
-     * The next dialog is titled "<prefix> - <title>", also when it opens over another one (unlike {@link #setTitlePrefix}),
-     * and the lists opened in it "<parent> - <title>": e.g. "Player - Video" for the Video card opened from the results of the
-     * settings search, as from the Player section
-     */
-    public void setNextTitlePrefix(CharSequence prefix) {
-        mNextTitlePrefix = prefix;
-    }
-
-    /**
      * Forgets what was appended for a dialog that wasn't shown (e.g. a panel that failed while the settings search looked it
      * through): the next dialog starts empty
      */
     public void clearPending() {
         resetData();
-        mNextTitlePrefix = null;
         mFocusedItemMatcher = null;
     }
 
-    private static OptionItem findItem(List<OptionCategory> categories, ItemMatcher matcher) {
+    /**
+     * @return the first item it matches, null for none
+     */
+    public static OptionItem findItem(List<OptionCategory> categories, ItemMatcher matcher) {
         for (OptionCategory category : categories) {
             if (category.options == null) {
                 continue;
@@ -289,14 +273,6 @@ public class AppDialogPresenter extends BasePresenter<AppDialogView> {
      */
     public CharSequence getTitlePrefix() {
         return mBackupTitlePrefix;
-    }
-
-    /**
-     * Of the dialog shown: titled "<root> - <title>", its lists "<parent> - <title>", also over another dialog (see
-     * {@link #setNextTitlePrefix}). Null for none.
-     */
-    public CharSequence getTitleRoot() {
-        return mBackupTitleRoot;
     }
 
     /**

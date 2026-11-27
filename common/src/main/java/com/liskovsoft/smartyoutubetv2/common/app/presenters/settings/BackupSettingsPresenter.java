@@ -6,6 +6,7 @@ import android.content.Context;
 import com.liskovsoft.mediaserviceinterfaces.data.MediaGroup;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.smartyoutubetv2.common.R;
+import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCapture;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
@@ -72,7 +73,7 @@ public class BackupSettingsPresenter extends BasePresenter<Void> {
         appendGDriveBackupCategory(settingsPresenter);
         appendSubscriptionsBackupButton(settingsPresenter);
         appendPlaylistsBackupButtons(settingsPresenter);
-        settingsPresenter.showDialog(getContext().getString(R.string.app_backup_restore), BackupSettingsPresenter::unhold);
+        settingsPresenter.showDialog(getContext().getString(R.string.app_backup_restore), SettingsCapture.release(BackupSettingsPresenter::unhold));
     }
 
     private void appendGDriveBackupCategory(AppDialogPresenter settingsPresenter) {

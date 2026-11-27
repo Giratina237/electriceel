@@ -37,18 +37,7 @@ public class AppDataSourceManager {
         return sInstance;
     }
 
-    /**
-     * The cards of the Settings section. Searched from the search bar above them (see SettingsCatalog).
-     */
     public List<SettingsItem> getSettingItems(Context context) {
-        return getSettingSections(context);
-    }
-
-    /**
-     * The cards of the Settings section that open settings, in their order there. Looked through by the settings search
-     * (see SettingsCatalog): the same order each time.
-     */
-    public List<SettingsItem> getSettingSections(Context context) {
         List<SettingsItem> settingItems = new ArrayList<>();
 
         settingItems.add(new SettingsItem(

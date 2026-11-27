@@ -77,7 +77,7 @@ public class SettingsGridFragment extends GridFragment implements SettingsSectio
 
         mCardsLayout = SettingsCardsLayout.attach(view, getBrowseGrid());
         mCardsLayout.setTitle(mTitle);
-        mSearchBar = SettingsSearchBar.attach(view);
+        mSearchBar = SettingsSearchBar.attach(view, this::runWithPassword);
         int columns = getGridPresenter().getNumberOfColumns();
         // Up from the first row goes to the search bar
         GridFragmentHelper.enableDownToShorterRow(getBrowseGrid(), columns, event -> mSearchBar != null
@@ -184,15 +184,38 @@ public class SettingsGridFragment extends GridFragment implements SettingsSectio
         return GeneralData.instance(getContext());
     }
 
+    /**
+     * Runs it once the settings password is typed in, right away when there's none: before each card, and each setting the search
+     * opens (child mode is turned off in the settings)
+     */
+    private void runWithPassword(Runnable open) {
+        String password = getGeneralData().getSettingsPassword();
+
+        if (password == null) {
+            open.run();
+            return;
+        }
+
+        SimpleEditDialog.showPassword(
+                getContext(),
+                getContext().getString(R.string.enter_settings_password),
+                null,
+                newValue -> {
+                    if (Utils.passwordMatch(password, newValue)) {
+                        open.run();
+                        return true;
+                    }
+                    return false;
+                });
+    }
+
     private final class ItemViewClickedListener implements OnItemViewClickedListener {
         @Override
         public void onItemClicked(Presenter.ViewHolder itemViewHolder, Object item,
                                   RowPresenter.ViewHolder rowViewHolder, Row row) {
 
             if (item instanceof SettingsItem) {
-                String password = getGeneralData().getSettingsPassword();
-
-                if (password == null) {
+                runWithPassword(() -> {
                     // The lists inside the panel are titled "<Parent> - <List>", e.g. "About - Changelog"
                     AppDialogPresenter dialogPresenter = AppDialogPresenter.instance(getContext());
                     dialogPresenter.enableNestedTitles(true);
@@ -201,19 +224,7 @@ public class SettingsGridFragment extends GridFragment implements SettingsSectio
                     } finally {
                         dialogPresenter.enableNestedTitles(false);
                     }
-                } else {
-                    SimpleEditDialog.showPassword(
-                            getContext(),
-                            getContext().getString(R.string.enter_settings_password),
-                            null,
-                            newValue -> {
-                                if (Utils.passwordMatch(password, newValue)) {
-                                    ((SettingsItem) item).onClick.run();
-                                    return true;
-                                }
-                                return false;
-                            });
-                }
+                });
 
                 // Close PIP inside Settings section
                 //if (PlaybackPresenter.instance(getContext()).isInPipMode()) {
