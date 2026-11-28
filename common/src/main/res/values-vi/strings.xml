@@ -133,6 +133,8 @@
   <string name="sorting_by_new_content">Nội dung mới</string>
   <string name="sorting_alphabetically">Theo bảng chữ cái</string>
   <string name="sorting_last_viewed">Xem lần cuối</string>
+  <string name="add_to_playlist_sorting">Sắp xếp Thêm vào/Xóa khỏi danh sách phát</string>
+  <string name="sorting_last_edited">Chỉnh sửa gần nhất (như trên YouTube)</string>
   <string name="player_pause_when_seek">Tạm dừng khi tua</string>
   <string name="playlists_style">Kiểu danh sách phát</string>
   <string name="playlists_style_grid">Lưới</string>
@@ -186,6 +188,7 @@
   <string name="settings_content_filtering">Lọc nội dung</string>
   <string name="settings_cards_options">Tùy chọn thẻ</string>
   <string name="settings_channels_options">Tùy chọn kênh</string>
+  <string name="settings_sort_options">Tùy chọn sắp xếp</string>
   <string name="settings_time_options">Tùy chọn thời gian</string>
   <string name="settings_system">Hệ thống</string>
   <string name="settings_exit_options">Tùy chọn thoát</string>
@@ -1192,4 +1195,8 @@
     <string name="card_desc_api_keys">Khóa YouTube Data API của riêng bạn, cần cho tự động phát nhạc và để ẩn hoặc đánh dấu video theo danh mục (âm nhạc, trò chơi, tin tức…) trên Trang chủ</string>
     <string name="card_desc_dns">Thay đổi cách ứng dụng tìm máy chủ của YouTube. Có thể giúp khi ứng dụng hoàn toàn không tải được.</string>
     <string name="card_desc_remote_control">Ghép nối điện thoại hoặc máy tính bảng để ứng dụng YouTube trên đó điều khiển việc phát trên TV này</string>
+    <!-- Settings search -->
+    <string name="find_setting">Tìm trong cài đặt</string>
+    <string name="find_setting_none">Không có cài đặt nào khớp với \"%s\"</string>
+    <string name="find_setting_gone">Cài đặt này không còn nữa. Hãy tìm lại.</string>
 </resources>

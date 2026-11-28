@@ -132,6 +132,8 @@
     <string name="sorting_by_new_content">Conținut nou</string>
     <string name="sorting_alphabetically">Alfabetic</string>
     <string name="sorting_last_viewed">Văzut ultima dată</string>
+    <string name="add_to_playlist_sorting">Sortarea pentru „Adaugă în lista de redare”</string>
+    <string name="sorting_last_edited">Editate ultima dată (ca pe YouTube)</string>
     <string name="player_pause_when_seek">Pauză când căutați</string>
     <string name="playlists_style">Playlists style</string>
     <string name="playlists_style_grid">Grilă</string>
@@ -201,6 +203,7 @@
     <string name="settings_content_filtering">Filtrarea conținutului</string>
     <string name="settings_cards_options">Opțiuni pentru carduri</string>
     <string name="settings_channels_options">Opțiuni pentru canale</string>
+    <string name="settings_sort_options">Opțiuni de sortare</string>
     <string name="settings_time_options">Opțiuni pentru oră</string>
     <string name="settings_system">Sistem</string>
     <string name="settings_exit_options">Opțiuni de ieșire</string>
@@ -1222,4 +1225,8 @@
     <string name="card_desc_api_keys">Propria dvs. cheie YouTube Data API, necesară pentru redarea automată a muzicii și pentru a ascunde sau marca videoclipurile după categorie (muzică, jocuri, știri…) în Acasă</string>
     <string name="card_desc_dns">Schimbă modul în care aplicația găsește serverele YouTube. Poate ajuta când aplicația nu se încarcă deloc.</string>
     <string name="card_desc_remote_control">Asociază un telefon sau o tabletă, astfel încât aplicația YouTube de pe acesta să controleze redarea pe acest televizor</string>
+    <!-- Settings search -->
+    <string name="find_setting">Caută în setări</string>
+    <string name="find_setting_none">Nicio setare nu corespunde cu „%s”</string>
+    <string name="find_setting_gone">Această setare nu mai există. Caută din nou.</string>
 </resources>

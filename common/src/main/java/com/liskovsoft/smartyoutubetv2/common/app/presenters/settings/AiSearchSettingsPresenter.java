@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.sharedutils.rx.RxHelper;
 import com.liskovsoft.smartyoutubetv2.common.R;
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsRows;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
@@ -23,8 +24,8 @@ import java.util.List;
 import io.reactivex.disposables.Disposable;
 
 /**
- * The AI of the settings search (see SettingsSearchPresenter): who answers, the user's key for it (checked as it's entered, kept
- * encrypted on the device) and the model.
+ * The AI help of the settings search (see SettingsSearchBar): on or off, who answers, the user's key for it (checked as it's
+ * entered, kept encrypted on the device) and the model.
  */
 public class AiSearchSettingsPresenter extends BasePresenter<Void> {
     private static final int AI_SETTINGS_ID = 154;
@@ -70,10 +71,36 @@ public class AiSearchSettingsPresenter extends BasePresenter<Void> {
         }
 
         AppDialogPresenter dialog = AppDialogPresenter.instance(context);
+        dialog.setId(AI_SETTINGS_ID);
+        dialog.showPanel(context.getString(R.string.ai_search), this::appendRows, () -> RxHelper.disposeActions(mAction));
+
+        if (pickModel) {
+            pickModel();
+        }
+    }
+
+    /**
+     * The rows of the panel show shows (see SettingsPanel)
+     */
+    public void appendRows(SettingsRows dialog) {
+        Context context = getContext();
+
+        if (context == null) {
+            return;
+        }
+
         AiProvider current = mData.getProvider();
 
+        dialog.appendSingleSwitch(UiOptionItem.from(context.getString(R.string.ai_search_enabled),
+                context.getString(R.string.ai_search_enabled_desc), option -> {
+                    mData.setEnabled(option.isSelected());
+
+                    if (option.isSelected() && mData.getReadyProvider() == null) {
+                        MessageHelpers.showMessage(context, R.string.ai_search_enabled_not_ready);
+                    }
+                }, mData.isEnabled()));
+
         List<OptionItem> providers = new ArrayList<>();
-        providers.add(UiOptionItem.from(context.getString(R.string.ai_search_off), option -> setProvider(null), current == null));
 
         for (AiProvider provider : AiProvider.values()) {
             providers.add(UiOptionItem.from(provider.title, option -> setProvider(provider), provider == current));
@@ -102,13 +129,6 @@ public class AiSearchSettingsPresenter extends BasePresenter<Void> {
 
         dialog.appendLongTextCategory(context.getString(R.string.ai_search_about),
                 UiOptionItem.from(context.getString(R.string.ai_search_privacy)));
-
-        dialog.setId(AI_SETTINGS_ID);
-        dialog.showDialog(context.getString(R.string.ai_search), () -> RxHelper.disposeActions(mAction));
-
-        if (pickModel) {
-            pickModel();
-        }
     }
 
     private void setProvider(@Nullable AiProvider provider) {
@@ -330,7 +350,7 @@ public class AiSearchSettingsPresenter extends BasePresenter<Void> {
     /**
      * Why the AI didn't answer, for the user
      */
-    static String getErrorText(Context context, @Nullable AiProvider provider, Throwable error) {
+    public static String getErrorText(Context context, @Nullable AiProvider provider, Throwable error) {
         String title = provider != null ? provider.title : "AI";
 
         if (!(error instanceof AiClient.AiException)) {

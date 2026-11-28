@@ -2,8 +2,11 @@ package com.liskovsoft.smartyoutubetv2.common.settingssearch;
 
 import android.app.Application;
 
+import com.liskovsoft.smartyoutubetv2.common.R;
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.BackupSettingsPresenter;
+import com.liskovsoft.smartyoutubetv2.common.misc.AppDataSourceManager;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -13,6 +16,7 @@ import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowToast;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,33 +30,102 @@ import static org.junit.Assert.assertTrue;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
 public class SettingsCatalogTest {
-    /**
-     * Every card is clicked, and nothing shows: no screen starts, no dialog is left to show, no message
-     */
     @Test
-    public void build_showsNothing() {
-        Application app = RuntimeEnvironment.getApplication();
+    public void build_findsTheSettings() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
 
-        SettingsCatalog catalog = SettingsCatalog.build(app);
-
-        assertNull(Shadows.shadowOf(app).getNextStartedActivity());
-        assertEquals(0, ShadowToast.shownToastCount());
-        assertTrue(AppDialogPresenter.instance(app).isEmpty());
         assertTrue("Only " + catalog.getEntries().size(), catalog.getEntries().size() > 150);
     }
 
     /**
-     * Each panel is closed as it would be: what it does as it closes is done (e.g. Backup lets the auto-backups run again, they
-     * wait while it's held)
+     * Read from what the cards declare: no panel is made by its presenter (e.g. Backup isn't held, its auto-backups wait while it
+     * is), no screen started, no message
      */
     @Test
-    public void build_closesThePanels() {
+    public void build_opensNothing() {
         Application app = RuntimeEnvironment.getApplication();
 
         SettingsCatalog.build(app);
 
         assertFalse(BackupSettingsPresenter.hasInstance());
-        assertFalse(SettingsCapture.isActive());
+        assertNull(Shadows.shadowOf(app).getNextStartedActivity());
+        assertEquals(0, ShadowToast.shownToastCount());
+        assertTrue(AppDialogPresenter.instance(app).isEmpty());
+    }
+
+    /**
+     * Each card declares what it opens, a section or a panel, so the search finds what's in it. Not the two whose rows are loaded
+     * in the background: Accounts, Android channels.
+     */
+    @Test
+    public void cards_declareWhatTheyOpen() {
+        Application app = RuntimeEnvironment.getApplication();
+        Set<String> loaded = new HashSet<>();
+        loaded.add(app.getString(R.string.settings_accounts));
+        loaded.add(app.getString(R.string.home_screen_channels));
+        List<String> missing = new ArrayList<>();
+
+        checkCards(app, AppDataSourceManager.instance().getSettingItems(app), loaded, missing);
+
+        assertTrue(missing.toString(), missing.isEmpty());
+    }
+
+    private static void checkCards(Application app, List<SettingsItem> cards, Set<String> loaded, List<String> missing) {
+        for (SettingsItem card : cards) {
+            if (card.getCards() != null) {
+                checkCards(app, card.getCards().getItems(app), loaded, missing);
+            } else if (card.getPanel() == null && !loaded.contains(card.title)) {
+                missing.add(card.title);
+            }
+        }
+    }
+
+    /**
+     * Not the rows of a menu greyed out in its panel: Categories, without a key of the Data API, can't be opened
+     */
+    @Test
+    public void build_notInGreyedOutMenus() {
+        Application app = RuntimeEnvironment.getApplication();
+        SettingsCatalog catalog = SettingsCatalog.build(app);
+        String categories = app.getString(R.string.hide_content_categories);
+        boolean isListed = false;
+
+        for (SettingEntry entry : catalog.getEntries()) {
+            assertFalse(entry.toString(), categories.equals(entry.menuItemTitle));
+            isListed |= categories.equals(entry.title);
+        }
+
+        // The row itself is
+        assertTrue(isListed);
+    }
+
+    @Test
+    public void search_findsSubtitles() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+
+        List<SettingEntry> found = SettingsSearch.find(catalog.getEntries(), "subtitles", 10);
+
+        assertFalse(found.isEmpty());
+        assertTrue(found.get(0).toString(), found.get(0).toString().toLowerCase().contains("subtitle"));
+    }
+
+    /**
+     * The words of the question, in any order and any case, the ones about no setting left out: the setting with all of them first
+     */
+    @Test
+    public void search_matchesTheWords() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+        List<SettingEntry> entries = catalog.getEntries();
+
+        List<SettingEntry> shorts = SettingsSearch.find(entries, "how do I HIDE the shorts", 50);
+        assertFalse(shorts.isEmpty());
+        assertTrue(shorts.get(0).toString(), shorts.get(0).title.toLowerCase().contains("shorts"));
+
+        assertFalse(SettingsSearch.find(entries, "shorts hide", 50).isEmpty());
+        assertTrue(SettingsSearch.find(entries, "zzqx", 50).isEmpty());
+
+        // Music isn't a setting's name: a choice of Set-up sections
+        assertFalse(SettingsSearch.find(entries, "music", 50).isEmpty());
     }
 
     /**
@@ -65,25 +138,22 @@ public class SettingsCatalogTest {
         assertFalse(SettingsSearch.find(catalog.getEntries(), "like", 10).isEmpty());
     }
 
+    /**
+     * What the settings do is kept, as they're shown under them: its words are searched too (see SettingsSearch.Fields)
+     */
     @Test
-    public void build_idsAreUnique() {
+    public void build_keepsTheDescriptions() {
         SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
-        Set<String> ids = new HashSet<>();
+        boolean hasDescription = false;
 
         for (SettingEntry entry : catalog.getEntries()) {
-            assertTrue(entry.id, ids.add(entry.id));
-            assertNotNull(catalog.find(entry.id));
+            if (entry.description != null && !entry.description.isEmpty()) {
+                hasDescription = true;
+                break;
+            }
         }
-    }
 
-    @Test
-    public void search_findsSubtitles() {
-        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
-
-        List<SettingEntry> found = SettingsSearch.find(catalog.getEntries(), "subtitles", 10);
-
-        assertFalse(found.isEmpty());
-        assertTrue(found.get(0).toString(), found.get(0).toString().toLowerCase().contains("subtitle"));
+        assertTrue(hasDescription);
     }
 
     /**

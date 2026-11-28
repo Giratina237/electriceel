@@ -51,6 +51,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.BaseInputConnection;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
@@ -78,9 +79,11 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.SplashPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.WebBrowserPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.smartyoutubetv2.common.app.views.ViewManager;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem.VideoPreset;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack;
+import com.liskovsoft.smartyoutubetv2.common.misc.AppDataSourceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.MotherActivity;
 import com.liskovsoft.smartyoutubetv2.common.misc.RemoteControlService;
 import com.liskovsoft.smartyoutubetv2.common.misc.RemoteControlWorker;
@@ -839,7 +842,78 @@ public class Utils {
             return false;
         }
 
+        if (isHdrUndecodable(preset)) {
+            return false;
+        }
+
         return true;
+    }
+
+    /**
+     * An HDR preset no hardware decoder of its codec plays in HDR (see TrackSelectorUtil#isVP9HdrDecodable)
+     */
+    public static boolean isHdrUndecodable(VideoPreset preset) {
+        if (!preset.isHdrPreset()) {
+            return false;
+        }
+
+        return preset.isAV1Preset() ? !TrackSelectorUtil.isAV1HdrDecodable() : !TrackSelectorUtil.isVP9HdrDecodable();
+    }
+
+    /**
+     * The SDR preset of the same codec, size and frame rate as an HDR preset no hardware decoder plays in HDR (see
+     * isHdrUndecodable): the one the player plays for it, e.g. (4K) 2160p 60fps vp9 for its vp9+hdr on a Shield. Null for any other
+     * format, and when the SDR one isn't supported either.
+     */
+    @Nullable
+    public static FormatItem getSdrPreset(@Nullable FormatItem format) {
+        if (format == null || !format.isPreset()) {
+            return null;
+        }
+
+        VideoPreset[] presets = AppDataSourceManager.instance().getVideoPresets();
+        VideoPreset hdrPreset = null;
+
+        for (VideoPreset preset : presets) {
+            if (preset.isHdrPreset() && format.equals(preset.format)) {
+                hdrPreset = preset;
+                break;
+            }
+        }
+
+        if (hdrPreset == null || !isHdrUndecodable(hdrPreset)) {
+            return null;
+        }
+
+        for (VideoPreset preset : presets) {
+            if (preset.format != null && !preset.isHdrPreset() && preset.isVP9Preset() == hdrPreset.isVP9Preset()
+                    && preset.isAV1Preset() == hdrPreset.isAV1Preset() && preset.getWidth() == hdrPreset.getWidth()
+                    && preset.getHeight() == hdrPreset.getHeight() && preset.format.getFrameRate() == hdrPreset.format.getFrameRate()
+                    && isPresetSupported(preset)) {
+                return preset.format;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * A format in HDR no hardware decoder of its codec plays in HDR (see TrackSelectorUtil#isVP9HdrDecodable)
+     */
+    public static boolean isHdrUndecodable(MediaTrack mediaTrack) {
+        if (!TrackSelectorUtil.isHdrFormat(mediaTrack.format)) {
+            return false;
+        }
+
+        if (mediaTrack.isVP9Codec()) {
+            return !TrackSelectorUtil.isVP9HdrDecodable();
+        }
+
+        if (mediaTrack.isAV1Codec()) {
+            return !TrackSelectorUtil.isAV1HdrDecodable();
+        }
+
+        return false;
     }
 
     public static boolean isFormatSupported(MediaTrack mediaTrack) {
@@ -848,6 +922,11 @@ public class Utils {
         }
 
         if (mediaTrack.isAV1Codec() && !DeviceHelpers.isAV1ResolutionSupported(TrackSelectorUtil.getRealHeight(mediaTrack.format))) {
+            return false;
+        }
+
+        // The video's SDR formats play instead (YouTube has them for every HDR video)
+        if (isHdrUndecodable(mediaTrack)) {
             return false;
         }
 

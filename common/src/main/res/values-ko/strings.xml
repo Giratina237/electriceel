@@ -139,6 +139,8 @@
   <string name="sorting_by_new_content">새 콘텐츠순</string>
   <string name="sorting_alphabetically">알파벳순</string>
   <string name="sorting_last_viewed">마지막으로 본 항목순</string>
+  <string name="add_to_playlist_sorting">재생 목록에서 추가/제거의 정렬</string>
+  <string name="sorting_last_edited">최근 수정순 (YouTube와 동일)</string>
   <string name="player_pause_when_seek">탐색바 사용중 일시 정지</string>
   <string name="playlists_style">재생 목록 섹션 스타일</string>
   <string name="playlists_style_grid">격자</string>
@@ -195,6 +197,7 @@
   <string name="settings_content_filtering">콘텐츠 필터링</string>
   <string name="settings_cards_options">카드 옵션</string>
   <string name="settings_channels_options">채널 옵션</string>
+  <string name="settings_sort_options">정렬 옵션</string>
   <string name="settings_time_options">시간 옵션</string>
   <string name="settings_system">시스템</string>
   <string name="settings_exit_options">종료 옵션</string>
@@ -1192,4 +1195,8 @@
     <string name="card_desc_api_keys">직접 발급한 YouTube Data API 키로, 음악 자동재생과 홈에서 카테고리(음악, 게임, 뉴스…)별로 동영상을 숨기거나 표시하는 데 필요합니다</string>
     <string name="card_desc_dns">앱이 YouTube 서버를 찾는 방식을 바꿉니다. 앱이 전혀 로드되지 않을 때 도움이 될 수 있습니다.</string>
     <string name="card_desc_remote_control">휴대전화나 태블릿을 페어링하여 해당 기기의 YouTube 앱으로 이 TV의 재생을 제어할 수 있게 합니다</string>
+    <!-- Settings search -->
+    <string name="find_setting">설정 검색</string>
+    <string name="find_setting_none">\"%s\"와(과) 일치하는 설정이 없습니다</string>
+    <string name="find_setting_gone">이 설정은 더 이상 없습니다. 다시 검색하세요.</string>
 </resources>

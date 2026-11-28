@@ -101,6 +101,14 @@ public final class PlayerCommands {
     }
 
     /**
+     * Told to play other formats: the user's pick in the player's quality menu, or the app's (see FormatAttempts#onSelected, whose
+     * reason the next attempt has). A change of formats had no command before it, and read as a fallback or a guess (0HCC641V #1, #2).
+     */
+    public static void onFormat(String source, long positionMs) {
+        add("format", source, null, positionMs);
+    }
+
+    /**
      * How long ago the video was last told to go to a position, -1 for not since it opened: a broken SABR response came 52-786 ms after
      * a seek in 15 of the 16 whose commands were known (V9H5DRS0, AYTTSQJK, FVNAAYZD, RF6HBNNH, F8DMFX2M, 2Q5RK79E, DMQEWB9B,
      * T33S5T0B, CX17FXZW), on Cronet and OkHttp alike

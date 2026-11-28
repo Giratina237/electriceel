@@ -69,6 +69,7 @@ public class VideoStartController extends BasePlayerController implements VideoS
 
     @Override
     public void onViewResumed() {
+        VideoStarts.onViewResumed();
         applyGraph();
     }
 
@@ -77,8 +78,9 @@ public class VideoStartController extends BasePlayerController implements VideoS
         PlaybackView player = getPlayer();
 
         // In PIP it plays on, but there's no room for the graph. Under a dialog of the player (e.g. its settings), it wasn't left.
+        // Behind another screen, it's left unless it's back in a moment (see VideoStarts#onViewPaused).
         if (player == null || (!player.isInPIPMode() && !getAppDialogPresenter().isDialogShown())) {
-            VideoStarts.abandon(VideoStart.OUTCOME_LEFT);
+            VideoStarts.onViewPaused();
         }
 
         hideGraph();

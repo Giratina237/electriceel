@@ -133,6 +133,8 @@
   <string name="sorting_by_new_content">Uusi sisältö</string>
   <string name="sorting_alphabetically">Aakkosittain</string>
   <string name="sorting_last_viewed">Viimeksi katsotut</string>
+  <string name="add_to_playlist_sorting">Lisää/poista soittolistasta -lajittelu</string>
+  <string name="sorting_last_edited">Viimeksi muokatut (kuten YouTubessa)</string>
   <string name="player_pause_when_seek">Pysäytä selauksen ajaksi</string>
   <string name="playlists_style">Soittolistan tyyli</string>
   <string name="playlists_style_grid">Ruudukko</string>
@@ -186,6 +188,7 @@
   <string name="settings_content_filtering">Sisällön suodatus</string>
   <string name="settings_cards_options">Korttien asetukset</string>
   <string name="settings_channels_options">Kanavien asetukset</string>
+  <string name="settings_sort_options">Lajitteluasetukset</string>
   <string name="settings_time_options">Ajan asetukset</string>
   <string name="settings_system">Järjestelmä</string>
   <string name="settings_exit_options">Poistumisen asetukset</string>
@@ -1207,4 +1210,8 @@
     <string name="card_desc_api_keys">Oma YouTube Data API -avaimesi, jota tarvitaan musiikin automaattiseen toistoon sekä videoiden piilottamiseen tai merkitsemiseen luokan mukaan (musiikki, pelit, uutiset…) Kodissa</string>
     <string name="card_desc_dns">Muuttaa tapaa, jolla sovellus löytää YouTuben palvelimet. Voi auttaa, kun sovellus ei lataudu lainkaan.</string>
     <string name="card_desc_remote_control">Muodostaa pariliitoksen puhelimeen tai tablettiin, jotta sen YouTube-sovellus voi ohjata toistoa tässä televisiossa</string>
+    <!-- Settings search -->
+    <string name="find_setting">Hae asetuksista</string>
+    <string name="find_setting_none">Mikään asetus ei vastaa hakua \"%s\"</string>
+    <string name="find_setting_gone">Tätä asetusta ei ole enää. Hae uudelleen.</string>
 </resources>

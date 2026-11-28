@@ -457,6 +457,8 @@ public final class DiagnosticsReport {
         result.put("audioTimeStretching", tweaksData.isAudioTimeStretchingEnabled());
         result.put("audioSyncFix", tweaksData.isAudioSyncFixEnabled());
         result.put("playbackMode", getPlaybackModeName(playerData.getPlaybackMode()));
+        // The player's, not a setting: 50 fps at 1.5x is 75 frames a second to decode (0HCC641V #1, #2)
+        result.put("speed", Double.parseDouble(Float.toString(PlaybackSpeed.get())));
 
         return result;
     }

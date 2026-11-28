@@ -144,6 +144,8 @@
     <string name="sorting_by_new_content">Yeni məzmun</string>
     <string name="sorting_alphabetically">Əlifba sırası ilə</string>
     <string name="sorting_last_viewed">Son baxılan</string>
+    <string name="add_to_playlist_sorting">Pleylistə əlavə et / sil çeşidlənməsi</string>
+    <string name="sorting_last_edited">Son redaktə edilən (YouTube-dakı kimi)</string>
     <string name="player_pause_when_seek">İrəli/geri çəkərkən dayandır</string>
     <string name="playlists_style">Pleylistlər bölməsinin üslubu</string>
     <string name="playlists_style_grid">Şəbəkə</string>
@@ -201,6 +203,7 @@
     <string name="settings_content_filtering">Məzmunun filtrlənməsi</string>
     <string name="settings_cards_options">Kart seçimləri</string>
     <string name="settings_channels_options">Kanal seçimləri</string>
+    <string name="settings_sort_options">Çeşidləmə seçimləri</string>
     <string name="settings_time_options">Vaxt seçimləri</string>
     <string name="settings_system">Sistem</string>
     <string name="settings_exit_options">Çıxış seçimləri</string>
@@ -1207,4 +1210,8 @@
     <string name="card_desc_api_keys">Öz YouTube Data API açarınız; musiqinin avtomatik oynadılması və Ev səhifəsində videoları kateqoriyaya görə (musiqi, oyunlar, xəbərlər…) gizlətmək və ya işarələmək üçün lazımdır</string>
     <string name="card_desc_dns">Tətbiqin YouTube serverlərini necə tapdığını dəyişir. Tətbiq ümumiyyətlə yüklənmədikdə kömək edə bilər.</string>
     <string name="card_desc_remote_control">Telefonu və ya planşeti qoşur ki, onun YouTube tətbiqi bu televizorda oxutmanı idarə edə bilsin</string>
+    <!-- Settings search -->
+    <string name="find_setting">Ayarlarda axtar</string>
+    <string name="find_setting_none">\"%s\" ilə uyğun ayar yoxdur</string>
+    <string name="find_setting_gone">Bu ayar artıq yoxdur. Yenidən axtarın.</string>
 </resources>

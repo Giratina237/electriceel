@@ -135,6 +135,8 @@
     <string name="sorting_by_new_content">Naujas turinys</string>
     <string name="sorting_alphabetically">Abėcėlės tvarka</string>
     <string name="sorting_last_viewed">Paskutinį kartą peržiūrėta</string>
+    <string name="add_to_playlist_sorting">Pridėjimo prie grojaraščio rūšiavimas</string>
+    <string name="sorting_last_edited">Paskutiniai redaguoti (kaip YouTube)</string>
     <string name="player_pause_when_seek">Pristabdyti atkūrimą prasukant vaizdo įrašą</string>
     <string name="playlists_style">Grojaraščių stilius</string>
     <string name="playlists_style_grid">Tinklelis</string>
@@ -189,6 +191,7 @@
     <string name="settings_content_filtering">Turinio filtravimas</string>
     <string name="settings_cards_options">Kortelių parinktys</string>
     <string name="settings_channels_options">Kanalų parinktys</string>
+    <string name="settings_sort_options">Rūšiavimo parinktys</string>
     <string name="settings_time_options">Laiko parinktys</string>
     <string name="settings_system">Sistema</string>
     <string name="settings_exit_options">Išėjimo parinktys</string>
@@ -1236,4 +1239,8 @@
     <string name="card_desc_api_keys">Jūsų paties YouTube Data API raktas, reikalingas muzikos automatiniam leidimui ir vaizdo įrašams slėpti ar pažymėti pagal kategoriją (muzika, žaidimai, naujienos…) Pagrindiniame</string>
     <string name="card_desc_dns">Keičia, kaip programa randa YouTube serverius. Gali padėti, kai programa visai neįsikelia.</string>
     <string name="card_desc_remote_control">Susieja telefoną ar planšetę, kad jo YouTube programa galėtų valdyti atkūrimą šiame televizoriuje</string>
+    <!-- Settings search -->
+    <string name="find_setting">Ieškoti nustatymuose</string>
+    <string name="find_setting_none">Nėra nustatymo, atitinkančio „%s“</string>
+    <string name="find_setting_gone">Šio nustatymo nebėra. Ieškokite dar kartą.</string>
 </resources>

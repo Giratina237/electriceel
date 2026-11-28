@@ -19,10 +19,12 @@ import java.util.regex.Pattern;
 /**
  * The settings search on the device, offline: the settings whose words are in the question, the rare words first (e.g.
  * "subtitles" counts more than "video", which is in many settings). A word matches the start of a word of the setting, or a part
- * of it when long enough (e.g. "sponsor" in "SponsorBlock"). In the language of the app, without its accents.
+ * of it when long enough (e.g. "sponsor" in "SponsorBlock"). In the language of the app, without its accents.<br/>
+ * The settings are the ones each screen declares (see SettingsCatalog), their words split once when they're listed (see Fields).
  */
 public final class SettingsSearch {
     private static final Pattern MARKS = Pattern.compile("\\p{M}+");
+    private static final Pattern SPACES = Pattern.compile("\\s+");
     private static final Pattern NOT_WORD = Pattern.compile("[^\\p{L}\\p{N}]+");
     private static final float TITLE_WEIGHT = 3;
     private static final float CHOICES_WEIGHT = 2;
@@ -53,36 +55,30 @@ public final class SettingsSearch {
             return Collections.emptyList();
         }
 
-        List<Fields> allFields = new ArrayList<>();
-
-        for (SettingEntry entry : entries) {
-            allFields.add(new Fields(entry));
-        }
-
         // How rare each word is in the settings
         Map<String, Float> weights = new HashMap<>();
 
         for (String word : words) {
             int count = 0;
 
-            for (Fields fields : allFields) {
-                if (fields.matchesAny(word)) {
+            for (SettingEntry entry : entries) {
+                if (entry.fields.match(word) > 0) {
                     count++;
                 }
             }
 
-            weights.put(word, (float) Math.log(1 + (double) allFields.size() / (1 + count)));
+            weights.put(word, (float) Math.log(1 + (double) entries.size() / (1 + count)));
         }
 
         List<Scored> scored = new ArrayList<>();
         float best = 0;
 
-        for (Fields fields : allFields) {
+        for (SettingEntry entry : entries) {
             float score = 0;
             int matched = 0;
 
             for (String word : words) {
-                float match = fields.match(word);
+                float match = entry.fields.match(word);
 
                 if (match > 0) {
                     score += weights.get(word) * match;
@@ -98,7 +94,7 @@ public final class SettingsSearch {
                 score *= 1.5f;
             }
 
-            scored.add(new Scored(fields.entry, score));
+            scored.add(new Scored(entry, score));
             best = Math.max(best, score);
         }
 
@@ -114,7 +110,7 @@ public final class SettingsSearch {
             }
 
             // A card and the untitled list of its panel are one setting: the list is named as its card
-            if (shown.add(getSameKey(item.entry))) {
+            if (shown.add(item.entry.sameKey)) {
                 result.add(item.entry);
             }
         }
@@ -144,14 +140,16 @@ public final class SettingsSearch {
     }
 
     /**
-     * Lower case, without accents, e.g. "Vidéo" → "video"
+     * Lower case, without accents, spaces as one, e.g. " Vidéo  buffer" → "video buffer"
      */
     static String normalize(@Nullable String text) {
         if (text == null) {
             return "";
         }
 
-        return MARKS.matcher(Normalizer.normalize(text, Normalizer.Form.NFD)).replaceAll("").toLowerCase(Locale.ROOT);
+        String result = MARKS.matcher(Normalizer.normalize(text, Normalizer.Form.NFD)).replaceAll("").toLowerCase(Locale.ROOT);
+
+        return SPACES.matcher(result).replaceAll(" ").trim();
     }
 
     static List<String> split(@Nullable String text) {
@@ -170,14 +168,12 @@ public final class SettingsSearch {
      * The title and the place of the setting, the place without a last part named as the setting (e.g. the untitled list of the
      * Video buffer card is Player, Video buffer, Video buffer: the same as the card)
      */
-    private static String getSameKey(SettingEntry entry) {
-        List<String> path = entry.path;
-
-        if (!path.isEmpty() && normalize(path.get(path.size() - 1)).equals(normalize(entry.title))) {
+    static String getSameKey(String searchTitle, List<String> path) {
+        if (!path.isEmpty() && normalize(path.get(path.size() - 1)).equals(searchTitle)) {
             path = path.subList(0, path.size() - 1);
         }
 
-        return normalize(entry.title) + "\n" + normalize(TextUtils.join("\n", path));
+        return searchTitle + "\n" + normalize(TextUtils.join("\n", path));
     }
 
     /**
@@ -215,11 +211,10 @@ public final class SettingsSearch {
     }
 
     /**
-     * The texts of a setting, as matched
+     * The texts of a setting as they're matched: normalized and split once, when the settings are listed
      */
-    private static final class Fields {
-        private final SettingEntry entry;
-        private final String title;
+    static final class Fields {
+        final String title;
         private final List<String> titleWords;
         private final String choices;
         private final List<String> choicesWords;
@@ -228,10 +223,9 @@ public final class SettingsSearch {
         private final String description;
         private final List<String> descriptionWords;
 
-        private Fields(SettingEntry entry) {
-            this.entry = entry;
+        Fields(SettingEntry entry) {
             title = normalize(entry.title);
-            titleWords = split(entry.title);
+            titleWords = split(title);
             choices = normalize(TextUtils.join("\n", entry.choices));
             choicesWords = split(choices);
             path = normalize(TextUtils.join("\n", entry.path));
@@ -240,14 +234,10 @@ public final class SettingsSearch {
             descriptionWords = split(description);
         }
 
-        private boolean matchesAny(String word) {
-            return match(word) > 0;
-        }
-
         /**
-         * The best of its texts, weighted
+         * The best of its texts, weighted: 0 when the word isn't in any
          */
-        private float match(String word) {
+        float match(String word) {
             return Math.max(Math.max(TITLE_WEIGHT * SettingsSearch.match(word, titleWords, title),
                             CHOICES_WEIGHT * SettingsSearch.match(word, choicesWords, choices)),
                     Math.max(PATH_WEIGHT * SettingsSearch.match(word, pathWords, path),

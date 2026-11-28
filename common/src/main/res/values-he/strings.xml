@@ -148,6 +148,8 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="sorting_by_new_content">תוכן חדש</string>
     <string name="sorting_alphabetically">בסדר אלפביתי</string>
     <string name="sorting_last_viewed">נצפה לאחרונה</string>
+    <string name="add_to_playlist_sorting">מיון הוספה/הסרה מפלייליסט</string>
+    <string name="sorting_last_edited">נערך לאחרונה (כמו ב-YouTube)</string>
     <string name="player_pause_when_seek">הפסקה בזמן דילוג</string>
     <string name="playlists_style">סגנון מדור פלייליסטים</string>
     <string name="playlists_style_grid">רשת</string>
@@ -205,6 +207,7 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="settings_content_filtering">סינון תוכן</string>
     <string name="settings_cards_options">אפשרויות כרטיסים</string>
     <string name="settings_channels_options">אפשרויות ערוצים</string>
+    <string name="settings_sort_options">אפשרויות מיון</string>
     <string name="settings_time_options">אפשרויות זמן</string>
     <string name="settings_system">מערכת</string>
     <string name="settings_exit_options">אפשרויות יציאה</string>
@@ -1226,4 +1229,8 @@ So, make a copy of values-he and name it values-iw. Keep both in your structure.
     <string name="card_desc_api_keys">מפתח YouTube Data API משלך, נדרש להפעלה אוטומטית של מוזיקה ולהסתרה או לסימון של סרטונים לפי קטגוריה (מוזיקה, משחקים, חדשות…) בדף הבית</string>
     <string name="card_desc_dns">משנה את האופן שבו האפליקציה מוצאת את השרתים של YouTube. יכול לעזור כשהאפליקציה לא נטענת בכלל.</string>
     <string name="card_desc_remote_control">מצמיד טלפון או טאבלט כך שאפליקציית YouTube שבו תוכל לשלוט בהפעלה בטלוויזיה הזו</string>
+    <!-- Settings search -->
+    <string name="find_setting">חיפוש בהגדרות</string>
+    <string name="find_setting_none">אין הגדרה שתואמת את \"%s\"</string>
+    <string name="find_setting_gone">ההגדרה הזו כבר לא קיימת. חפשו שוב.</string>
 </resources>

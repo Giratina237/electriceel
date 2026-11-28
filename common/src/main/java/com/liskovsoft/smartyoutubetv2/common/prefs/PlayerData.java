@@ -109,6 +109,7 @@ public class PlayerData extends DataChangeBase implements PlayerConstants, Profi
     private long mAfrSwitchTimeMs;
     private List<String> mLastAudioLanguages;
     private final PendingSave mPersistStateInt = new PendingSave(this::persistStateInt);
+    private final Runnable mReplaceHiddenHdrPreset = this::replaceHiddenHdrPreset;
     private boolean mIsLegacyCodecsForced;
     private boolean mIsAudioDelayEnabled;
 
@@ -144,6 +145,26 @@ public class PlayerData extends DataChangeBase implements PlayerConstants, Profi
         initSubtitleStyles();
         initDefaultFormats();
         restoreState();
+        replaceHiddenHdrPreset();
+    }
+
+    /**
+     * A saved HDR preset the device can't play in HDR (e.g. vp9+hdr on a Shield, saved before such presets were hidden, see
+     * Utils#isHdrUndecodable) becomes the SDR one of its size and frame rate: the one it plays, now shown checked among the
+     * presets. Saved with the next change, as the legacy sound off is (see restoreState): a save unasked would write the values
+     * never saved too, and the storage sync would take them for changes (see PendingSave). Each time the saved one is read again
+     * (see onProfileChanged, onProfileDataSynced).
+     */
+    private void replaceHiddenHdrPreset() {
+        if (PlayerTweaksData.instance(mPrefs.getContext()).isAllFormatsUnlocked()) {
+            return;
+        }
+
+        FormatItem sdrPreset = Utils.getSdrPreset(mVideoFormat);
+
+        if (sdrPreset != null) {
+            mVideoFormat = sdrPreset;
+        }
     }
 
     public static PlayerData instance(Context context) {
@@ -962,6 +983,8 @@ public class PlayerData extends DataChangeBase implements PlayerConstants, Profi
         mSpeeds.clear();
 
         restoreState();
+        // Once every listener has read the new profile: PlayerTweaksData, and its unlock, may come after this one
+        Utils.post(mReplaceHiddenHdrPreset);
     }
 
     @Override
@@ -974,6 +997,8 @@ public class PlayerData extends DataChangeBase implements PlayerConstants, Profi
         if (keys.contains(VIDEO_PLAYER_DATA)) {
             mPersistStateInt.cancel();
             restoreState();
+            // The same profile, its unlock already read (and not synced, see SyncedSettings)
+            replaceHiddenHdrPreset();
             onDataChange();
         }
     }

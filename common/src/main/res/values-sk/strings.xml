@@ -144,6 +144,8 @@
     <string name="sorting_by_new_content">Nový obsah</string>
     <string name="sorting_alphabetically">Abecedne</string>
     <string name="sorting_last_viewed">Posledné videné</string>
+    <string name="add_to_playlist_sorting">Zoradenie v „Uložiť do zoznamu“</string>
+    <string name="sorting_last_edited">Naposledy upravené (ako na YouTube)</string>
     <string name="player_pause_when_seek">Pozastaviť video pri preskakovaní</string>
     <string name="playlists_style">Štýl sekcie Knižnica</string>
     <string name="playlists_style_grid">Mriežka</string>
@@ -201,6 +203,7 @@
     <string name="settings_content_filtering">Filtrovanie obsahu</string>
     <string name="settings_cards_options">Možnosti kariet</string>
     <string name="settings_channels_options">Možnosti kanálov</string>
+    <string name="settings_sort_options">Možnosti zoradenia</string>
     <string name="settings_time_options">Možnosti času</string>
     <string name="settings_system">Systém</string>
     <string name="settings_exit_options">Možnosti ukončenia</string>
@@ -1237,4 +1240,8 @@
     <string name="card_desc_api_keys">Váš vlastný kľúč YouTube Data API, potrebný na automatické prehrávanie hudby a na skrývanie alebo označovanie videí podľa kategórie (hudba, hry, správy…) na stránke Domov</string>
     <string name="card_desc_dns">Mení, ako aplikácia hľadá servery YouTube. Môže pomôcť, keď sa aplikácia vôbec nenačíta.</string>
     <string name="card_desc_remote_control">Spáruje telefón alebo tablet, aby jeho aplikácia YouTube mohla ovládať prehrávanie na tomto televízore</string>
+    <!-- Settings search -->
+    <string name="find_setting">Hľadať v nastaveniach</string>
+    <string name="find_setting_none">Žiadne nastavenie nezodpovedá „%s“</string>
+    <string name="find_setting_gone">Toto nastavenie už neexistuje. Hľadajte znova.</string>
 </resources>

@@ -141,6 +141,8 @@
   <string name="sorting_by_new_content">Nieuwe video\'s</string>
   <string name="sorting_alphabetically">Alfabetisch</string>
   <string name="sorting_last_viewed">Laatst bekeken</string>
+  <string name="add_to_playlist_sorting">Sortering van Voeg toe/Verwijder uit afspeellijst</string>
+  <string name="sorting_last_edited">Laatst bewerkt (zoals op YouTube)</string>
   <string name="player_pause_when_seek">Pauzeren tijdens snelzoeken</string>
   <string name="playlists_style">Afspeellijstindeling</string>
   <string name="playlists_style_grid">Rooster</string>
@@ -197,6 +199,7 @@
   <string name="settings_content_filtering">Inhoud filteren</string>
   <string name="settings_cards_options">Kaartopties</string>
   <string name="settings_channels_options">Kanaalopties</string>
+  <string name="settings_sort_options">Sorteeropties</string>
   <string name="settings_time_options">Tijdopties</string>
   <string name="settings_system">Systeem</string>
   <string name="settings_exit_options">Afsluitopties</string>
@@ -1207,4 +1210,8 @@
     <string name="card_desc_api_keys">Je eigen YouTube Data API-sleutel, nodig om muziek automatisch af te spelen en om video\'s per categorie (muziek, gaming, nieuws…) op Home te verbergen of te markeren</string>
     <string name="card_desc_dns">Wijzigt hoe de app de servers van YouTube vindt. Kan helpen als de app helemaal niet laadt.</string>
     <string name="card_desc_remote_control">Koppelt een telefoon of tablet zodat de YouTube-app daarop het afspelen op deze tv kan bedienen</string>
+    <!-- Settings search -->
+    <string name="find_setting">Instellingen doorzoeken</string>
+    <string name="find_setting_none">Geen instelling komt overeen met \"%s\"</string>
+    <string name="find_setting_gone">Deze instelling bestaat niet meer. Zoek opnieuw.</string>
 </resources>

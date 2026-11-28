@@ -12,14 +12,24 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The kinds of video (a codec at a size and frame rate, e.g. "av1 1080p50") that dropped frames on the device with a decoder that
- * declares them (see ErrorFixerController#onHealthFailure), and the videos they did so on. Kept across runs: the device's decoders drop
- * them in every run alike (27XPFNZC #1, #2 and Y36K953Z #1, runs apart: AV1 and AVC 1080p50 dropped frames on that Sansui, VP9
- * 1080p50 none in 21 min, VRENB3NE), and each run paid two videos of drops to learn it again. A video's is kept KEEP_MS (e.g. a
- * firmware update may mend the decoder).
+ * The kinds of video (a codec at a size and the frame rate it's decoded at, e.g. "av1 1080p75") that dropped frames on the device with a
+ * decoder that declares the video's frame rate (see ErrorFixerController#onHealthFailure), and the videos they did so on. Kept across
+ * runs: the device's decoders drop them in every run alike, and each run paid two videos of drops to learn it again. A video's is kept
+ * KEEP_MS (e.g. a firmware update may mend the decoder).
+ * <p>
+ * The rate is the video's times the playback speed: a Sansui's AV1 and AVC 1080p50 dropped frames on video after video at 1.5x, 75 frames
+ * a second (6-14 % of AV1's first 10 s), and none at 1x (27XPFNZC: 0 and 1 of 523 and 532; AV1 1080p60 0 and 1), while VP9 1080p50 kept
+ * up at 1.5x (9 of 808, 0HCC641V). Kept by the video's own rate, 1.5x drops took AV1 and AVC 1080p50 off at 1x too (0HCC641V,
+ * 27XPFNZC, Y36K953Z: the speed was found only from the position against the time).
  */
 public final class FrameDropCodecs {
-    private static final String PREFS = "frame_drop_codecs";
+    private static final String PREFS = "frame_drop_rates";
+    /**
+     * Of the apps that kept the kinds by the video's own frame rate, whatever the speed (see above): what they kept isn't known to be of
+     * 1x, it's cleared once (see #getPrefs)
+     */
+    private static final String OLD_PREFS = "frame_drop_codecs";
+    private static boolean sIsOldCleared;
     @VisibleForTesting
     static final long KEEP_MS = 30L * 24 * 60 * 60 * 1_000;
     /**
@@ -44,12 +54,14 @@ public final class FrameDropCodecs {
     }
 
     /**
-     * E.g. "av1 1080p50"
+     * E.g. "av1 1080p75" for a 1080p50 video at 1.5x
      *
      * @param size the shorter side, as 1080 of 1920x1080 (or of 1080x1920)
+     * @param frameRate the video's
+     * @param speed the playback's, 1 for the normal speed: the decoder decodes frameRate times it a second
      */
-    public static String kindOf(String codec, int size, float frameRate) {
-        return String.format(Locale.US, "%s %dp%d", codec, size, Math.round(frameRate));
+    public static String kindOf(String codec, int size, float frameRate, float speed) {
+        return String.format(Locale.US, "%s %dp%d", codec, size, Math.round(frameRate * (speed > 0 ? speed : 1)));
     }
 
     /**
@@ -96,7 +108,14 @@ public final class FrameDropCodecs {
      * Some video dropped frames on the kind, within KEEP_MS
      */
     public static synchronized boolean hasDropped(@Nullable Context context, String kind) {
-        return context != null && !read(getPrefs(context).getString(kind, null), sClock.now()).isEmpty();
+        return count(context, kind) > 0;
+    }
+
+    /**
+     * How many videos dropped frames on the kind, within KEEP_MS (up to MAX_VIDEOS)
+     */
+    public static synchronized int count(@Nullable Context context, String kind) {
+        return context != null ? read(getPrefs(context).getString(kind, null), sClock.now()).size() : 0;
     }
 
     /**
@@ -168,7 +187,23 @@ public final class FrameDropCodecs {
         return value.toString();
     }
 
+    @VisibleForTesting
+    static synchronized void resetForTesting() {
+        sIsOldCleared = false;
+    }
+
     private static SharedPreferences getPrefs(Context context) {
-        return context.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        Context app = context.getApplicationContext();
+
+        if (!sIsOldCleared) {
+            sIsOldCleared = true;
+            SharedPreferences old = app.getSharedPreferences(OLD_PREFS, Context.MODE_PRIVATE);
+
+            if (!old.getAll().isEmpty()) {
+                old.edit().clear().apply();
+            }
+        }
+
+        return app.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 }

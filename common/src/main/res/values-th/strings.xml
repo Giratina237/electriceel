@@ -135,6 +135,8 @@
     <string name="sorting_by_new_content">เนื้อหาใหม่</string>
     <string name="sorting_alphabetically">ตามตัวอักษร</string>
     <string name="sorting_last_viewed">ดูล่าสุด</string>
+    <string name="add_to_playlist_sorting">การเรียงลำดับใน บันทึกไปยังเพลย์ลิสต์</string>
+    <string name="sorting_last_edited">แก้ไขล่าสุด (เหมือนใน YouTube)</string>
     <string name="player_pause_when_seek">หยุดชั่วคราวเมื่อกรอวิดีโอ</string>
     <string name="playlists_style">รูปแบบของส่วนเพลย์ลิสต์</string>
     <string name="playlists_style_grid">ตาราง</string>
@@ -189,6 +191,7 @@
     <string name="settings_content_filtering">การกรองเนื้อหา</string>
     <string name="settings_cards_options">ตัวเลือกการ์ด</string>
     <string name="settings_channels_options">ตัวเลือกช่อง</string>
+    <string name="settings_sort_options">ตัวเลือกการเรียงลำดับ</string>
     <string name="settings_time_options">ตัวเลือกเวลา</string>
     <string name="settings_system">ระบบ</string>
     <string name="settings_exit_options">ตัวเลือกการออก</string>
@@ -1192,4 +1195,8 @@
     <string name="card_desc_api_keys">คีย์ YouTube Data API ของคุณเอง จำเป็นสำหรับการเล่นเพลงอัตโนมัติ และการซ่อนหรือทำเครื่องหมายวิดีโอตามหมวดหมู่ (เพลง เกม ข่าว…) ในหน้าแรก</string>
     <string name="card_desc_dns">เปลี่ยนวิธีที่แอปค้นหาเซิร์ฟเวอร์ของ YouTube อาจช่วยได้เมื่อแอปโหลดไม่ขึ้นเลย</string>
     <string name="card_desc_remote_control">จับคู่โทรศัพท์หรือแท็บเล็ตเพื่อให้แอป YouTube บนอุปกรณ์นั้นควบคุมการเล่นบนทีวีเครื่องนี้ได้</string>
+    <!-- Settings search -->
+    <string name="find_setting">ค้นหาการตั้งค่า</string>
+    <string name="find_setting_none">ไม่มีการตั้งค่าที่ตรงกับ \"%s\"</string>
+    <string name="find_setting_gone">การตั้งค่านี้ไม่มีอยู่แล้ว ค้นหาอีกครั้ง</string>
 </resources>

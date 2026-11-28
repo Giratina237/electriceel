@@ -9,6 +9,7 @@ import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecInfo.CodecCapabilities;
+import android.media.MediaCodecInfo.CodecProfileLevel;
 import android.media.MediaCodecInfo.VideoCapabilities;
 import android.media.MediaCodecList;
 import android.media.MediaRouter;
@@ -246,6 +247,7 @@ public final class DeviceCapabilities {
                     }
 
                     decoder.put("supports", supports);
+                    decoder.put("profiles", buildProfiles(capabilities));
                 } else if (!isVideo && capabilities.getAudioCapabilities() != null) {
                     decoder.put("maxChannels", capabilities.getAudioCapabilities().getMaxInputChannelCount());
                 }
@@ -255,6 +257,23 @@ public final class DeviceCapabilities {
             }
 
             result.put(decoder);
+        }
+
+        return result;
+    }
+
+    /**
+     * The profiles and levels it lists, as CodecProfileLevel's numbers, e.g. "4/256": VP9 profile 2 at level 5. Whether it plays
+     * YouTube's HDR: VP9 profile 2 and AV1 Main 10 (see TrackSelectorUtil#isVP9HdrDecodable). A Shield's VP9 one lists "1/512"
+     * only, profile 0.
+     */
+    private static JSONArray buildProfiles(CodecCapabilities capabilities) {
+        JSONArray result = new JSONArray();
+
+        if (capabilities.profileLevels != null) {
+            for (CodecProfileLevel profileLevel : capabilities.profileLevels) {
+                result.put(profileLevel.profile + "/" + profileLevel.level);
+            }
         }
 
         return result;

@@ -132,6 +132,8 @@
   <string name="sorting_by_new_content">नई सामग्री</string>
   <string name="sorting_alphabetically">वर्णक्रमानुसार</string>
   <string name="sorting_last_viewed">अंतिम बार देखा गया</string>
+  <string name="add_to_playlist_sorting">प्लेलिस्ट में जोड़ें/हटाएँ की छँटाई</string>
+  <string name="sorting_last_edited">अंतिम बार संपादित (YouTube की तरह)</string>
   <string name="player_pause_when_seek">आगे बढ़ाने पर रोकें</string>
   <string name="playlists_style">प्लेलिस्ट शैली</string>
   <string name="playlists_style_grid">ग्रिड</string>
@@ -184,6 +186,7 @@
   <string name="settings_content_filtering">सामग्री फ़िल्टरिंग</string>
   <string name="settings_cards_options">कार्ड विकल्प</string>
   <string name="settings_channels_options">चैनल विकल्प</string>
+  <string name="settings_sort_options">छँटाई विकल्प</string>
   <string name="settings_time_options">समय विकल्प</string>
   <string name="settings_system">सिस्टम</string>
   <string name="settings_exit_options">बाहर निकलने के विकल्प</string>
@@ -1207,4 +1210,8 @@
     <string name="card_desc_api_keys">आपकी अपनी YouTube Data API कुंजी, संगीत ऑटोप्ले के लिए और होम पर वीडियो को श्रेणी (संगीत, गेमिंग, समाचार…) के अनुसार छिपाने या चिह्नित करने के लिए ज़रूरी</string>
     <string name="card_desc_dns">बदलता है कि ऐप YouTube के सर्वर कैसे ढूँढता है। जब ऐप बिल्कुल लोड न हो, तब मदद कर सकता है।</string>
     <string name="card_desc_remote_control">किसी फ़ोन या टैबलेट को जोड़ता है ताकि उसका YouTube ऐप इस टीवी पर प्लेबैक नियंत्रित कर सके</string>
+    <!-- Settings search -->
+    <string name="find_setting">सेटिंग खोजें</string>
+    <string name="find_setting_none">\"%s\" से मेल खाने वाली कोई सेटिंग नहीं है</string>
+    <string name="find_setting_gone">यह सेटिंग अब मौजूद नहीं है। फिर से खोजें।</string>
 </resources>

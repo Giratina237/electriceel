@@ -144,6 +144,8 @@
     <string name="sorting_by_new_content">Новий контент</string>
     <string name="sorting_alphabetically">За абеткою</string>
     <string name="sorting_last_viewed">Останні переглянуті</string>
+    <string name="add_to_playlist_sorting">Сортування в «Додати/Видалити із плейлиста»</string>
+    <string name="sorting_last_edited">Останні змінені (як на YouTube)</string>
     <string name="player_pause_when_seek">Пауза при перемотуванні</string>
     <string name="playlists_style">Стиль розділу Плейлисти</string>
     <string name="playlists_style_grid">Сітка</string>
@@ -201,6 +203,7 @@
     <string name="settings_content_filtering">Фільтрування вмісту</string>
     <string name="settings_cards_options">Параметри карток</string>
     <string name="settings_channels_options">Параметри каналів</string>
+    <string name="settings_sort_options">Параметри сортування</string>
     <string name="settings_time_options">Параметри часу</string>
     <string name="settings_system">Система</string>
     <string name="settings_exit_options">Параметри виходу</string>
@@ -1240,4 +1243,8 @@
     <string name="card_desc_api_keys">Ваш власний ключ YouTube Data API, потрібний для автовідтворення музики та щоб приховувати або позначати відео за категорією (музика, ігри, новини…) на Головній</string>
     <string name="card_desc_dns">Змінює спосіб, у який застосунок знаходить сервери YouTube. Може допомогти, коли застосунок взагалі не завантажується.</string>
     <string name="card_desc_remote_control">Поєднує телефон або планшет, щоб його застосунок YouTube міг керувати відтворенням на цьому телевізорі</string>
+    <!-- Settings search -->
+    <string name="find_setting">Пошук у налаштуваннях</string>
+    <string name="find_setting_none">Немає налаштувань, що відповідають «%s»</string>
+    <string name="find_setting_gone">Цього налаштування більше немає. Повторіть пошук.</string>
 </resources>

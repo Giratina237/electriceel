@@ -12,7 +12,6 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.DebuggingSe
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.MainUISectionSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.PlayerSectionSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.SearchSectionSettingsPresenter;
-import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.SettingsSearchPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.SystemSectionSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.UpdatesSettingsPresenter;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.ExoFormatItem;
@@ -38,51 +37,42 @@ public class AppDataSourceManager {
         return sInstance;
     }
 
-    /**
-     * The cards of the Settings section: Find a setting, then the settings themselves
-     */
     public List<SettingsItem> getSettingItems(Context context) {
-        List<SettingsItem> settingItems = new ArrayList<>();
-
-        settingItems.add(new SettingsItem(
-                context.getString(R.string.find_setting), () -> SettingsSearchPresenter.instance(context).show(), R.drawable.settings_find)
-                .setDescription(context.getString(R.string.card_desc_find_setting)));
-        settingItems.addAll(getSettingSections(context));
-
-        return settingItems;
-    }
-
-    /**
-     * The cards of the Settings section that open settings, in their order there. Looked through by the settings search
-     * (see SettingsCatalog): the same order each time.
-     */
-    public List<SettingsItem> getSettingSections(Context context) {
         List<SettingsItem> settingItems = new ArrayList<>();
 
         settingItems.add(new SettingsItem(
                 context.getString(R.string.settings_accounts), () -> AccountSettingsPresenter.instance(context).show(), R.drawable.settings_account));
         settingItems.add(new SettingsItem(
-                context.getString(R.string.settings_system), () -> SystemSectionSettingsPresenter.instance(context).show(), R.drawable.settings_app));
+                context.getString(R.string.settings_system), () -> SystemSectionSettingsPresenter.instance(context).show(), R.drawable.settings_app)
+                .setCards(SystemSectionSettingsPresenter.instance(context)));
         settingItems.add(new SettingsItem(
-                context.getString(R.string.settings_main_ui), () -> MainUISectionSettingsPresenter.instance(context).show(), R.drawable.settings_main_ui));
+                context.getString(R.string.settings_main_ui), () -> MainUISectionSettingsPresenter.instance(context).show(), R.drawable.settings_main_ui)
+                .setCards(MainUISectionSettingsPresenter.instance(context)));
         settingItems.add(new SettingsItem(
-                context.getString(R.string.settings_content_filtering), () -> ContentFilteringSettingsPresenter.instance(context).show(), R.drawable.settings_content_filtering));
+                context.getString(R.string.settings_content_filtering), () -> ContentFilteringSettingsPresenter.instance(context).show(), R.drawable.settings_content_filtering)
+                .setCards(ContentFilteringSettingsPresenter.instance(context)));
         settingItems.add(new SettingsItem(
-                context.getString(R.string.settings_player), () -> PlayerSectionSettingsPresenter.instance(context).show(), R.drawable.settings_player));
+                context.getString(R.string.settings_player), () -> PlayerSectionSettingsPresenter.instance(context).show(), R.drawable.settings_player)
+                .setCards(PlayerSectionSettingsPresenter.instance(context)));
         settingItems.add(new SettingsItem(
-                context.getString(R.string.settings_search), () -> SearchSectionSettingsPresenter.instance(context).show(), R.drawable.settings_search));
+                context.getString(R.string.settings_search), () -> SearchSectionSettingsPresenter.instance(context).show(), R.drawable.settings_search)
+                .setCards(SearchSectionSettingsPresenter.instance(context)));
 
         settingItems.add(new SettingsItem(
-                context.getString(R.string.settings_updates), () -> UpdatesSettingsPresenter.instance(context).show(), R.drawable.settings_updates));
+                context.getString(R.string.settings_updates), () -> UpdatesSettingsPresenter.instance(context).show(), R.drawable.settings_updates)
+                .setPanel(rows -> UpdatesSettingsPresenter.instance(context).appendRows(rows)));
         settingItems.add(new SettingsItem(
-                context.getString(R.string.settings_debugging), () -> DebuggingSettingsPresenter.instance(context).show(), R.drawable.settings_debugging));
+                context.getString(R.string.settings_debugging), () -> DebuggingSettingsPresenter.instance(context).show(), R.drawable.settings_debugging)
+                .setPanel(rows -> DebuggingSettingsPresenter.instance(context).appendRows(rows)));
 
         if (Helpers.equalsAny(context.getPackageName(), Utils.KNOWN_PACKAGES)) {
             settingItems.add(new SettingsItem(
-                    context.getString(R.string.settings_about), () -> AboutSettingsPresenter.instance(context).show(), R.drawable.settings_about));
+                    context.getString(R.string.settings_about), () -> AboutSettingsPresenter.instance(context).show(), R.drawable.settings_about)
+                    .setPanel(rows -> AboutSettingsPresenter.instance(context).appendRows(rows)));
         } else {
             settingItems.add(new SettingsItem(
-                    context.getString(R.string.settings_about), () -> AboutSimpleSettingsPresenter.instance(context).show(), R.drawable.settings_about));
+                    context.getString(R.string.settings_about), () -> AboutSimpleSettingsPresenter.instance(context).show(), R.drawable.settings_about)
+                    .setPanel(rows -> AboutSimpleSettingsPresenter.instance(context).appendRows(rows)));
         }
 
         return settingItems;

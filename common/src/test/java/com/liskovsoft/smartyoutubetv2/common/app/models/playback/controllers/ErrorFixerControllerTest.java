@@ -25,6 +25,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.sharedutils.prefs.GlobalPreferences;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.Connections;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackSpeed;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.LoadErrors;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlaybackHealth;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerFailure;
@@ -148,6 +149,8 @@ public class ErrorFixerControllerTest {
         Connections.resetForTesting();
         ProtectionStatuses.resetForTesting(null);
         NetworkEngineFallback.resetForTesting();
+        // A test's player played at its own speed (see ErrorFixerController#onPlay)
+        PlaybackSpeed.onChanged(1f);
     }
 
     /**
@@ -1495,8 +1498,8 @@ public class ErrorFixerControllerTest {
     }
 
     /**
-     * 27XPFNZC, Y36K953Z: AV1 and AVC 1080p50 both dropped frames, VP9 none. With AVC first (preferred over VP9), AV1's other codec is
-     * VP9: AVC has dropped them too.
+     * 27XPFNZC, Y36K953Z: AV1 and AVC 1080p50 both dropped frames (at 1.5x, as found later, 0HCC641V), VP9 none. With AVC first
+     * (preferred over VP9), AV1's other codec is VP9: AVC has dropped them too.
      */
     @Test
     public void anotherCodecThatDroppedFramesIsPassedOver() throws Exception {
@@ -1565,8 +1568,138 @@ public class ErrorFixerControllerTest {
      * The video dropped frames on the codec at 1080p50, in this run or one before (see FrameDropCodecs)
      */
     private static void droppedFramesBefore(String codec, String videoId) {
-        FrameDropCodecs.add(RuntimeEnvironment.getApplication(), FrameDropCodecs.kindOf(TrackSelectorUtil.codecNameShort(codec), 1080, 50),
-                videoId);
+        droppedFramesBefore(codec, videoId, 1);
+    }
+
+    /**
+     * @param speed the playback's: the rate the drops are of is the video's times it
+     */
+    private static void droppedFramesBefore(String codec, String videoId, float speed) {
+        FrameDropCodecs.add(RuntimeEnvironment.getApplication(), FrameDropCodecs.kindOf(TrackSelectorUtil.codecNameShort(codec), 1080, 50,
+                speed), videoId);
+    }
+
+    /**
+     * 0HCC641V: a Sansui's AV1 and AVC 1080p50 dropped frames at 1.5x, none at 1x (27XPFNZC). Drops at 1.5x don't count at 1x.
+     */
+    @Test
+    public void framesDroppedAtASpeedDontCountAtAnother() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,50,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,vp9", false));
+        droppedFramesBefore("av01", "1YKvmLD3QW4", 1.5f);
+        TestController controller = new TestController(video("EOIkoWmVRBs"), formats, formats.get(0));
+        controller.onPlay();
+
+        dropFrames(controller);
+
+        assertEquals(Collections.emptyList(), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * 0HCC641V #2: the second video whose AVC 1080p50 dropped frames at 1.5x went to VP9, which kept up at that rate
+     */
+    @Test
+    public void framesDroppedAtTheSameSpeedCount() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,50,avc", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,vp9", false));
+        droppedFramesBefore("avc", "-LPIayq78Zw", 1.5f);
+        TestController controller = new TestController(video("nnwnqpQ_Gho"), null,
+                speedPlayerStub(formats, formats.get(0), 1.5f, new ArrayList<>()));
+        controller.onPlay();
+
+        dropFrames(controller);
+
+        assertEquals(Arrays.asList("other_codec:vp9", "restart_engine"), getActions(mLog.readAll().get(0)));
+    }
+
+    /**
+     * 0HCC641V: each 1080p50 video at 1.5x played AV1 for 13-20 s of drops. Known to drop at that rate on two videos, another codec
+     * that hasn't plays from the start, for this video, and the attempt says why.
+     */
+    @Test
+    public void aFasterSpeedPlaysACodecThatKeepsUpFromTheStart() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,50,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,vp9", false));
+        droppedFramesBefore("av01", "-LPIayq78Zw", 1.5f);
+        droppedFramesBefore("av01", "nnwnqpQ_Gho", 1.5f);
+        List<FormatItem> selected = new ArrayList<>();
+        TestController controller = new TestController(video("EOIkoWmVRBs"), null,
+                speedPlayerStub(formats, formats.get(0), 1.5f, selected));
+        FormatAttempts.onNewVideo(RuntimeEnvironment.getApplication(), "EOIkoWmVRBs");
+
+        controller.onTrackChanged(formats.get(0));
+
+        assertEquals(Collections.singletonList(formats.get(1)), selected);
+        assertEquals("vp9", TrackSelectorUtil.codecNameShort(getPlayerData().getTempVideoFormat().getTrack().format.codecs));
+        // Once a video: the user's pick after it stays
+        controller.onTrackChanged(formats.get(0));
+        controller.onSpeedChanged(1.5f);
+        assertEquals(1, selected.size());
+        FormatAttempts.end(RuntimeEnvironment.getApplication());
+    }
+
+    /**
+     * At 1x the same codecs dropped none (27XPFNZC): the one picked plays
+     */
+    @Test
+    public void theNormalSpeedKeepsTheCodecPicked() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,50,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,vp9", false));
+        droppedFramesBefore("av01", "-LPIayq78Zw", 1.5f);
+        droppedFramesBefore("av01", "nnwnqpQ_Gho", 1.5f);
+        List<FormatItem> selected = new ArrayList<>();
+        TestController controller = new TestController(video("EOIkoWmVRBs"), null, speedPlayerStub(formats, formats.get(0), 1f, selected));
+
+        controller.onTrackChanged(formats.get(0));
+        controller.onSpeedChanged(1f);
+
+        assertEquals(Collections.emptyList(), selected);
+    }
+
+    /**
+     * Dropping on one video may be the video's (see FRAME_DROP_VIDEOS); another codec that dropped at the rate too keeps up no better
+     */
+    @Test
+    public void aFasterSpeedKeepsACodecNotKnownToDropOrWithNoBetterOne() throws Exception {
+        List<FormatItem> formats = Arrays.asList(
+                ExoFormatItem.fromVideoSpec("1920,1080,50,av01", false),
+                ExoFormatItem.fromVideoSpec("1920,1080,50,avc", false));
+        droppedFramesBefore("av01", "-LPIayq78Zw", 1.5f);
+        List<FormatItem> selected = new ArrayList<>();
+        TestController controller = new TestController(video("EOIkoWmVRBs"), null,
+                speedPlayerStub(formats, formats.get(0), 1.5f, selected));
+
+        controller.onTrackChanged(formats.get(0));
+        assertEquals(Collections.emptyList(), selected);
+
+        droppedFramesBefore("av01", "nnwnqpQ_Gho", 1.5f);
+        droppedFramesBefore("avc", "MP7apWQEHNY", 1.5f);
+        controller.onSpeedChanged(1.5f);
+        assertEquals(Collections.emptyList(), selected);
+    }
+
+    /**
+     * At the speed, with the formats and the one playing: the formats it's told to play go to selected
+     */
+    private static PlaybackView speedPlayerStub(List<FormatItem> videoFormats, FormatItem videoFormat, float speed,
+            List<FormatItem> selected) {
+        PlaybackView stub = playerStub(videoFormats, videoFormat);
+
+        return (PlaybackView) Proxy.newProxyInstance(PlaybackView.class.getClassLoader(), new Class<?>[]{PlaybackView.class},
+                (proxy, method, args) -> {
+                    if ("getSpeed".equals(method.getName())) {
+                        return speed;
+                    } else if ("setFormat".equals(method.getName())) {
+                        selected.add((FormatItem) args[0]);
+                        return null;
+                    }
+
+                    return method.invoke(stub, args);
+                });
     }
 
     /**

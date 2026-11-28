@@ -132,6 +132,8 @@
   <string name="sorting_by_new_content">Νέο περιεχόμενο</string>
   <string name="sorting_alphabetically">Αλφαβητικά</string>
   <string name="sorting_last_viewed">Τελευταίες προβολές</string>
+  <string name="add_to_playlist_sorting">Ταξινόμηση Προσθήκης/Αφαίρεσης από λίστα αναπαραγωγής</string>
+  <string name="sorting_last_edited">Τελευταία επεξεργασία (όπως στο YouTube)</string>
   <string name="player_pause_when_seek">Παύση κατά την αναζήτηση</string>
   <string name="playlists_style">Στυλ λίστας αναπαραγωγής</string>
   <string name="playlists_style_grid">Πλέγμα</string>
@@ -185,6 +187,7 @@
   <string name="settings_content_filtering">Φιλτράρισμα περιεχομένου</string>
   <string name="settings_cards_options">Επιλογές καρτών</string>
   <string name="settings_channels_options">Επιλογές καναλιών</string>
+  <string name="settings_sort_options">Επιλογές ταξινόμησης</string>
   <string name="settings_time_options">Επιλογές ώρας</string>
   <string name="settings_system">Σύστημα</string>
   <string name="settings_exit_options">Επιλογές εξόδου</string>
@@ -1207,4 +1210,8 @@
     <string name="card_desc_api_keys">Το δικό σας κλειδί YouTube Data API, απαραίτητο για την αυτόματη αναπαραγωγή μουσικής και για να κρύβετε ή να επισημαίνετε βίντεο ανά κατηγορία (μουσική, παιχνίδια, ειδήσεις…) στην Αρχική</string>
     <string name="card_desc_dns">Αλλάζει τον τρόπο που η εφαρμογή βρίσκει τους διακομιστές του YouTube. Μπορεί να βοηθήσει όταν η εφαρμογή δεν φορτώνει καθόλου.</string>
     <string name="card_desc_remote_control">Συνδέει ένα τηλέφωνο ή tablet ώστε η εφαρμογή YouTube του να ελέγχει την αναπαραγωγή σε αυτή την τηλεόραση</string>
+    <!-- Settings search -->
+    <string name="find_setting">Αναζήτηση ρυθμίσεων</string>
+    <string name="find_setting_none">Καμία ρύθμιση δεν ταιριάζει με «%s»</string>
+    <string name="find_setting_gone">Αυτή η ρύθμιση δεν υπάρχει πια. Αναζητήστε ξανά.</string>
 </resources>

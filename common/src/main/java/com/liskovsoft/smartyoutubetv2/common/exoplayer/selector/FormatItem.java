@@ -66,6 +66,13 @@ public interface FormatItem {
             return name != null && name.contains("av01");
         }
 
+        /**
+         * E.g. "vp9+hdr", "av01+hdr"
+         */
+        public boolean isHdrPreset() {
+            return name != null && name.contains("+hdr");
+        }
+
         public int getWidth() {
             return format != null ? format.getWidth() : -1;
         }

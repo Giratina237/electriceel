@@ -144,6 +144,8 @@
     <string name="sorting_by_new_content">投稿順</string>
     <string name="sorting_alphabetically">アルファベット順</string>
     <string name="sorting_last_viewed">視聴順</string>
+    <string name="add_to_playlist_sorting">再生リストへの追加または削除の並べ替え</string>
+    <string name="sorting_last_edited">最終編集順（YouTube と同じ）</string>
     <string name="player_pause_when_seek">シーク中は一時停止</string>
     <string name="playlists_style">再生リストセクションのスタイル</string>
     <string name="playlists_style_grid">グリッド</string>
@@ -201,6 +203,7 @@
     <string name="settings_content_filtering">コンテンツのフィルタリング</string>
     <string name="settings_cards_options">カードのオプション</string>
     <string name="settings_channels_options">チャンネルのオプション</string>
+    <string name="settings_sort_options">並べ替えのオプション</string>
     <string name="settings_time_options">時刻のオプション</string>
     <string name="settings_system">システム</string>
     <string name="settings_exit_options">終了のオプション</string>
@@ -1192,4 +1195,8 @@
     <string name="card_desc_api_keys">ご自身の YouTube Data API キー。音楽の自動再生と、ホームでカテゴリ（音楽、ゲーム、ニュース…）ごとに動画を非表示にしたり印を付けたりするのに必要です</string>
     <string name="card_desc_dns">アプリが YouTube のサーバーを見つける方法を変更します。アプリがまったく読み込まれないときに役立つことがあります。</string>
     <string name="card_desc_remote_control">スマートフォンやタブレットをペア設定し、その YouTube アプリでこのテレビの再生を操作できるようにします</string>
+    <!-- Settings search -->
+    <string name="find_setting">設定を検索</string>
+    <string name="find_setting_none">「%s」に一致する設定はありません</string>
+    <string name="find_setting_gone">この設定はもうありません。もう一度検索してください。</string>
 </resources>

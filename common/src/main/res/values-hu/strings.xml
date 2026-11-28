@@ -134,6 +134,8 @@
   <string name="sorting_by_new_content">Új tartalom</string>
   <string name="sorting_alphabetically">Abc szerint</string>
   <string name="sorting_last_viewed">Utoljára nézett</string>
+  <string name="add_to_playlist_sorting">Videólistához adás rendezése</string>
+  <string name="sorting_last_edited">Utoljára szerkesztett (mint a YouTube-on)</string>
   <string name="player_pause_when_seek">Szünet gyorstekeréskor</string>
   <string name="playlists_style">Videólista nézete</string>
   <string name="playlists_style_grid">Rácsnézet</string>
@@ -187,6 +189,7 @@
   <string name="settings_content_filtering">Tartalomszűrés</string>
   <string name="settings_cards_options">Kártyák beállításai</string>
   <string name="settings_channels_options">Csatornák beállításai</string>
+  <string name="settings_sort_options">Rendezési beállítások</string>
   <string name="settings_time_options">Idő beállításai</string>
   <string name="settings_system">Rendszer</string>
   <string name="settings_exit_options">Kilépés beállításai</string>
@@ -1207,4 +1210,8 @@
     <string name="card_desc_api_keys">Az Ön saját YouTube Data API-kulcsa, amely a zene automatikus lejátszásához, valamint a videók kategória szerinti (zene, játék, hírek…) elrejtéséhez vagy megjelöléséhez kell a Főoldalon</string>
     <string name="card_desc_dns">Megváltoztatja, hogyan találja meg az alkalmazás a YouTube szervereit. Segíthet, ha az alkalmazás egyáltalán nem töltődik be.</string>
     <string name="card_desc_remote_control">Párosít egy telefont vagy táblagépet, hogy annak YouTube-alkalmazása vezérelhesse a lejátszást ezen a tévén</string>
+    <!-- Settings search -->
+    <string name="find_setting">Keresés a beállításokban</string>
+    <string name="find_setting_none">Egy beállítás sem felel meg ennek: „%s”</string>
+    <string name="find_setting_gone">Ez a beállítás már nem létezik. Keressen újra.</string>
 </resources>

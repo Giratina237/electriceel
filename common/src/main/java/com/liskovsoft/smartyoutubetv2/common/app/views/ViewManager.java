@@ -28,7 +28,6 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.base.BasePresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.AppUpdatePresenter;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.MotherActivity;
-import com.liskovsoft.smartyoutubetv2.common.settingssearch.SettingsCapture;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
 import com.liskovsoft.youtubeapi.service.YouTubeServiceManager;
 
@@ -162,11 +161,6 @@ public class ViewManager {
      * On running activity, this method invokes standard activity lifecycle: pause, resume etc...
      */
     public void startView(Class<?> viewClass, boolean forceStart) {
-        // The settings are looked through by the settings search: nothing starts
-        if (SettingsCapture.isActive()) {
-            return;
-        }
-
         // Skip starting activity twice to get rid of pausing/resuming activity cycle
         if (Utils.isAppInForegroundFixed() && getTopView() == viewClass) {
             return;

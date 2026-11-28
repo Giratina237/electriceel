@@ -48,6 +48,7 @@ public class AiSearchDataTest {
     @Test
     public void ready_withKeyAndModel() {
         AiSearchData data = AiSearchData.instance(RuntimeEnvironment.getApplication());
+        data.setEnabled(true);
         data.setProvider(AiProvider.CLAUDE);
         assertNull(data.getReadyProvider());
 
@@ -61,12 +62,32 @@ public class AiSearchDataTest {
     @Test
     public void openAi_needsAModel() {
         AiSearchData data = AiSearchData.instance(RuntimeEnvironment.getApplication());
+        data.setEnabled(true);
         data.setProvider(AiProvider.OPENAI);
         data.setKey(AiProvider.OPENAI, "sk-x");
         assertNull(data.getReadyProvider());
 
         data.setModel(AiProvider.OPENAI, "gpt-5.5");
         assertSame(AiProvider.OPENAI, data.getReadyProvider());
+    }
+
+    /**
+     * The AI help is off until it's turned on: set up, it isn't asked then
+     */
+    @Test
+    public void off_untilTurnedOn() {
+        AiSearchData data = AiSearchData.instance(RuntimeEnvironment.getApplication());
+        data.setProvider(AiProvider.CLAUDE);
+        data.setKey(AiProvider.CLAUDE, "sk-ant-x");
+
+        assertFalse(data.isEnabled());
+        assertNull(data.getReadyProvider());
+
+        data.setEnabled(true);
+        assertSame(AiProvider.CLAUDE, data.getReadyProvider());
+
+        data.setEnabled(false);
+        assertNull(data.getReadyProvider());
     }
 
     /**

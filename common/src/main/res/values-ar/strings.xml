@@ -134,6 +134,8 @@
   <string name="sorting_by_new_content">محتوى جديد</string>
   <string name="sorting_alphabetically">أبجديًا</string>
   <string name="sorting_last_viewed">أخر ماتم مشاهدته</string>
+  <string name="add_to_playlist_sorting">فرز إضافة/إزالة من قائمة التشغيل</string>
+  <string name="sorting_last_edited">آخر تعديل (كما في YouTube)</string>
   <string name="player_pause_when_seek">إيقاف أثناء التنقل في الفيديو</string>
   <string name="playlists_style">نمط قسم قوائم التشغيل</string>
   <string name="playlists_style_grid">شبكة</string>
@@ -188,6 +190,7 @@
   <string name="settings_content_filtering">تصفية المحتوى</string>
   <string name="settings_cards_options">خيارات البطاقات</string>
   <string name="settings_channels_options">خيارات القنوات</string>
+  <string name="settings_sort_options">خيارات الفرز</string>
   <string name="settings_time_options">خيارات الوقت</string>
   <string name="settings_system">النظام</string>
   <string name="settings_exit_options">خيارات الخروج</string>
@@ -1267,4 +1270,8 @@
     <string name="card_desc_api_keys">مفتاح YouTube Data API الخاص بك، مطلوب للتشغيل التلقائي للموسيقى ولإخفاء الفيديوهات أو تمييزها حسب الفئة (موسيقى، ألعاب، أخبار…) في الصفحة الرئيسية</string>
     <string name="card_desc_dns">يغيّر طريقة عثور التطبيق على خوادم YouTube. قد يساعد عندما لا يتم تحميل التطبيق إطلاقًا.</string>
     <string name="card_desc_remote_control">يقرن هاتفًا أو جهازًا لوحيًا ليتمكن تطبيق YouTube فيه من التحكم في التشغيل على هذا التلفزيون</string>
+    <!-- Settings search -->
+    <string name="find_setting">البحث في الإعدادات</string>
+    <string name="find_setting_none">لا يوجد إعداد يطابق \"%s\"</string>
+    <string name="find_setting_gone">هذا الإعداد لم يعد موجودًا. ابحث مرة أخرى.</string>
 </resources>

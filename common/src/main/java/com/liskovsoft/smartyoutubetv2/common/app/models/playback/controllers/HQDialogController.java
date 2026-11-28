@@ -7,6 +7,8 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionCatego
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.FormatAttempts;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.track.MediaTrack;
 import com.liskovsoft.smartyoutubetv2.common.utils.AppDialogUtil;
@@ -81,11 +83,17 @@ public class HQDialogController extends BasePlayerController {
         List<FormatItem> audioFormats = getPlayer().getAudioFormats();
         String audioFormatsTitle = getContext().getString(R.string.title_audio_formats);
 
+        List<OptionItem> videoOptions = UiOptionItem.from(videoFormats, this::selectFormatOption, getContext().getString(R.string.option_disabled));
+
+        if (videoOptions != null && getPlayer().hasHiddenHdrFormats()) {
+            videoOptions.add(0, AppDialogUtil.createHdrNotDecodableNote(getContext()));
+        }
+
         addCategoryInt(OptionCategory.from(
                 VIDEO_FORMATS_ID,
                 OptionCategory.TYPE_RADIO_LIST,
                 videoFormatsTitle,
-                UiOptionItem.from(videoFormats, this::selectFormatOption, getContext().getString(R.string.option_disabled))));
+                videoOptions));
         addCategoryInt(OptionCategory.from(
                 AUDIO_FORMATS_ID,
                 OptionCategory.TYPE_RADIO_LIST,
@@ -99,6 +107,9 @@ public class HQDialogController extends BasePlayerController {
         }
 
         FormatItem formatItem = UiOptionItem.toFormat(option);
+        // The user's pick: the formats it changes to aren't a fallback of the app's (see FormatAttempts#REASON_USER_SELECTED)
+        FormatAttempts.onSelected(FormatAttempts.REASON_USER_SELECTED);
+        PlayerCommands.onFormat(PlayerCommands.SOURCE_APP, getPlayer().getPositionMs());
         getPlayer().setFormat(formatItem);
         persistFormat(formatItem);
 

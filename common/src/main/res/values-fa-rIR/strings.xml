@@ -134,6 +134,8 @@
   <string name="sorting_by_new_content">محتوا جدید</string>
   <string name="sorting_alphabetically">الفبایی</string>
   <string name="sorting_last_viewed">آخرین بازدید</string>
+  <string name="add_to_playlist_sorting">مرتب‌سازی افزودن/حذف از فهرست پخش</string>
+  <string name="sorting_last_edited">آخرین ویرایش (مانند YouTube)</string>
   <string name="player_pause_when_seek">توقف هنگام جستجوی ویدیو</string>
   <string name="playlists_style">سبک بخش فهرست‌های پخش</string>
   <string name="playlists_style_grid">شبکه</string>
@@ -188,6 +190,7 @@
   <string name="settings_content_filtering">فیلتر کردن محتوا</string>
   <string name="settings_cards_options">گزینه‌های کارت‌ها</string>
   <string name="settings_channels_options">گزینه‌های کانال‌ها</string>
+  <string name="settings_sort_options">گزینه‌های مرتب‌سازی</string>
   <string name="settings_time_options">گزینه‌های زمان</string>
   <string name="settings_system">سیستم</string>
   <string name="settings_exit_options">گزینه‌های خروج</string>
@@ -1207,4 +1210,8 @@
     <string name="card_desc_api_keys">کلید YouTube Data API خودتان، لازم برای پخش خودکار موسیقی و پنهان یا علامت‌گذاری کردن ویدیوها بر اساس دسته (موسیقی، بازی، اخبار…) در خانه</string>
     <string name="card_desc_dns">نحوهٔ پیدا کردن سرورهای YouTube توسط برنامه را تغییر می‌دهد. وقتی برنامه اصلاً بارگیری نمی‌شود ممکن است کمک کند.</string>
     <string name="card_desc_remote_control">یک تلفن یا تبلت را جفت می‌کند تا برنامهٔ YouTube آن بتواند پخش را روی این تلویزیون کنترل کند</string>
+    <!-- Settings search -->
+    <string name="find_setting">جستجو در تنظیمات</string>
+    <string name="find_setting_none">هیچ تنظیمی با «%s» مطابقت ندارد</string>
+    <string name="find_setting_gone">این تنظیم دیگر وجود ندارد. دوباره جستجو کنید.</string>
 </resources>

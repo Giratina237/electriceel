@@ -20,6 +20,7 @@ import java.security.GeneralSecurityException;
 public final class AiSearchData extends SharedPreferencesBase {
     private static final String TAG = AiSearchData.class.getSimpleName();
     private static final String PROVIDER = "provider";
+    private static final String ENABLED = "enabled";
     private static final String KEY_PREFIX = "key_";
     private static final String MODEL_PREFIX = "model_";
     @SuppressLint("StaticFieldLeak")
@@ -115,11 +116,22 @@ public final class AiSearchData extends SharedPreferencesBase {
     }
 
     /**
-     * @return the provider picked when it has a key and a model: the AI answers. Null otherwise.
+     * The AI helps the settings search: off by default, the search on this device only
+     */
+    public boolean isEnabled() {
+        return getBoolean(ENABLED, false);
+    }
+
+    public void setEnabled(boolean enabled) {
+        putBoolean(ENABLED, enabled);
+    }
+
+    /**
+     * @return the provider picked when the AI help is on and it has a key and a model: the AI answers. Null otherwise.
      */
     @Nullable
     public AiProvider getReadyProvider() {
         AiProvider provider = getProvider();
-        return provider != null && getModel(provider) != null && hasKey(provider) ? provider : null;
+        return isEnabled() && provider != null && getModel(provider) != null && hasKey(provider) ? provider : null;
     }
 }

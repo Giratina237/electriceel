@@ -144,6 +144,8 @@
     <string name="sorting_by_new_content">Kandungan baharu</string>
     <string name="sorting_alphabetically">Mengikut abjad</string>
     <string name="sorting_last_viewed">Terakhir ditonton</string>
+    <string name="add_to_playlist_sorting">Pengisihan Tambah/Alih keluar dari senarai main</string>
+    <string name="sorting_last_edited">Terakhir disunting (seperti di YouTube)</string>
     <string name="player_pause_when_seek">Jeda apabila melangkau</string>
     <string name="playlists_style">Gaya bahagian Senarai main</string>
     <string name="playlists_style_grid">Grid</string>
@@ -201,6 +203,7 @@
     <string name="settings_content_filtering">Penapisan kandungan</string>
     <string name="settings_cards_options">Pilihan kad</string>
     <string name="settings_channels_options">Pilihan saluran</string>
+    <string name="settings_sort_options">Pilihan pengisihan</string>
     <string name="settings_time_options">Pilihan masa</string>
     <string name="settings_system">Sistem</string>
     <string name="settings_exit_options">Pilihan keluar</string>
@@ -1192,4 +1195,8 @@
     <string name="card_desc_api_keys">Kunci YouTube Data API anda sendiri, diperlukan untuk main automatik muzik dan untuk menyembunyikan atau menandakan video mengikut kategori (muzik, permainan, berita…) di Laman Utama</string>
     <string name="card_desc_dns">Menukar cara apl mencari pelayan YouTube. Boleh membantu apabila apl langsung tidak dimuatkan.</string>
     <string name="card_desc_remote_control">Memadankan telefon atau tablet supaya apl YouTubenya boleh mengawal main balik pada TV ini</string>
+    <!-- Settings search -->
+    <string name="find_setting">Cari tetapan</string>
+    <string name="find_setting_none">Tiada tetapan yang sepadan dengan \"%s\"</string>
+    <string name="find_setting_gone">Tetapan ini tiada lagi. Cari semula.</string>
 </resources>

@@ -36,6 +36,9 @@ public final class SettingEntry {
      */
     public static final int KIND_BUTTON = 4;
 
+    /**
+     * Its place in the list, e.g. "s12": how the AI names it (see AiPrompt). Another setting after the list is made again.
+     */
     public final String id;
     public final int kind;
     public final String title;
@@ -43,19 +46,22 @@ public final class SettingEntry {
      * Where it is: the titles of the cards that lead to it, then of the list it's in (e.g. Player, General, Player buttons)
      */
     public final List<String> path;
+    /**
+     * What it does, as under it (e.g. of a card): null when it has none
+     */
     @Nullable
     public final String description;
     /**
-     * Of a list of choices, empty for the others
+     * Of a list of choices, and the items of a list a row opens (e.g. the sections to put in order): empty for the others
      */
     public final List<String> choices;
     /**
-     * Of a list of choices: the title of the one picked, null when none is
+     * Of a list of choices: the one picked, as the settings were listed. Null for the others.
      */
     @Nullable
     public final String picked;
     /**
-     * Of a switch or a checkbox
+     * Of a switch or a checkbox: on, as the settings were listed
      */
     public final boolean isOn;
 
@@ -81,10 +87,19 @@ public final class SettingEntry {
     final String menuCategoryTitle;
     @Nullable
     final String menuItemTitle;
+    /**
+     * Its texts as they're searched (see SettingsSearch.Fields): made once, not on each letter typed
+     */
+    final SettingsSearch.Fields fields;
+    /**
+     * The same for the same setting listed twice (see SettingsSearch.getSameKey)
+     */
+    final String sameKey;
 
     SettingEntry(String id, int kind, String title, List<String> path, @Nullable String description, List<String> choices,
-                 @Nullable String picked, boolean isOn, int[] cards, boolean isRow, @Nullable String categoryTitle,
-                 @Nullable String itemTitle, @Nullable String menuCategoryTitle, @Nullable String menuItemTitle) {
+                 @Nullable String picked, boolean isOn, int[] cards, boolean isRow,
+                 @Nullable String categoryTitle, @Nullable String itemTitle, @Nullable String menuCategoryTitle,
+                 @Nullable String menuItemTitle) {
         this.id = id;
         this.kind = kind;
         this.title = title;
@@ -99,6 +114,8 @@ public final class SettingEntry {
         this.itemTitle = itemTitle;
         this.menuCategoryTitle = menuCategoryTitle;
         this.menuItemTitle = menuItemTitle;
+        fields = new SettingsSearch.Fields(this);
+        sameKey = SettingsSearch.getSameKey(fields.title, path);
     }
 
     /**
@@ -122,6 +139,6 @@ public final class SettingEntry {
 
     @Override
     public String toString() {
-        return id + " " + TextUtils.join(" › ", path) + " › " + title;
+        return TextUtils.join(" › ", path) + " › " + title;
     }
 }
