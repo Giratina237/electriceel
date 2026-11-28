@@ -297,8 +297,8 @@ public final class SettingsCatalog {
             }
 
             SettingsCardsPresenter.Cards section = card.getCards();
-            add(section != null ? SettingEntry.KIND_SECTION : SettingEntry.KIND_CARD, title, path, Collections.emptyList(), cards,
-                    false, null, null);
+            add(section != null ? SettingEntry.KIND_SECTION : SettingEntry.KIND_CARD, title, path, card.getDescription(),
+                    Collections.emptyList(), cards, false, null, null);
             List<String> inside = plus(path, title);
 
             if (section != null && cards.length < MAX_DEPTH) {
@@ -365,8 +365,8 @@ public final class SettingsCatalog {
                             List<OptionCategory> opened = !isSwitch ? collectMenu(item) : null;
                             // To put in order: its items, as its choices
                             List<String> items = opened != null ? getOrderItems(opened) : Collections.emptyList();
-                            add(isSwitch ? SettingEntry.KIND_TOGGLE : SettingEntry.KIND_BUTTON, title, path, items, cards, true,
-                                    categoryTitle, title);
+                            add(isSwitch ? SettingEntry.KIND_TOGGLE : SettingEntry.KIND_BUTTON, title, path,
+                                    toText(item.getDescription()), items, cards, true, categoryTitle, title);
 
                             // Otherwise its rows, under it
                             if (opened != null && items.isEmpty()) {
@@ -391,7 +391,7 @@ public final class SettingsCatalog {
                                 }
                             }
 
-                            add(SettingEntry.KIND_BUTTON, categoryTitle, path, items, cards, true, categoryTitle, null);
+                            add(SettingEntry.KIND_BUTTON, categoryTitle, path, null, items, cards, true, categoryTitle, null);
                         }
                         break;
                     default:
@@ -416,7 +416,7 @@ public final class SettingsCatalog {
 
             // Untitled: the only list of the panel, named as its card
             String title = categoryTitle != null ? categoryTitle : path.get(path.size() - 1);
-            add(SettingEntry.KIND_CHOICE, title, path, choices, cards, true, categoryTitle, null);
+            add(SettingEntry.KIND_CHOICE, title, path, null, choices, cards, true, categoryTitle, null);
         }
 
         /**
@@ -441,8 +441,8 @@ public final class SettingsCatalog {
 
                 boolean isMenu = item.isMenu();
                 List<String> itemPath = label != null ? plus(inside, label) : inside;
-                add(isMenu ? SettingEntry.KIND_BUTTON : SettingEntry.KIND_TOGGLE, title, itemPath, Collections.emptyList(), cards,
-                        true, categoryTitle, title);
+                add(isMenu ? SettingEntry.KIND_BUTTON : SettingEntry.KIND_TOGGLE, title, itemPath, toText(item.getDescription()),
+                        Collections.emptyList(), cards, true, categoryTitle, title);
 
                 // Not what a greyed out one opens (e.g. Categories, without a key of the Data API): it can't be opened
                 List<OptionCategory> menu = isMenu ? collectMenu(item) : null;
@@ -505,9 +505,10 @@ public final class SettingsCatalog {
             }
         }
 
-        private void add(int kind, String title, List<String> path, List<String> choices, int[] cards, boolean isRow,
+        private void add(int kind, String title, List<String> path, @Nullable String description, List<String> choices, int[] cards,
+                         boolean isRow,
                          @Nullable String categoryTitle, @Nullable String itemTitle) {
-            mEntries.add(new SettingEntry(kind, title, path, choices, cards, isRow, categoryTitle, itemTitle, mMenuCategoryTitle,
+            mEntries.add(new SettingEntry(kind, title, path, description, choices, cards, isRow, categoryTitle, itemTitle, mMenuCategoryTitle,
                     mMenuItemTitle));
         }
 

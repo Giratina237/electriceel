@@ -7,7 +7,6 @@ import androidx.annotation.Nullable;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionCategory;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.OptionItem;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -44,6 +43,11 @@ public final class SettingEntry {
      */
     public final List<String> path;
     /**
+     * What it does, as under it (e.g. of a card): null when it has none
+     */
+    @Nullable
+    public final String description;
+    /**
      * Of a list of choices, and the items of a list a row opens (e.g. the sections to put in order): empty for the others
      */
     public final List<String> choices;
@@ -71,21 +75,22 @@ public final class SettingEntry {
     @Nullable
     final String menuItemTitle;
     /**
-     * The title and the choices as they're searched (see SettingsSearch.normalize): made once, not on each letter typed
+     * Its texts as they're searched (see SettingsSearch.Fields): made once, not on each letter typed
      */
-    final String searchTitle;
-    final List<String> searchChoices;
+    final SettingsSearch.Fields fields;
     /**
      * The same for the same setting listed twice (see SettingsSearch.getSameKey)
      */
     final String sameKey;
 
-    SettingEntry(int kind, String title, List<String> path, List<String> choices, int[] cards, boolean isRow,
+    SettingEntry(int kind, String title, List<String> path, @Nullable String description, List<String> choices, int[] cards,
+                 boolean isRow,
                  @Nullable String categoryTitle, @Nullable String itemTitle, @Nullable String menuCategoryTitle,
                  @Nullable String menuItemTitle) {
         this.kind = kind;
         this.title = title;
         this.path = Collections.unmodifiableList(path);
+        this.description = description;
         this.choices = Collections.unmodifiableList(choices);
         this.cards = cards;
         this.isRow = isRow;
@@ -93,15 +98,8 @@ public final class SettingEntry {
         this.itemTitle = itemTitle;
         this.menuCategoryTitle = menuCategoryTitle;
         this.menuItemTitle = menuItemTitle;
-        searchTitle = SettingsSearch.normalize(title);
-        List<String> searchChoices = new ArrayList<>(choices.size());
-
-        for (String choice : choices) {
-            searchChoices.add(SettingsSearch.normalize(choice));
-        }
-
-        this.searchChoices = Collections.unmodifiableList(searchChoices);
-        sameKey = SettingsSearch.getSameKey(searchTitle, path);
+        fields = new SettingsSearch.Fields(this);
+        sameKey = SettingsSearch.getSameKey(fields.title, path);
     }
 
     /**

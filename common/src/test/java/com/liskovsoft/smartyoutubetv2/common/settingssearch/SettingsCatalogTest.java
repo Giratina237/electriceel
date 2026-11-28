@@ -110,26 +110,50 @@ public class SettingsCatalogTest {
     }
 
     /**
-     * The text as typed: names that start with it first, any case, the words in their order only
+     * The words of the question, in any order and any case, the ones about no setting left out: the setting with all of them first
      */
     @Test
-    public void search_matchesTheTextAsTyped() {
+    public void search_matchesTheWords() {
         SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
         List<SettingEntry> entries = catalog.getEntries();
 
-        List<SettingEntry> shorts = SettingsSearch.find(entries, "  HIDE   Shorts ", 50);
+        List<SettingEntry> shorts = SettingsSearch.find(entries, "how do I HIDE the shorts", 50);
         assertFalse(shorts.isEmpty());
-        assertTrue(shorts.get(0).title, shorts.get(0).title.toLowerCase().startsWith("hide shorts"));
+        assertTrue(shorts.get(0).toString(), shorts.get(0).title.toLowerCase().contains("shorts"));
 
-        for (SettingEntry entry : shorts) {
-            assertTrue(entry.toString(), entry.title.toLowerCase().contains("hide shorts"));
-        }
-
-        assertTrue(SettingsSearch.find(entries, "shorts hide", 50).isEmpty());
+        assertFalse(SettingsSearch.find(entries, "shorts hide", 50).isEmpty());
         assertTrue(SettingsSearch.find(entries, "zzqx", 50).isEmpty());
 
         // Music isn't a setting's name: a choice of Set-up sections
         assertFalse(SettingsSearch.find(entries, "music", 50).isEmpty());
+    }
+
+    /**
+     * A question of words about no setting alone is searched all the same
+     */
+    @Test
+    public void search_onlyCommonWords() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+
+        assertFalse(SettingsSearch.find(catalog.getEntries(), "like", 10).isEmpty());
+    }
+
+    /**
+     * What the settings do is kept, as they're shown under them: its words are searched too (see SettingsSearch.Fields)
+     */
+    @Test
+    public void build_keepsTheDescriptions() {
+        SettingsCatalog catalog = SettingsCatalog.build(RuntimeEnvironment.getApplication());
+        boolean hasDescription = false;
+
+        for (SettingEntry entry : catalog.getEntries()) {
+            if (entry.description != null && !entry.description.isEmpty()) {
+                hasDescription = true;
+                break;
+            }
+        }
+
+        assertTrue(hasDescription);
     }
 
     /**
