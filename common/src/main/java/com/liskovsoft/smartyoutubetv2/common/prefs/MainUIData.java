@@ -34,6 +34,14 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
     public static final int CHANNEL_SORTING_DEFAULT = 2;
     public static final int CHANNEL_SORTING_LAST_VIEWED = 3;
     public static final int CHANNEL_SORTING_NAME2 = 4;
+    /**
+     * The playlists of Add/Remove from playlist by title, so that they don't move around
+     */
+    public static final int ADD_TO_PLAYLIST_SORTING_NAME = 0;
+    /**
+     * The playlists of Add/Remove from playlist as YouTube gives them, the latest edited first
+     */
+    public static final int ADD_TO_PLAYLIST_SORTING_LAST_EDITED = 1;
     public static final int PLAYLISTS_STYLE_GRID = 0;
     public static final int PLAYLISTS_STYLE_ROWS = 1;
     public static final long MENU_ITEM_RECENT_PLAYLIST = 1;
@@ -156,6 +164,7 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
     private final List<ColorScheme> mColorSchemes = new ArrayList<>();
     private int mColorSchemeId;
     private int mChannelCategorySorting;
+    private int mAddToPlaylistSorting;
     private int mPlaylistsStyle;
     private boolean mIsUploadsOldLookEnabled;
     private boolean mIsUploadsAutoLoadEnabled;
@@ -285,6 +294,15 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
 
     public void setChannelCategorySorting(int type) {
         mChannelCategorySorting = type;
+        persistState();
+    }
+
+    public int getAddToPlaylistSorting() {
+        return mAddToPlaylistSorting;
+    }
+
+    public void setAddToPlaylistSorting(int type) {
+        mAddToPlaylistSorting = type;
         persistState();
     }
 
@@ -638,6 +656,7 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
         boolean isNewUser = TextUtils.isEmpty(data) && isFirstInstall(mContext);
         mSkinId = Helpers.parseInt(split, 32, isNewUser ? SKIN_HYBRID : SKIN_CLASSIC);
         // 33: restoreMenus
+        mAddToPlaylistSorting = Helpers.parseInt(split, 34, ADD_TO_PLAYLIST_SORTING_NAME);
 
         int idx = -1;
         for (Long menuItem : MENU_ITEM_DEFAULT_ORDER) {
@@ -858,7 +877,8 @@ public class MainUIData extends DataChangeBase implements ProfileChangeListener 
                 Helpers.mergeList(mMenuItemsOrderedByMenu.get(MENU_SIDEBAR)),
                 true, // the subscription group item placed (see restoreMenus)
                 mSkinId,
-                true)); // the Add to Playlists/Delete playlist item placed (see restoreMenus)
+                true, // the Add to Playlists/Delete playlist item placed (see restoreMenus)
+                mAddToPlaylistSorting));
     }
 
     public static class ColorScheme {

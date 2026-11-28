@@ -131,6 +131,8 @@
   <string name="sorting_by_new_content">Nyt indhold</string>
   <string name="sorting_alphabetically">Alfabetisk</string>
   <string name="sorting_last_viewed">Sidst set</string>
+  <string name="add_to_playlist_sorting">Sortering i Tilføj/fjern fra playliste</string>
+  <string name="sorting_last_edited">Senest redigeret (som på YouTube)</string>
   <string name="playback_queue_category_title">Afspilningskø</string>
   <string name="open_playlist">Åbn playliste</string>
   <string name="repeat_mode_pause_alt">Afspil kun playlistevideoer uafbrudt</string>
@@ -292,6 +294,7 @@
   <string name="settings_content_filtering">Indholdsfiltrering</string>
   <string name="settings_cards_options">Kortindstillinger</string>
   <string name="settings_channels_options">Kanalindstillinger</string>
+  <string name="settings_sort_options">Sorteringsindstillinger</string>
   <string name="settings_time_options">Tidsindstillinger</string>
   <string name="settings_system">System</string>
   <string name="settings_exit_options">Indstillinger for afslutning</string>

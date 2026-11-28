@@ -49,8 +49,11 @@ public class OptionCategory {
         return new OptionCategory(title, Collections.singletonList(item), TYPE_CHAT);
     }
 
-    public static OptionCategory comments(CharSequence title, OptionItem item) {
-        return new OptionCategory(title, Collections.singletonList(item), TYPE_COMMENTS);
+    /**
+     * @param subtitle on its own line under the title (e.g. the number of comments), null for none
+     */
+    public static OptionCategory comments(CharSequence title, CharSequence subtitle, OptionItem item) {
+        return new OptionCategory(title, Collections.singletonList(item), TYPE_COMMENTS, -1, null, null, true, subtitle);
     }
 
     /**
@@ -100,6 +103,11 @@ public class OptionCategory {
 
     private OptionCategory(CharSequence title, List<OptionItem> options, int type, int id, String qrCodeText, OnReorder onReorder,
                            boolean isLinkified) {
+        this(title, options, type, id, qrCodeText, onReorder, isLinkified, null);
+    }
+
+    private OptionCategory(CharSequence title, List<OptionItem> options, int type, int id, String qrCodeText, OnReorder onReorder,
+                           boolean isLinkified, CharSequence subtitle) {
         this.id = id;
         this.type = type;
         this.title = title;
@@ -107,6 +115,7 @@ public class OptionCategory {
         this.qrCodeText = qrCodeText;
         this.onReorder = onReorder;
         this.isLinkified = isLinkified;
+        this.subtitle = subtitle;
     }
 
     public static final int TYPE_RADIO_LIST = 0;
@@ -135,4 +144,8 @@ public class OptionCategory {
      * Of {@link #TYPE_LONG_TEXT}: its addresses and time codes are links
      */
     public final boolean isLinkified;
+    /**
+     * Of {@link #TYPE_COMMENTS}: the line under the title (the number of comments), null for none and for the others
+     */
+    public final CharSequence subtitle;
 }

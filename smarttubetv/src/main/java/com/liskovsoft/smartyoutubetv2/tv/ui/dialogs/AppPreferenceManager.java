@@ -238,6 +238,8 @@ public class AppPreferenceManager {
         pref.setCommentsReceiver(optionItem.getCommentsReceiver());
 
         initDialogPreference(category, pref);
+        // The line under the title (see CommentsPreferenceDialogFragment)
+        pref.setDialogMessage(category.subtitle);
 
         return pref;
     }
@@ -314,6 +316,10 @@ public class AppPreferenceManager {
         for (OptionItem item : category.options) {
             if (!item.isEnabled()) {
                 pref.setDisabled(item.toString());
+            }
+
+            if (item.isNote()) {
+                pref.setNote(item.toString());
             }
         }
 

@@ -64,6 +64,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.PlaybackPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.PlaybackView;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.PlayerCommands;
 import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStart;
+import com.liskovsoft.smartyoutubetv2.common.diagnostics.VideoStarts;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.controller.ExoPlayerController;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.CensoredWords.Range;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.other.DebugInfoManager;
@@ -123,6 +124,8 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     private static final String SELECTED_VIDEO_ID = "SelectedVideoId";
     private static final int UPDATE_DELAY_MS = 100;
     private static final int SUGGESTIONS_START_INDEX = 1;
+    // After the comment count, as the thumbs after the like and dislike counts
+    private static final String SPEECH_BALLOON = "\uD83D\uDCAC";
     private VideoPlayerGlue mPlayerGlue;
     private SimpleExoPlayer mPlayer;
     private PlaybackPresenter mPlaybackPresenter;
@@ -672,6 +675,9 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             public boolean dispatchSeekTo(Player player, int windowIndex, long positionMs) {
                 // E.g. a play of an ended video goes to its start (C.TIME_UNSET: the default position)
                 PlayerCommands.onSeek(PlayerCommands.SOURCE_APP, positionMs != C.TIME_UNSET ? positionMs : 0);
+                // And for a start: the user's skips while it loads (e.g. 4 of 10 s to 0:40) told nothing, its only seek row said 0:00
+                // (0HCC641V qydG9Ntm-zM, kaPymkALErM)
+                VideoStarts.onSeek(positionMs != C.TIME_UNSET ? positionMs : 0);
 
                 return super.dispatchSeekTo(player, windowIndex, positionMs);
             }
@@ -877,6 +883,7 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             public boolean dispatchSeekTo(Player player, int windowIndex, long positionMs) {
                 // E.g. a play of an ended video goes to its start (C.TIME_UNSET: the default position)
                 PlayerCommands.onSeek(PlayerCommands.SOURCE_MEDIA_SESSION, positionMs != C.TIME_UNSET ? positionMs : 0);
+                VideoStarts.onSeek(positionMs != C.TIME_UNSET ? positionMs : 0);
 
                 return super.dispatchSeekTo(player, windowIndex, positionMs);
             }
@@ -1186,6 +1193,13 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
             result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.dislikeCount, Helpers.NON_BREAKING_SPACE, Helpers.THUMB_DOWN); // color of thumb cannot be changed
         }
 
+        // Always, unlike the likes and dislikes (Show likes/dislikes count). Before the subscribers: the modern player cuts
+        // the end of a line too long to fit. Kept in one piece where the count has a space (e.g. "1,1 тыс.").
+        if (getContext() != null && video.commentCount != null) {
+            result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.commentCount.replace(" ", Helpers.NON_BREAKING_SPACE),
+                    Helpers.NON_BREAKING_SPACE, SPEECH_BALLOON);
+        }
+
         // A collaboration's would be the uploader's alone: each channel's is in the Collaborators panel (see CollaboratorsPresenter)
         if (getContext() != null && video.subscriberCount != null && !video.hasCollaborators()) {
             result = TextUtils.concat(result, " ", Video.TERTIARY_TEXT_DELIM, " ", video.subscriberCount.replace(" ", Helpers.NON_BREAKING_SPACE));
@@ -1400,6 +1414,11 @@ public class PlaybackFragment extends SeekModePlaybackFragment implements Playba
     @Override
     public List<FormatItem> getVideoFormats() {
         return mExoPlayerController.getVideoFormats();
+    }
+
+    @Override
+    public boolean hasHiddenHdrFormats() {
+        return mExoPlayerController.hasHiddenHdrFormats();
     }
 
     @Override

@@ -54,6 +54,7 @@ public class FormatAttemptsTest {
     public void tearDown() {
         FormatAttempts.sClock = System::currentTimeMillis;
         FormatAttempts.resetForTesting();
+        PlaybackSpeed.resetForTesting();
         PlayerFailureLog.useForTesting(null);
         PlayerTweaksData.instance(getContext()).setPlayerDataSource(mSavedEngine);
     }
@@ -146,6 +147,68 @@ public class FormatAttemptsTest {
 
         assertEquals(25_300, attempt.getLong("soundBackMs"));
         assertEquals(FormatAttempts.STATUS_FAILED, attempt.getString("audioStatus"));
+    }
+
+    /**
+     * 0HCC641V: a 50 fps format's drops at 1.5x are 75 frames a second's. An attempt says how long it played at each speed, the time
+     * going on at the speed it plays at now.
+     */
+    @Test
+    public void anAttemptSaysHowLongItPlayedAtEachSpeed() throws Exception {
+        long[] now = {1_000_000};
+        FormatAttempts.sClock = () -> now[0];
+        FormatAttempts.onNewVideo(getContext(), "-LPIayq78Zw");
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onPlaying(true);
+        now[0] += 4_000;
+        PlaybackSpeed.onChanged(1.5f);
+        now[0] += 10_000;
+        FormatAttempts.onPlaying(false);
+        // Not playing: nothing more at any speed
+        now[0] += 5_000;
+        PlaybackSpeed.onChanged(1.25f);
+        FormatAttempts.onPlaying(true);
+        now[0] += 2_000;
+        failure("-LPIayq78Zw").record();
+
+        JSONObject attempt = mLog.readAll().get(0).getJSONObject("formats").getJSONArray("attempted").getJSONObject(0);
+        JSONArray speeds = attempt.getJSONArray("speeds");
+
+        assertEquals(16_000, attempt.getLong("playedMs"));
+        assertEquals(3, speeds.length());
+        assertEquals(1.0, speeds.getJSONObject(0).getDouble("speed"), 0);
+        assertEquals(4_000, speeds.getJSONObject(0).getLong("playedMs"));
+        assertEquals(1.5, speeds.getJSONObject(1).getDouble("speed"), 0);
+        assertEquals(10_000, speeds.getJSONObject(1).getLong("playedMs"));
+        assertEquals(1.25, speeds.getJSONObject(2).getDouble("speed"), 0);
+        assertEquals(2_000, speeds.getJSONObject(2).getLong("playedMs"));
+    }
+
+    /**
+     * 0HCC641V #1, #2: AV1 to AVC with no failure nor command before it read as a guess. The user's pick in the quality menu, and the
+     * app's for the speed, say so; a reason told long before the tracks change, or a pick of the formats playing, isn't the next one's.
+     */
+    @Test
+    public void otherFormatsPickedSayWhoPickedThem() throws Exception {
+        long[] now = {1_000_000};
+        FormatAttempts.sClock = () -> now[0];
+        FormatAttempts.onNewVideo(getContext(), "nnwnqpQ_Gho");
+        FormatAttempts.onTracks(VP9_4K, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onSelected(FormatAttempts.REASON_USER_SELECTED);
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onSelected(FormatAttempts.REASON_SPEED_CODEC);
+        FormatAttempts.onTracks(VP9_4K, FormatItem.AUDIO_HQ_MP4A);
+        FormatAttempts.onSelected(FormatAttempts.REASON_USER_SELECTED);
+        now[0] += 60_000;
+        FormatAttempts.onTracks(AVC_FHD, FormatItem.AUDIO_HQ_MP4A);
+        failure("nnwnqpQ_Gho").record();
+
+        JSONArray attempted = mLog.readAll().get(0).getJSONObject("formats").getJSONArray("attempted");
+
+        assertEquals(FormatAttempts.REASON_FIRST, attempted.getJSONObject(0).getString("reason"));
+        assertEquals(FormatAttempts.REASON_USER_SELECTED, attempted.getJSONObject(1).getString("reason"));
+        assertEquals(FormatAttempts.REASON_SPEED_CODEC, attempted.getJSONObject(2).getString("reason"));
+        assertEquals(FormatAttempts.REASON_FORMATS_CHANGED, attempted.getJSONObject(3).getString("reason"));
     }
 
     /**
@@ -767,6 +830,22 @@ public class FormatAttemptsTest {
         assertEquals("opus", FormatAttempts.getStatsAudio("opus 160k"));
     }
 
+    /**
+     * YouTube's HDR is counted apart from the SDR of its size: its codec reads as the SDR one's (see PlayerFailure#describeVideo)
+     */
+    @Test
+    public void statsNamesKeepHdr() {
+        assertEquals("vp9 hdr 2160p60", FormatAttempts.getStatsVideo("3840x2160 vp09 hdr 60fps"));
+        assertEquals("av1 hdr 1080p", FormatAttempts.getStatsVideo("1920x1080 av01 hdr"));
+    }
+
+    @Test
+    public void hdrIsDescribed() {
+        assertEquals("1920x1080 vp9 hdr 30fps", PlayerFailure.describeVideo(ExoFormatItem.fromVideoSpec("1920,1080,30,vp9.2", true)));
+        assertEquals("3840x2160 av01 hdr 60fps", PlayerFailure.describeVideo(ExoFormatItem.fromVideoSpec("3840,2160,60,av01.hdr", true)));
+        assertEquals("3840x2160 vp9 60fps", PlayerFailure.describeVideo(VP9_4K));
+    }
+
     @Test
     public void formatsAreLikeByTheirLongerSideCodecAndFrameRate() {
         assertTrue(FormatAttempts.isSameVideo("1920x1080 avc 30fps", "1920x800 avc1 30fps"));
@@ -775,6 +854,9 @@ public class FormatAttemptsTest {
         assertFalse(FormatAttempts.isSameVideo("1920x1080 avc 30fps", "1920x1080 vp09 30fps"));
         assertFalse(FormatAttempts.isSameVideo("1920x1080 avc 60fps", "1920x1080 avc1 30fps"));
         assertFalse(FormatAttempts.isSameVideo("3840x2160 vp9 60fps", "1920x1080 vp09 60fps"));
+        assertTrue(FormatAttempts.isSameVideo("3840x2160 vp9 hdr 60fps", "3840x2160 vp09 hdr 59fps"));
+        // An HDR preset the player gave an SDR format for (e.g. on a decoder without VP9 profile 2) wasn't tried
+        assertFalse(FormatAttempts.isSameVideo("3840x2160 vp9 hdr 60fps", "3840x2160 vp9 60fps"));
         assertTrue(FormatAttempts.isSameAudio("mp4a", "mp4a 128k"));
         assertFalse(FormatAttempts.isSameAudio("ec-3", "opus 160k"));
     }

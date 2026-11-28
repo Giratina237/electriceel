@@ -21,6 +21,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.SimpleTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.liskovsoft.sharedutils.mylogger.Log;
+import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.misc.PlayerKeyTranslator;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
@@ -386,6 +387,18 @@ public class VideoPlayerGlue extends MaxControlsVideoPlayerGlue<PlayerAdapter> i
     public void setNextTitle(CharSequence title) {
         mSkipNextAction.setLabel1(title != null ? title : getContext().getString(R.string.lb_playback_controls_skip_next));
         invalidateUi(mSkipNextAction);
+    }
+
+    @Override
+    public void setVideo(Video video) {
+        super.setVideo(video);
+
+        // The comment count on the label of the comments button (shown on focus with the button tooltips)
+        ChatAction chatAction = (ChatAction) mActions.get(R.id.action_chat);
+
+        if (chatAction != null && chatAction.setCount(video != null ? video.commentCount : null)) {
+            invalidateUi(chatAction);
+        }
     }
 
     @Override

@@ -111,6 +111,7 @@ public class SyncedSettingsTest {
         tweaks.setLoopShortsEnabled(loop);
         SponsorBlockData.instance(mContext).setIgnoredDurationMs(1234);
         SearchData.instance(mContext).setSearchOptions(5);
+        MainUIData.instance(mContext).setAddToPlaylistSorting(MainUIData.ADD_TO_PLAYLIST_SORTING_LAST_EDITED);
         // Saved without the main thread running: persistPendingData saves what's waiting
         mPrefs.persistPendingData();
 
@@ -120,6 +121,7 @@ public class SyncedSettingsTest {
         assertEquals(String.valueOf(loop), read("tweaks.loopShorts"));
         assertEquals("1234", read("sponsorBlock.ignoredDurationMs"));
         assertEquals("5", read("search.options"));
+        assertEquals(String.valueOf(MainUIData.ADD_TO_PLAYLIST_SORTING_LAST_EDITED), read("ui.addToPlaylistSorting"));
     }
 
     @Test

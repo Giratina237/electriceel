@@ -134,6 +134,8 @@
     <string name="sorting_by_new_content">క్రొత్త కంటెంట్</string>
     <string name="sorting_alphabetically">అక్షరక్రమంలో</string>
     <string name="sorting_last_viewed">చివరిగా వీక్షించారు</string>
+    <string name="add_to_playlist_sorting">ప్లేజాబితా నుండి జోడించండి/తీసివేయండి సార్టింగ్</string>
+    <string name="sorting_last_edited">చివరిగా సవరించినవి (YouTubeలో లాగా)</string>
     <string name="player_pause_when_seek">కోరినప్పుడు పాజ్ చేయండి</string>
     <string name="playlists_style">ప్లేజాబితాల శైలి</string>
     <string name="playlists_style_grid">గ్రిడ్</string>
@@ -184,6 +186,7 @@
     <string name="settings_content_filtering">కంటెంట్ ఫిల్టరింగ్</string>
     <string name="settings_cards_options">కార్డ్ ఎంపికలు</string>
     <string name="settings_channels_options">ఛానెల్ ఎంపికలు</string>
+    <string name="settings_sort_options">సార్టింగ్ ఎంపికలు</string>
     <string name="settings_time_options">సమయ ఎంపికలు</string>
     <string name="settings_system">సిస్టమ్</string>
     <string name="settings_exit_options">నిష్క్రమణ ఎంపికలు</string>

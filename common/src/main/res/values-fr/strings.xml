@@ -139,6 +139,8 @@
   <string name="sorting_by_new_content">Nouveau contenu</string>
   <string name="sorting_alphabetically">Ordre alphabétique</string>
   <string name="sorting_last_viewed">Dernier visionnage</string>
+  <string name="add_to_playlist_sorting">Tri dans Ajouter/Retirer d\'une playlist</string>
+  <string name="sorting_last_edited">Dernière modification (comme sur YouTube)</string>
   <string name="player_pause_when_seek">Mettre en pause pendant la navigation vidéo</string>
   <string name="playlists_style">Style des playlists</string>
   <string name="playlists_style_grid">Grille</string>
@@ -193,6 +195,7 @@
   <string name="settings_content_filtering">Filtrage du contenu</string>
   <string name="settings_cards_options">Options des cartes</string>
   <string name="settings_channels_options">Options des chaînes</string>
+  <string name="settings_sort_options">Options de tri</string>
   <string name="settings_time_options">Options de l\'heure</string>
   <string name="settings_system">Système</string>
   <string name="settings_exit_options">Options de sortie</string>

@@ -142,6 +142,8 @@
     <string name="sorting_by_new_content">Нови садржај</string>
     <string name="sorting_alphabetically">Абецедно</string>
     <string name="sorting_last_viewed">Последње гледано</string>
+    <string name="add_to_playlist_sorting">Ређање у „Додај/уклони са листе”</string>
+    <string name="sorting_last_edited">Последње уређено (као на YouTube-у)</string>
     <string name="player_pause_when_seek">Пауза при премотавању</string>
     <string name="playlists_style">Стил одељка листе пуштања</string>
     <string name="playlists_style_grid">Мрежа</string>
@@ -198,6 +200,7 @@
     <string name="settings_content_filtering">Филтрирање садржаја</string>
     <string name="settings_cards_options">Опције картица</string>
     <string name="settings_channels_options">Опције канала</string>
+    <string name="settings_sort_options">Опције ређања</string>
     <string name="settings_time_options">Опције времена</string>
     <string name="settings_system">Систем</string>
     <string name="settings_exit_options">Опције изласка</string>

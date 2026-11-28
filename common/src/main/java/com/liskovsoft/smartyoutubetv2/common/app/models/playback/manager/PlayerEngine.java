@@ -46,6 +46,10 @@ public interface PlayerEngine extends PlayerConstants {
     boolean isPlaying();
     boolean isLoading();
     List<FormatItem> getVideoFormats();
+    /**
+     * The video has formats in HDR that getVideoFormats leaves out, as the device can't play them in HDR, and none it shows
+     */
+    boolean hasHiddenHdrFormats();
     List<FormatItem> getAudioFormats();
     List<FormatItem> getSubtitleFormats();
     void setFormat(FormatItem option);

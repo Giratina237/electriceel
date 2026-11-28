@@ -207,7 +207,8 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
     }
 
     /**
-     * The Channels options card of the User interface settings, in General: the sorting of the Channels section and its options (were in General and Misc)
+     * The Channels options card of the User interface settings, in General: the options of the Channels section (were in General and
+     * Misc). Its sorting is in Sort options (see showSorting).
      */
     public void showChannels() {
         AppDialogPresenter.instance(getContext()).showPanel(getContext().getString(R.string.settings_channels_options),
@@ -222,14 +223,24 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
     }
 
     /**
-     * One list: the sorting opens from it, the options are in it
+     * The Sort options card of the User interface settings, in General: the sorting of the Channels section (was in Channels options)
+     * and of the playlists of Add/Remove from playlist
      */
+    public void showSorting() {
+        AppDialogPresenter.instance(getContext()).showPanel(getContext().getString(R.string.settings_sort_options),
+                this::appendSortingRows, mOnFinish);
+    }
+
+    /**
+     * The rows of the panel showSorting shows (see SettingsPanel)
+     */
+    public void appendSortingRows(SettingsRows rows) {
+        appendChannelSortingCategory(rows);
+        appendAddToPlaylistSortingCategory(rows);
+    }
+
     private void appendChannelOptionsCategory(SettingsRows settingsPresenter) {
         List<OptionItem> options = new ArrayList<>();
-
-        OptionItem sorting = UiOptionItem.from(getContext().getString(R.string.channels_section_sorting), option -> showChannelSortingMenu());
-        sorting.setMenu(true);
-        options.add(sorting);
 
         options.add(UiOptionItem.from(getContext().getString(R.string.channels_old_look),
                 optionItem -> {
@@ -1142,14 +1153,6 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
         settingsPresenter.appendRadioCategory(getContext().getString(R.string.card_content), options);
     }
 
-    private void showChannelSortingMenu() {
-        AppDialogPresenter settingsPresenter = AppDialogPresenter.instance(getContext());
-
-        appendChannelSortingCategory(settingsPresenter);
-
-        settingsPresenter.showDialog(getContext().getString(R.string.channels_section_sorting));
-    }
-
     private void appendChannelSortingCategory(SettingsRows settingsPresenter) {
         List<OptionItem> options = new ArrayList<>();
 
@@ -1164,6 +1167,22 @@ public class MainUISettingsPresenter extends BasePresenter<Void> {
         }
 
         settingsPresenter.appendRadioCategory(getContext().getString(R.string.channels_section_sorting), options);
+    }
+
+    /**
+     * By title, so that they don't move around, or as YouTube gives them, the latest edited first (see AppDialogUtil.createPlaylistOptions)
+     */
+    private void appendAddToPlaylistSortingCategory(SettingsRows settingsPresenter) {
+        List<OptionItem> options = new ArrayList<>();
+
+        for (int[] pair : new int[][] {
+                {R.string.sorting_alphabetically, MainUIData.ADD_TO_PLAYLIST_SORTING_NAME},
+                {R.string.sorting_last_edited, MainUIData.ADD_TO_PLAYLIST_SORTING_LAST_EDITED}}) {
+            options.add(UiOptionItem.from(getContext().getString(pair[0]), optionItem -> mMainUIData.setAddToPlaylistSorting(pair[1]),
+                    mMainUIData.getAddToPlaylistSorting() == pair[1]));
+        }
+
+        settingsPresenter.appendRadioCategory(getContext().getString(R.string.add_to_playlist_sorting), options);
     }
 
     private void appendPlaylistsCategoryStyle(SettingsRows settingsPresenter) {

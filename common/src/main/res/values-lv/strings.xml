@@ -131,6 +131,8 @@
     <string name="sorting_by_new_content">Jauns saturs</string>
     <string name="sorting_alphabetically">Alfabētiski</string>
     <string name="sorting_last_viewed">Pēdējais skatītais</string>
+    <string name="add_to_playlist_sorting">Pievienošanas atskaņošanas sarakstam šķirošana</string>
+    <string name="sorting_last_edited">Pēdējie rediģētie (kā YouTube)</string>
     <string name="playback_queue_category_title">Atskaņošanas rinda</string>
     <string name="not_supported_by_device">Ierīce neatbalsta šo funkciju</string>
     <string name="video_buffer_size_none">Nav</string>
@@ -200,6 +202,7 @@
     <string name="settings_content_filtering">Satura filtrēšana</string>
     <string name="settings_cards_options">Kartīšu opcijas</string>
     <string name="settings_channels_options">Kanālu opcijas</string>
+    <string name="settings_sort_options">Šķirošanas opcijas</string>
     <string name="settings_time_options">Laika opcijas</string>
     <string name="settings_system">Sistēma</string>
     <string name="settings_exit_options">Iziešanas opcijas</string>

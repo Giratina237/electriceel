@@ -2,6 +2,7 @@ package com.liskovsoft.smartyoutubetv2.tv.ui.modern.dialogs;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.graphics.Typeface;
 import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -87,6 +88,10 @@ public class ModernDialogPageView extends FrameLayout implements AppDialogView {
         int role = ModernOptionRow.ROLE_NONE;
         Runnable onClick;
         OptionCategory category;
+        /**
+         * Only a line of text (see OptionItem#isNote): it can't be focused or chosen
+         */
+        boolean note;
     }
 
     public ModernDialogPageView(Activity activity) {
@@ -242,7 +247,7 @@ public class ModernDialogPageView extends FrameLayout implements AppDialogView {
         mShownCategory = null;
         leaveOptions();
 
-        int position = Math.max(0, Math.min(page.focused, mEntriesAdapter.getItemCount() - 1));
+        int position = focusable(mEntriesAdapter, Math.max(0, Math.min(page.focused, mEntriesAdapter.getItemCount() - 1)));
         mEntries.setSelectedPosition(position);
         mEntries.requestFocus();
         showDetails(position);
@@ -310,6 +315,12 @@ public class ModernDialogPageView extends FrameLayout implements AppDialogView {
             Row row = new Row();
             row.title = item.getTitle();
             row.summary = item.getDescription();
+
+            if (item.isNote()) {
+                row.note = true;
+                rows.add(row);
+                continue;
+            }
 
             switch (category.type) {
                 case OptionCategory.TYPE_RADIO_LIST:
@@ -438,7 +449,7 @@ public class ModernDialogPageView extends FrameLayout implements AppDialogView {
             mOptions.setVisibility(View.VISIBLE);
             mOptionsTitle.setText(categoryTitle(category));
             mOptionsAdapter.setRows(createOptionRows(category, this::onCategoryOptionsChanged));
-            mOptions.setSelectedPosition(Math.max(0, firstSelected(category)));
+            mOptions.setSelectedPosition(focusable(mOptionsAdapter, Math.max(0, firstSelected(category))));
         } else {
             showPreview(categoryTitle(category), summary(category));
         }
@@ -487,6 +498,22 @@ public class ModernDialogPageView extends FrameLayout implements AppDialogView {
         if (holder != null) {
             holder.itemView.setActivated(activated);
         }
+    }
+
+    /**
+     * The position, or the first one after it a row can be focused at: a note can't (e.g. the line above the video formats
+     * when their HDR ones are hidden)
+     */
+    private static int focusable(RowAdapter adapter, int position) {
+        for (int i = position; i < adapter.getItemCount(); i++) {
+            Row row = adapter.getRow(i);
+
+            if (row != null && !row.note) {
+                return i;
+            }
+        }
+
+        return position;
     }
 
     private static boolean hasOptionsList(OptionCategory category) {
@@ -600,10 +627,12 @@ public class ModernDialogPageView extends FrameLayout implements AppDialogView {
         private final TextView mTitle;
         private final TextView mSummary;
         private final ImageView mIndicator;
+        private final Typeface mTitleTypeface;
 
         RowHolder(View view, RowAdapter adapter) {
             super(view);
             mTitle = view.findViewById(R.id.modern_dialog_page_row_title);
+            mTitleTypeface = mTitle.getTypeface();
             mSummary = view.findViewById(R.id.modern_dialog_page_row_summary);
             mIndicator = view.findViewById(R.id.modern_dialog_page_row_indicator);
             ImageViewCompat.setImageTintList(mIndicator, ContextCompat.getColorStateList(view.getContext(), R.color.modern_pill_text));
@@ -649,6 +678,10 @@ public class ModernDialogPageView extends FrameLayout implements AppDialogView {
 
         void bind(Row row) {
             ((ModernOptionRow) itemView).setCheckedState(row.role, Boolean.TRUE.equals(row.checked));
+            // A note's in italics, as in the classic skin (see dialog_list_preference_item_note), and the D-pad goes past it
+            itemView.setFocusable(!row.note);
+            itemView.setFocusableInTouchMode(!row.note);
+            mTitle.setTypeface(mTitleTypeface, row.note ? Typeface.ITALIC : Typeface.NORMAL);
             mTitle.setText(row.title);
             mSummary.setText(row.summary);
             mSummary.setVisibility(TextUtils.isEmpty(row.summary) ? View.GONE : View.VISIBLE);

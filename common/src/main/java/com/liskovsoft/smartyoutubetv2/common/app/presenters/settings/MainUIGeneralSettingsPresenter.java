@@ -50,6 +50,9 @@ public class MainUIGeneralSettingsPresenter extends BasePresenter<Void> implemen
         items.add(new SettingsItem(context.getString(R.string.settings_channels_options),
                 () -> MainUISettingsPresenter.instance(context).showChannels(), R.drawable.settings_channels)
                 .setPanel(rows -> MainUISettingsPresenter.instance(context).appendChannelsRows(rows)));
+        items.add(new SettingsItem(context.getString(R.string.settings_sort_options),
+                () -> MainUISettingsPresenter.instance(context).showSorting(), R.drawable.settings_sort)
+                .setPanel(rows -> MainUISettingsPresenter.instance(context).appendSortingRows(rows)));
         items.add(new SettingsItem(context.getString(R.string.settings_color_scheme_options),
                 () -> MainUISettingsPresenter.instance(context).showColors(), R.drawable.settings_color_scheme)
                 .setPanel(rows -> MainUISettingsPresenter.instance(context).appendColorsRows(rows)));

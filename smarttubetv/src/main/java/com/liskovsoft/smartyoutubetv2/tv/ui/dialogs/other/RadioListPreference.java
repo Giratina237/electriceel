@@ -7,10 +7,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * A radio list with entries that are greyed out and can't be chosen (see LeanbackListPreferenceDialogFragment.AdapterSingle)
+ * A radio list with entries that are greyed out and can't be chosen, and notes, a line of text (see
+ * LeanbackListPreferenceDialogFragment.AdapterSingle)
  */
 public class RadioListPreference extends ListPreference {
     private final Set<String> mDisabled = new HashSet<>(); // entry values
+    private final Set<String> mNotes = new HashSet<>(); // entry values shown as a line of text
     private CharSequence mSummary;
 
     public RadioListPreference(Context context) {
@@ -39,5 +41,16 @@ public class RadioListPreference extends ListPreference {
 
     public boolean isDisabled(String entryValue) {
         return mDisabled.contains(entryValue);
+    }
+
+    /**
+     * Only a line of text: it has no radio button and can't be focused or chosen (e.g. why the HDR formats are missing)
+     */
+    public void setNote(String entryValue) {
+        mNotes.add(entryValue);
+    }
+
+    public boolean isNote(String entryValue) {
+        return mNotes.contains(entryValue);
     }
 }

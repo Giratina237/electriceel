@@ -24,6 +24,7 @@ public class CommentsController extends BasePlayerController {
     private Disposable mCommentsAction;
     private String mLiveChatKey;
     private String mCommentsKey;
+    private String mCommentCount;
     private String mTitle;
     private Pair<String, Backup> mBackup;
 
@@ -40,6 +41,7 @@ public class CommentsController extends BasePlayerController {
     public void onMetadata(MediaItemMetadata metadata) {
         mLiveChatKey = metadata != null && metadata.getLiveChatKey() != null ? metadata.getLiveChatKey() : null;
         mCommentsKey = metadata != null && metadata.getCommentsKey() != null ? metadata.getCommentsKey() : null;
+        mCommentCount = metadata != null ? metadata.getCommentCount() : null;
         mTitle = metadata != null ? metadata.getTitle() : null;
         if (mBackup != null && !Helpers.equals(mBackup.first, mCommentsKey)) {
             mBackup = null;
@@ -167,12 +169,30 @@ public class CommentsController extends BasePlayerController {
                 );
     }
 
+    /**
+     * The video's title, then the number of its comments on a line of its own (the replies of a comment too)
+     */
     private void showDialog(CommentsReceiver receiver, String title) {
         AppDialogPresenter appDialogPresenter = getAppDialogPresenter();
 
-        appDialogPresenter.appendCommentsCategory(title, UiOptionItem.from(title, receiver));
+        appDialogPresenter.appendCommentsCategory(title, getCommentCountText(), UiOptionItem.from(title, receiver));
         //appDialogPresenter.enableTransparent(true);
         appDialogPresenter.showDialog();
+    }
+
+    /**
+     * E.g. "1.1K comments", null when YouTube doesn't tell the number.<br/>
+     * YouTube gives it exactly below a thousand ("212") and shortened above ("1.1K"), so a shortened one takes the plural
+     * form of a thousand.
+     */
+    private String getCommentCountText() {
+        if (mCommentCount == null || getContext() == null) {
+            return null;
+        }
+
+        int quantity = Helpers.isInteger(mCommentCount) ? Helpers.parseInt(mCommentCount) : 1_000;
+
+        return getContext().getResources().getQuantityString(R.plurals.comment_count, quantity, mCommentCount);
     }
 
     private void toggleLike(CommentsReceiver receiver, CommentItem commentItem) {

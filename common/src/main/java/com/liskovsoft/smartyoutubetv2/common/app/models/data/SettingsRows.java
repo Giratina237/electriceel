@@ -52,8 +52,11 @@ public interface SettingsRows {
         appendCategory(OptionCategory.chat(categoryTitle, item));
     }
 
-    default void appendCommentsCategory(CharSequence categoryTitle, OptionItem item) {
-        appendCategory(OptionCategory.comments(categoryTitle, item));
+    /**
+     * @param subtitle on its own line under the title (e.g. the number of comments), null for none
+     */
+    default void appendCommentsCategory(CharSequence categoryTitle, CharSequence subtitle, OptionItem item) {
+        appendCategory(OptionCategory.comments(categoryTitle, subtitle, item));
     }
 
     default void appendSingleSwitch(OptionItem optionItem) {

@@ -60,6 +60,20 @@ public final class FormatAttempts {
      */
     static final String REASON_AFTER_FAILURE = "after_failure";
     /**
+     * Other formats the user picked in the player's quality menu (see #onSelected): a change with nothing before it read as a fallback
+     * of the app's, or a guess (0HCC641V #1, #2: AV1 to AVC 1080p50 at 0:45 and 0:20, no failure nor command before either)
+     */
+    public static final String REASON_USER_SELECTED = "user_selected";
+    /**
+     * Another codec the app picked for the playback speed: the one playing dropped frames at its rate on other videos (see
+     * ErrorFixerController#applySpeedCodec)
+     */
+    public static final String REASON_SPEED_CODEC = "speed_codec";
+    /**
+     * A reason told before the tracks change (see #onSelected) is theirs this long: a pick of the formats playing changes nothing
+     */
+    private static final long SELECTED_REASON_MS = 10_000;
+    /**
      * Of the requested one: no format like it was tried
      */
     public static final String STATUS_NOT_ATTEMPTED = "not_attempted";
@@ -70,9 +84,9 @@ public final class FormatAttempts {
     static final int MAX_ATTEMPTS = 20;
     private static final String AUTO = "auto";
     /**
-     * E.g. 1920x1080 vp09 30fps (see PlayerFailure#describeVideo)
+     * E.g. 1920x1080 vp09 30fps, 3840x2160 vp09 hdr 60fps (see PlayerFailure#describeVideo)
      */
-    private static final Pattern VIDEO = Pattern.compile("^(\\d+)x(\\d+) (\\S+)(?: (\\d+)fps)?$");
+    private static final Pattern VIDEO = Pattern.compile("^(\\d+)x(\\d+) (\\S+)( hdr)?(?: (\\d+)fps)?$");
     private static String sVideoId;
     private static String sClient;
     private static String sProtocol;
@@ -148,6 +162,12 @@ public final class FormatAttempts {
      * kept up with at 52.6 Mbps (CX17FXZW #15).
      */
     private static final Map<String, Integer> sAverageKbps = new HashMap<>();
+    /**
+     * Why the next other formats are played (see #onSelected), and when it was told: null for none
+     */
+    @Nullable
+    private static String sSelectedReason;
+    private static long sSelectedAt;
 
     interface Clock {
         long now();
@@ -218,6 +238,10 @@ public final class FormatAttempts {
         @Nullable
         String countedAudioStatus;
         long playingSince = -1;
+        /**
+         * How long it played at each speed (see PlaybackSpeed): the drops of a 50 fps format at 1.5x are 75 frames a second's
+         */
+        final SpeedTimes speeds = new SpeedTimes();
         long stallSince = -1;
         /**
          * The numbers of the servers its segments were asked of (see sHosts)
@@ -285,7 +309,7 @@ public final class FormatAttempts {
         useSource(attempt);
 
         if (last != null) {
-            attempt.reason = last.isSameFormats(attempt) ? REASON_AFTER_FAILURE : REASON_FORMATS_CHANGED;
+            attempt.reason = last.isSameFormats(attempt) ? REASON_AFTER_FAILURE : takeSelectedReason(REASON_FORMATS_CHANGED);
         }
 
         // Switched while playing (e.g. another quality): this one plays from now
@@ -315,6 +339,43 @@ public final class FormatAttempts {
 
         sIsLastFailed = false;
         sIsChangedSinceFailure = true;
+    }
+
+    /**
+     * Other formats are asked for, for this reason (see REASON_USER_SELECTED, REASON_SPEED_CODEC): the next attempt's, when its tracks
+     * change within SELECTED_REASON_MS
+     */
+    public static void onSelected(String reason) {
+        sSelectedReason = reason;
+        sSelectedAt = sClock.now();
+    }
+
+    private static String takeSelectedReason(String otherwise) {
+        String reason = sSelectedReason != null && sClock.now() - sSelectedAt <= SELECTED_REASON_MS ? sSelectedReason : otherwise;
+        sSelectedReason = null;
+
+        return reason;
+    }
+
+    /**
+     * The player's speed changes (see PlaybackSpeed#onChanged): the time played till now was at the speed before
+     */
+    static void onSpeedChanged() {
+        Attempt last = getLast();
+
+        if (last != null && last.playingSince >= 0) {
+            long now = sClock.now();
+            addPlayed(last, now - last.playingSince);
+            last.playingSince = now;
+        }
+    }
+
+    /**
+     * Played this long at the speed it plays at now (see #onSpeedChanged)
+     */
+    private static void addPlayed(Attempt attempt, long playedMs) {
+        attempt.playedMs += playedMs;
+        attempt.speeds.add(PlaybackSpeed.get(), playedMs);
     }
 
     /**
@@ -581,7 +642,7 @@ public final class FormatAttempts {
 
             last.hasPlayed = true;
         } else if (last.playingSince >= 0) {
-            last.playedMs += now - last.playingSince;
+            addPlayed(last, now - last.playingSince);
             last.playingSince = -1;
             sIsChangedSinceFailure = true;
         }
@@ -865,6 +926,7 @@ public final class FormatAttempts {
         sHasFailed = false;
         sIsChangedSinceFailure = false;
         sIsLastFailed = false;
+        sSelectedReason = null;
     }
 
     private static void setStatus(boolean isVideo, String status) {
@@ -963,7 +1025,8 @@ public final class FormatAttempts {
     }
 
     /**
-     * E.g. "vp9 1080p30" of "1920x1080 vp09 30fps": the codec, the shorter side and the frame rate
+     * E.g. "vp9 1080p30" of "1920x1080 vp09 30fps": the codec, the shorter side and the frame rate. "vp9 hdr 2160p60" of
+     * "3840x2160 vp09 hdr 60fps".
      */
     @Nullable
     @VisibleForTesting
@@ -979,9 +1042,10 @@ public final class FormatAttempts {
         }
 
         int side = Math.min(Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2)));
-        String fps = matcher.group(4) != null ? matcher.group(4) : "";
+        String hdr = matcher.group(4) != null ? " hdr" : "";
+        String fps = matcher.group(5) != null ? matcher.group(5) : "";
 
-        return getCodecFamily(matcher.group(3)) + " " + side + "p" + fps;
+        return getCodecFamily(matcher.group(3)) + hdr + " " + side + "p" + fps;
     }
 
     /**
@@ -1001,7 +1065,7 @@ public final class FormatAttempts {
         long now = sClock.now();
 
         if (attempt.playingSince >= 0) {
-            attempt.playedMs += now - attempt.playingSince;
+            addPlayed(attempt, now - attempt.playingSince);
             attempt.playingSince = -1;
         }
 
@@ -1101,6 +1165,7 @@ public final class FormatAttempts {
         result.put("audioDecoder", nullable(attempt.audioDecoder));
         result.put("droppedFrames", attempt.droppedFrames);
         result.put("playedMs", playedMs);
+        result.put("speeds", attempt.speeds.toJson(attempt.playingSince >= 0 ? now - attempt.playingSince : 0));
 
         if (attempt.soundBackMs >= 0) {
             result.put("soundBackMs", attempt.soundBackMs);
@@ -1135,7 +1200,7 @@ public final class FormatAttempts {
     }
 
     /**
-     * The longer side (1920 of 1920x800 or 1080x1920 is 1080p), the codec and the frame rate (when both have one)
+     * The longer side (1920 of 1920x800 or 1080x1920 is 1080p), the codec, HDR or not, and the frame rate (when both have one)
      */
     @VisibleForTesting
     static boolean isSameVideo(String requested, String tried) {
@@ -1148,9 +1213,10 @@ public final class FormatAttempts {
 
         int sideA = Math.max(Integer.parseInt(a.group(1)), Integer.parseInt(a.group(2)));
         int sideB = Math.max(Integer.parseInt(b.group(1)), Integer.parseInt(b.group(2)));
-        boolean isSameFps = a.group(4) == null || b.group(4) == null || Math.abs(Integer.parseInt(a.group(4)) - Integer.parseInt(b.group(4))) <= 1;
+        boolean isSameHdr = (a.group(4) != null) == (b.group(4) != null);
+        boolean isSameFps = a.group(5) == null || b.group(5) == null || Math.abs(Integer.parseInt(a.group(5)) - Integer.parseInt(b.group(5))) <= 1;
 
-        return sideA == sideB && getCodecFamily(a.group(3)).equals(getCodecFamily(b.group(3))) && isSameFps;
+        return sideA == sideB && getCodecFamily(a.group(3)).equals(getCodecFamily(b.group(3))) && isSameHdr && isSameFps;
     }
 
     /**

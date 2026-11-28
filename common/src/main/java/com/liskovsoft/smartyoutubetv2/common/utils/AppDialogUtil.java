@@ -9,6 +9,7 @@ import android.os.Build;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
 
 import com.google.android.exoplayer2.Format;
 import com.liskovsoft.mediaserviceinterfaces.MediaItemService;
@@ -52,6 +53,7 @@ import com.liskovsoft.smartyoutubetv2.common.prefs.SentenceSubtitlesData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.CaptionStylesData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.SponsorBlockData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
+import com.liskovsoft.smartyoutubetv2.common.prefs.MainUIData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.youtubeapi.common.helpers.AppClient;
@@ -295,11 +297,16 @@ public class AppDialogUtil {
         FormatItem selectedFormat = playerData.getFormat(FormatItem.TYPE_VIDEO);
         boolean isPresetSelection = selectedFormat != null && selectedFormat.isPreset();
         boolean isAllFormatsUnlocked = playerTweaksData.isAllFormatsUnlocked();
+        boolean isHdrHidden = false;
+        boolean isHdrShown = false;
 
         for (VideoPreset preset : presets) {
             if (!isAllFormatsUnlocked && !Utils.isPresetSupported(preset)) {
+                isHdrHidden |= Utils.isHdrUndecodable(preset);
                 continue;
             }
+
+            isHdrShown |= preset.isHdrPreset();
 
             result.add(0, UiOptionItem.from(preset.name,
                     option -> setFormat(preset.format, playerData, onFormatSelected),
@@ -318,7 +325,22 @@ public class AppDialogUtil {
                 optionItem -> setFormat(playerData.getDefaultVideoFormat(), playerData, onFormatSelected),
                 !isPresetSelection));
 
+        // Not with some HDR left: e.g. vp9+hdr shown and av01+hdr hidden on a device without an AV1 decoder
+        if (isHdrHidden && !isHdrShown) {
+            result.add(0, createHdrNotDecodableNote(context));
+        }
+
         return result;
+    }
+
+    /**
+     * The line above the presets or the formats when their HDR ones are hidden and none is left, so HDR not working on e.g. a
+     * Shield isn't taken for a bug (see TrackSelectorUtil#isVP9HdrDecodable). It can't be focused or chosen.
+     */
+    public static OptionItem createHdrNotDecodableNote(Context context) {
+        OptionItem note = UiOptionItem.from(context.getString(R.string.hdr_not_decodable));
+        note.setNote(true);
+        return note;
     }
 
     public static OptionCategory createVideoBufferCategory(Context context) {
@@ -1205,11 +1227,26 @@ public class AppDialogUtil {
 
     private static void appendPlaylistDialogContent(
             Context context, Video video, VideoMenuCallback callback, AppDialogPresenter dialogPresenter, List<PlaylistInfo> playlistInfos) {
+        dialogPresenter.appendCheckedCategory(context.getString(R.string.dialog_add_to_playlist),
+                createPlaylistOptions(context, video, callback, playlistInfos));
+    }
+
+    /**
+     * The playlists of Add/Remove from playlist, Watch later on top
+     */
+    @VisibleForTesting
+    static List<OptionItem> createPlaylistOptions(Context context, Video video, VideoMenuCallback callback, List<PlaylistInfo> playlistInfos) {
         List<OptionItem> options = new ArrayList<>();
         // YouTube never marks Watch later as selected
         boolean isInWatchLater = WatchLaterManager.instance(context).isInWatchLater(video.videoId);
         YouTubeMediaItemService itemService = YouTubeMediaItemService.instance();
         OptionItem watchLater = null;
+
+        // As YouTube gives them, the latest edited first, or by title, so that they don't move around (Sort options). A new list:
+        // the player keeps the one given for the next time (see PlayerUIController).
+        if (MainUIData.instance(context).getAddToPlaylistSorting() == MainUIData.ADD_TO_PLAYLIST_SORTING_NAME) {
+            playlistInfos = itemService.sortPlaylistsByTitle(playlistInfos);
+        }
 
         for (PlaylistInfo playlistInfo : playlistInfos) {
             boolean isWatchLater = WatchLaterManager.WATCH_LATER_PLAYLIST_ID.equals(playlistInfo.getPlaylistId());
@@ -1236,7 +1273,7 @@ public class AppDialogUtil {
             }
         }
 
-        // Watch later on top, set apart from the playlists by title (see PlaylistOrder)
+        // Watch later on top, set apart from the other playlists (see PlaylistOrder)
         if (watchLater != null) {
             if (!options.isEmpty()) {
                 OptionItem separator = UiOptionItem.from("");
@@ -1247,7 +1284,7 @@ public class AppDialogUtil {
             options.add(0, watchLater);
         }
 
-        dialogPresenter.appendCheckedCategory(context.getString(R.string.dialog_add_to_playlist), options);
+        return options;
     }
 
     private static void addRemoveFromPlaylist(Context context, Video video, VideoMenuCallback callback, PlaylistInfo playlistInfo, boolean add) {

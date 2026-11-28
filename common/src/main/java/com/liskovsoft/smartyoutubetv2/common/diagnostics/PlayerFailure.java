@@ -9,6 +9,7 @@ import com.liskovsoft.smartyoutubetv2.common.BuildConfig;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.listener.PlayerEventListener;
 import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.FormatItem;
+import com.liskovsoft.smartyoutubetv2.common.exoplayer.selector.TrackSelectorUtil;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerData;
 import com.liskovsoft.smartyoutubetv2.common.prefs.PlayerTweaksData;
 import com.liskovsoft.smartyoutubetv2.common.utils.Utils;
@@ -595,7 +596,8 @@ public final class PlayerFailure {
     }
 
     /**
-     * E.g. "1920x1080 vp09 30fps"
+     * E.g. "1920x1080 vp09 30fps", "3840x2160 vp09 hdr 60fps": YouTube's HDR (see TrackSelectorUtil#isHdrFormat), whose codec
+     * reads as the SDR one's (vp09, av01)
      */
     @Nullable
     static String describeVideo(@Nullable FormatItem item) {
@@ -621,8 +623,9 @@ public final class PlayerFailure {
 
         String size = format.width > 0 && format.height > 0 ? format.width + "x" + format.height + " " : "";
         String fps = format.frameRate > 0 ? " " + Math.round(format.frameRate) + "fps" : "";
+        String hdr = TrackSelectorUtil.isHdrFormat(format) ? " hdr" : "";
 
-        return size + getCodec(format) + fps;
+        return size + getCodec(format) + hdr + fps;
     }
 
     /**

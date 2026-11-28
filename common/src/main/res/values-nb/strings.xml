@@ -131,10 +131,13 @@
     <string name="sorting_by_new_content">Nytt innhold</string>
     <string name="sorting_alphabetically">Alfabetisk</string>
     <string name="sorting_last_viewed">Sist sett</string>
+    <string name="add_to_playlist_sorting">Sortering i «Legg til i spilleliste»</string>
+    <string name="sorting_last_edited">Sist redigert (som på YouTube)</string>
     <string name="settings_general">Generelt</string>
     <string name="settings_content_filtering">Innholdsfiltrering</string>
     <string name="settings_cards_options">Kortvalg</string>
     <string name="settings_channels_options">Kanalvalg</string>
+    <string name="settings_sort_options">Sorteringsvalg</string>
     <string name="settings_time_options">Tidsvalg</string>
     <string name="settings_system">System</string>
     <string name="settings_exit_options">Valg for avslutning</string>

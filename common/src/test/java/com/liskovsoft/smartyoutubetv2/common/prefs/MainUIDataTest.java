@@ -218,6 +218,31 @@ public class MainUIDataTest {
         assertFalse(getData().isMenuItemEnabled(MainUIData.MENU_VIDEOS, MainUIData.MENU_ITEM_MARK_AS_WATCHED));
     }
 
+    /**
+     * Settings saved before there was a choice keep the playlists of Add/Remove from playlist by title, as they were
+     */
+    @Test
+    public void addToPlaylistSortingIsByTitleInSettingsSavedBefore() {
+        getPrefs().setProfileData(DATA_KEY, sharedSettings(getData().getColorSchemes().get(0)));
+        MainUIData.resetInstanceForTesting();
+
+        assertEquals(MainUIData.ADD_TO_PLAYLIST_SORTING_NAME, getData().getAddToPlaylistSorting());
+    }
+
+    /**
+     * Saved after the skin (slot 32) and the menu marker (33): they're kept along with it
+     */
+    @Test
+    public void addToPlaylistSortingPickedIsKept() {
+        getData().setSkinId(MainUIData.SKIN_MODERN);
+        getData().setAddToPlaylistSorting(MainUIData.ADD_TO_PLAYLIST_SORTING_LAST_EDITED);
+        ShadowLooper.shadowMainLooper().idle();
+        MainUIData.resetInstanceForTesting();
+
+        assertEquals(MainUIData.ADD_TO_PLAYLIST_SORTING_LAST_EDITED, getData().getAddToPlaylistSorting());
+        assertEquals(MainUIData.SKIN_MODERN, getData().getSkinId());
+    }
+
     @Test
     public void eachAccountHasItsOwnSkin() {
         AppPrefs prefs = getPrefs();

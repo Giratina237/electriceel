@@ -1520,6 +1520,82 @@ public class VideoStartsTest {
         // None of the app's
         assertNull(VideoStarts.describeSeekCaller(new StackTraceElement[]{
                 new StackTraceElement("android.os.Handler", "dispatchMessage", null, 1)}));
+        // The player's controls (0HCC641V qydG9Ntm-zM: 4 skips of 10 s to 0:40 while it started, its only seek row said 0:00): the
+        // skip, not the dispatcher every one of them goes through
+        assertEquals("VideoPlayerGlue.fastForward", VideoStarts.describeSeekCaller(new StackTraceElement[]{
+                frame("diagnostics.VideoStarts", "onSeek"),
+                new StackTraceElement("com.liskovsoft.smartyoutubetv2.tv.ui.playback.PlaybackFragment$3", "dispatchSeekTo", null, 1),
+                new StackTraceElement("com.google.android.exoplayer2.ext.leanback.LeanbackPlayerAdapter", "seekTo", null, 1),
+                new StackTraceElement("com.liskovsoft.smartyoutubetv2.tv.ui.playback.other.VideoPlayerGlue", "fastForward", null, 1)}));
+    }
+
+    /**
+     * 0HCC641V gN3LBlDbUjs: a remote's start into a process just begun was left at 2.2 s, and the video played on to its end. Its screen
+     * behind another for a moment (as the app came up), the start goes on, the time behind as a row.
+     */
+    @Test
+    public void aScreenBehindAnotherForAMomentDoesntLeaveTheStart() {
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_REMOTE);
+        VideoStarts.onEngineWait(VIDEO_ID);
+        mFixture.at(2_019);
+        VideoStarts.onEngineInitialized();
+        mFixture.at(2_222);
+        VideoStarts.onViewPaused();
+        assertEquals(VideoStarts.VIEW_PAUSED_MS, mFixture.leaveBehindDelayMs);
+        mFixture.at(2_300);
+        VideoStarts.onViewResumed();
+        assertNull(mFixture.leaveBehind);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(3_000);
+        VideoStarts.onFormats(VIDEO_ID, "TV");
+        VideoStarts.onPrepare();
+        mFixture.at(4_000);
+        VideoStarts.onFirstFrame();
+        VideoStarts.onPlaying(true);
+
+        VideoStart start = last();
+        assertEquals(VideoStart.OUTCOME_PLAYED, start.outcome);
+        assertEquals(4_000, start.totalMs);
+        assertStage(find(start, VideoStarts.STAGE_SCREEN_BEHIND), VideoStarts.STAGE_SCREEN_BEHIND, null, 0, 2_222, 2_300);
+    }
+
+    /**
+     * Behind another screen for VIEW_PAUSED_MS, it was left: as of when its screen went, not when that was known
+     */
+    @Test
+    public void aScreenBehindAnotherLeavesTheStartAsOfWhenItWent() {
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(2_222);
+        VideoStarts.onViewPaused();
+        mFixture.at(2_222 + VideoStarts.VIEW_PAUSED_MS);
+        mFixture.fireLeaveBehind();
+
+        VideoStart start = last();
+        assertEquals(1, mFixture.recorded.size());
+        assertEquals(VideoStart.OUTCOME_LEFT, start.outcome);
+        assertEquals(2_222, start.totalMs);
+        assertNull(mFixture.giveUp);
+        // Back too late: nothing more of it
+        VideoStarts.onViewResumed();
+        assertEquals(1, mFixture.recorded.size());
+    }
+
+    /**
+     * The player closed while its screen was behind another: left as of when it went
+     */
+    @Test
+    public void aStartClosedBehindAnotherScreenIsLeftAsOfWhenItWent() {
+        VideoStarts.start(VIDEO_ID, VideoStart.TRIGGER_OPEN);
+        VideoStarts.onFetch(VIDEO_ID);
+        mFixture.at(3_000);
+        VideoStarts.onViewPaused();
+        mFixture.at(4_000);
+        VideoStarts.abandon(VideoStart.OUTCOME_LEFT);
+
+        assertEquals(VideoStart.OUTCOME_LEFT, last().outcome);
+        assertEquals(3_000, last().totalMs);
+        assertNull(mFixture.leaveBehind);
     }
 
     /**

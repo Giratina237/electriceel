@@ -31,6 +31,7 @@ public class CommentsPreferenceDialogFragment extends LeanbackPreferenceDialogFr
     private boolean mIsTransparent;
     private CommentsReceiver mCommentsReceiver;
     private CharSequence mDialogTitle;
+    private CharSequence mDialogMessage;
     private CommentGroup mCurrentGroup;
     private List<ChatItemMessage> mBackupMessages;
     private ChatItemMessage mFocusedMessage;
@@ -66,6 +67,7 @@ public class CommentsPreferenceDialogFragment extends LeanbackPreferenceDialogFr
         if (savedInstanceState == null) {
             final DialogPreference preference = getPreference();
             mDialogTitle = preference.getDialogTitle();
+            mDialogMessage = preference.getDialogMessage();
         }
     }
 
@@ -80,6 +82,12 @@ public class CommentsPreferenceDialogFragment extends LeanbackPreferenceDialogFr
             final TextView titleView = (TextView) view.findViewById(R.id.decor_title);
             titleView.setText(title);
         }
+
+        // The number of comments under the title. Every comments panel has the line, so the comments start at the same
+        // place when YouTube doesn't tell the number.
+        final TextView subtitleView = (TextView) view.findViewById(R.id.decor_subtitle);
+        subtitleView.setText(mDialogMessage);
+        subtitleView.setVisibility(TextUtils.isEmpty(mDialogMessage) ? View.INVISIBLE : View.VISIBLE);
 
         if (mCommentsReceiver == null) {
             return view;
