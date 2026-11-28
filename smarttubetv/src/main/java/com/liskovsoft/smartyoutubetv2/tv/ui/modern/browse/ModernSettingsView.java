@@ -13,6 +13,7 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsGroup;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.SettingsItem;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.Video;
 import com.liskovsoft.smartyoutubetv2.common.app.models.data.VideoGroup;
+import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.settings.SettingsLinksPresenter;
 import com.liskovsoft.smartyoutubetv2.common.prefs.GeneralData;
 import com.liskovsoft.smartyoutubetv2.common.utils.SimpleEditDialog;
@@ -160,9 +161,17 @@ public class ModernSettingsView extends FrameLayout implements ModernSection {
                 });
     }
 
-    private static void open(SettingsItem item) {
-        // A category opens its cards (SettingsCardsView), their panels as the classic ones: every kind of option works there
-        item.onClick.run();
+    private void open(SettingsItem item) {
+        // A category opens its cards (SettingsCardsView), their panels as the classic ones: every kind of option works there.
+        // The lists inside a panel are titled "<Parent> - <List>", e.g. "About - Changelog", as in the classic grid and from the
+        // search (see SettingsGridFragment, SettingsCatalog.open)
+        AppDialogPresenter dialogPresenter = AppDialogPresenter.instance(getContext());
+        dialogPresenter.enableNestedTitles(true);
+        try {
+            item.onClick.run();
+        } finally {
+            dialogPresenter.enableNestedTitles(false);
+        }
     }
 
     private void showPreview(SettingsItem item) {
