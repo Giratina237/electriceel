@@ -67,12 +67,12 @@ public class SettingsSearchBar {
     };
     private final ViewTreeObserver.OnGlobalFocusChangeListener mOnFocusChange = this::onFocusChange;
 
-    private SettingsSearchBar(View root, Consumer<Runnable> runWithPassword) {
+    private SettingsSearchBar(View root, TextView titleView, Consumer<Runnable> runWithPassword) {
         mContext = root.getContext();
         mRunWithPassword = runWithPassword;
         mRoot = root;
         mContainer = root.findViewById(R.id.settings_search);
-        mTitleView = root.findViewById(R.id.settings_cards_title);
+        mTitleView = titleView;
         mField = root.findViewById(R.id.settings_search_field);
         mEmptyView = root.findViewById(R.id.settings_search_empty);
         mResults = root.findViewById(R.id.settings_search_results);
@@ -84,11 +84,12 @@ public class SettingsSearchBar {
     /**
      * Shows the bar until {@link #detach()}
      *
-     * @param root the view made by SettingsCardsLayout.wrap
+     * @param root a view with the bar in it (settings_search_bar): the classic cards (settings_cards), the modern settings page
+     * @param titleView the title the bar sits on the line of, in the same parent as the bar
      * @param runWithPassword runs a setting opened once the settings password is typed in, as a card (see SettingsGridFragment)
      */
-    public static SettingsSearchBar attach(View root, Consumer<Runnable> runWithPassword) {
-        SettingsSearchBar bar = new SettingsSearchBar(root, runWithPassword);
+    public static SettingsSearchBar attach(View root, TextView titleView, Consumer<Runnable> runWithPassword) {
+        SettingsSearchBar bar = new SettingsSearchBar(root, titleView, runWithPassword);
         bar.setup();
 
         return bar;

@@ -77,7 +77,7 @@ public class SettingsGridFragment extends GridFragment implements SettingsSectio
 
         mCardsLayout = SettingsCardsLayout.attach(view, getBrowseGrid());
         mCardsLayout.setTitle(mTitle);
-        mSearchBar = SettingsSearchBar.attach(view, this::runWithPassword);
+        mSearchBar = SettingsSearchBar.attach(view, view.findViewById(R.id.settings_cards_title), this::runWithPassword);
         int columns = getGridPresenter().getNumberOfColumns();
         // Up from the first row goes to the search bar
         GridFragmentHelper.enableDownToShorterRow(getBrowseGrid(), columns, event -> mSearchBar != null

@@ -22,13 +22,15 @@ import com.liskovsoft.smartyoutubetv2.tv.ui.modern.common.ModernIcons;
 import com.liskovsoft.smartyoutubetv2.tv.ui.modern.common.ModernText;
 import com.liskovsoft.smartyoutubetv2.tv.ui.modern.common.ModernTheme;
 import com.liskovsoft.smartyoutubetv2.tv.ui.settingscards.SettingsCardLongPress;
+import com.liskovsoft.smartyoutubetv2.tv.ui.settingscards.SettingsSearchBar;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Settings page: title, list of categories on the start side, preview of the focused category on the end side.<br/>
- * Opening a category shows its full SmartTube options in the side panel.
+ * Opening a category shows its full SmartTube options in the side panel.<br/>
+ * The search bar of the classic Settings at the end of the title's line (see SettingsSearchBar): Up from the first category.
  */
 @SuppressLint("ViewConstructor") // created from code with its presenter, never inflated from a layout
 public class ModernSettingsView extends FrameLayout implements ModernSection {
@@ -39,7 +41,9 @@ public class ModernSettingsView extends FrameLayout implements ModernSection {
     private final View mPreview;
     private final List<SettingsItem> mItems = new ArrayList<>();
     private final int mOffsetTop;
+    private final TextView mTitle;
     private int mLastIndex;
+    private SettingsSearchBar mSearchBar;
 
     public ModernSettingsView(Context context, CharSequence title) {
         super(context);
@@ -49,12 +53,33 @@ public class ModernSettingsView extends FrameLayout implements ModernSection {
         mOffsetTop = getResources().getDimensionPixelSize(R.dimen.modern_first_shelf_y);
         setTranslationY(-mOffsetTop);
 
-        ((TextView) findViewById(R.id.modern_settings_title)).setText(ModernText.sentenceCase(title));
+        mTitle = findViewById(R.id.modern_settings_title);
+        mTitle.setText(ModernText.sentenceCase(title));
+        // Its end the page's: the classic padding is the cards' (see settings_cards)
+        View search = findViewById(R.id.settings_search);
+        search.setPaddingRelative(search.getPaddingStart(), search.getPaddingTop(), 0, search.getPaddingBottom());
         mList = findViewById(R.id.modern_settings_list);
         mPreview = findViewById(R.id.modern_settings_preview);
         mPreviewIcon = findViewById(R.id.modern_settings_preview_icon);
         mPreviewTitle = findViewById(R.id.modern_settings_preview_title);
         mPreviewDescription = findViewById(R.id.modern_settings_preview_description);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        // Its listeners are on the window's views
+        mSearchBar = SettingsSearchBar.attach(this, mTitle, this::runWithPassword);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        if (mSearchBar != null) {
+            mSearchBar.detach();
+            mSearchBar = null;
+        }
+
+        super.onDetachedFromWindow();
     }
 
     @Override
@@ -78,6 +103,11 @@ public class ModernSettingsView extends FrameLayout implements ModernSection {
             mList.addView(createRow(item));
         }
 
+        // Up from the first category: the search bar
+        if (mList.getChildCount() > 0) {
+            mList.getChildAt(0).setNextFocusUpId(R.id.settings_search_field);
+        }
+
         if (hadFocus && mList.getChildCount() > 0) {
             focusContent();
         } else if (!mItems.isEmpty()) {
@@ -91,7 +121,7 @@ public class ModernSettingsView extends FrameLayout implements ModernSection {
         text.setText(ModernText.sentenceCase(item.title));
         row.setOnClickListener(v -> {
             if (item.onClick != null) {
-                openWithPassword(item);
+                runWithPassword(() -> open(item));
             }
         });
         // The addresses of the category as QR codes, without the settings password: they're public (see SettingsLinksPresenter)
@@ -106,13 +136,14 @@ public class ModernSettingsView extends FrameLayout implements ModernSection {
     }
 
     /**
-     * Same protection as the classic settings: the settings password is asked before every category.
+     * Same protection as the classic settings: the settings password is asked before every category, and every setting the
+     * search opens (child mode is turned off in the settings).
      */
-    private void openWithPassword(SettingsItem item) {
+    private void runWithPassword(Runnable open) {
         String password = GeneralData.instance(getContext()).getSettingsPassword();
 
         if (password == null) {
-            open(item);
+            open.run();
             return;
         }
 
@@ -122,7 +153,7 @@ public class ModernSettingsView extends FrameLayout implements ModernSection {
                 null,
                 newValue -> {
                     if (Utils.passwordMatch(password, newValue)) {
-                        open(item);
+                        open.run();
                         return true;
                     }
                     return false;
