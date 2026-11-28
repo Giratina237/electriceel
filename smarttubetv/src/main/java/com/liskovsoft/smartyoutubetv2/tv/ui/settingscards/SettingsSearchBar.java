@@ -185,6 +185,16 @@ public class SettingsSearchBar {
                 return true;
             }
 
+            // Up from the first setting found: to the bar. The list keeps the key otherwise, and its next focus up isn't
+            // followed in the Browse screen
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP && mResults.getSelectedItemPosition() <= 0) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    mField.requestFocus();
+                }
+
+                return true;
+            }
+
             return false;
         });
 
